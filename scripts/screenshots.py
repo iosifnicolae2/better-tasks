@@ -113,11 +113,16 @@ def save(app, path) -> None:
 async def main():
     orch, paths = build()
     app = SupermanagerApp(orch)
-    async with app.run_test(size=(150, 20)) as pilot:
-        for _ in range(4):
+    async with app.run_test(size=(150, 22)) as pilot:
+        for _ in range(3):
+            await pilot.pause()
+        await with_bar(app, "tasks", 5, 2)
+        for _ in range(3):
             await pilot.pause()
         save(app, OUT / "tasks.svg")
-        await pilot.press("v"); await pilot.pause(); await pilot.pause()
+        await pilot.press("v")
+        for _ in range(3):
+            await pilot.pause()
         save(app, OUT / "board.svg")
 
     agents = AgentsApp(paths)
@@ -142,4 +147,5 @@ async def main():
         save(config, OUT / "config.svg")
     print("\n".join(f"{p.name}: {p.stat().st_size // 1024} KB" for p in sorted(OUT.glob('*.svg'))))
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
