@@ -73,7 +73,8 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
     @mcp.tool()
     def create_task(title: str, problem: str, expected_outcome: str, acceptance_criteria: list[str],
                     verification: str, context: str = "", priority: str = "P2",
-                    tool: str = "", model: str = "", effort: str = "", fields: dict | None = None) -> str:
+                    tool: str = "", model: str = "", effort: str = "", fields: dict | None = None,
+                    asked: str = "") -> str:
         """Add a task to the backlog. Rejected unless the problem is clearly described, expected_outcome is stated,
         acceptance_criteria are concrete and checkable, and verification says how to check (command or steps).
         If you lack any of these, ask the user before calling. priority: P0 (urgent) .. P3 (someday).
@@ -82,10 +83,18 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
         model must belong to the tool (e.g. opus for claude, gpt-6-astra for codex).
         fields carries the project's own fields, e.g. {"labels": ["api", "perf"], "scheduled": "2026-W38"};
         get_status / get_config name the ones this project defines. Ask the user for a label or a date only when
-        they bring it up — otherwise leave fields out."""
+        they bring it up — otherwise leave fields out.
+        asked: the user's own message, copied word for word, that led to this task. Always pass it; it is kept in
+        the task's "Asked for" log so everyone can see what was actually requested, not only your reading of it."""
         return call("create_task", title=title, problem=problem, expected_outcome=expected_outcome,
                     acceptance_criteria=acceptance_criteria, verification=verification, context=context,
-                    priority=priority, tool=tool, model=model, effort=effort, fields=fields)
+                    priority=priority, tool=tool, model=model, effort=effort, fields=fields, asked=asked)
+
+    @mcp.tool()
+    def record_request(task_id: str, text: str) -> str:
+        """Add the user's own words to a task's "Asked for" log — word for word, not your summary. Call it every
+        time the user says something more about a task: a correction, a detail, a change of mind."""
+        return call("record_request", task_id=task_id, text=text)
 
     @mcp.tool()
     def update_task(task_id: str, title: str | None = None, problem: str | None = None,
@@ -177,6 +186,13 @@ def _register_agent_tools(mcp: FastMCP, call, task_id: str, tool: str) -> None:
             """Call this once the user has explicitly approved your plan in the chat, right before you start
             changing files. Never call it before the user said yes."""
             return call("plan_approved", task_id=task_id)
+
+    @mcp.tool()
+    def record_request(text: str) -> str:
+        """Add what the user just told you, word for word, to this task's "Asked for" log. Call it whenever the
+        user gives you an instruction or a correction in the chat, so the task keeps the request, not only your
+        reading of it."""
+        return call("record_request", task_id=task_id, text=text)
 
     @mcp.tool()
     def update_plan(plan: str) -> str:

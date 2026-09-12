@@ -204,7 +204,8 @@ class Orchestrator:
 
     def create_task(self, title: str, problem: str, expected_outcome: str, acceptance_criteria: list[str],
                     verification: str, context: str = "", priority: str = "P2",
-                    tool: str = "", model: str = "", effort: str = "", fields: dict[str, Any] | None = None) -> Task:
+                    tool: str = "", model: str = "", effort: str = "", fields: dict[str, Any] | None = None,
+                    asked: str = "") -> Task:
         priority = (priority or "P2").upper()
         errors = self.validate_task(title, problem, expected_outcome, acceptance_criteria, verification, priority)
         if errors:
@@ -220,6 +221,8 @@ class Orchestrator:
                 verification=verification.strip(), context=(context or "").strip(), priority=priority,
                 fields=self._task_fields(fields), **settings,
             )
+            if (asked or "").strip():
+                task.requests.append({"ts": time.time(), "text": " ".join(asked.split())})
             self.state.tasks[task_id] = task
             self.state.order.append(task_id)
             self._sort_by_priority()
@@ -616,6 +619,19 @@ class Orchestrator:
                 return
 
     # ---------------------------------------------------------- agent reports
+    def record_request(self, task_id: str, text: str) -> Task:
+        """Keep what the user asked, in their own words, in the task's "Asked for" log."""
+        task = self._task(task_id)
+        text = " ".join((text or "").split())
+        if not text:
+            raise OrchestratorError("Pass what the user said.")
+        with self._lock:
+            if not task.requests or task.requests[-1]["text"] != text:
+                task.requests.append({"ts": time.time(), "text": text})
+                task.touch()
+                self.save()
+        return task
+
     def update_plan(self, task_id: str, plan: str) -> Task:
         """The agent writes (or rewrites) the Plan section of its task file."""
         task = self._task(task_id)

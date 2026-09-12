@@ -75,6 +75,7 @@ class Task:
     effort: str = ""
     status: str = TaskStatus.BACKLOG
     agent: AgentInfo | None = None
+    requests: list[dict[str, Any]] = field(default_factory=list)   # what the user asked, in their own words
     sessions: list[dict[str, Any]] = field(default_factory=list)   # every agent session that worked on this task
     progress: list[dict[str, Any]] = field(default_factory=list)
     result: dict[str, Any] | None = None
@@ -133,6 +134,7 @@ class State:
             td = {**td, "agent": AgentInfo(**agent) if agent else None}
             td.setdefault("sessions", [])
             td.setdefault("fields", {})
+            td.setdefault("requests", [])
             tasks[tid] = Task(**td)
         manager = d.get("manager")
         return cls(

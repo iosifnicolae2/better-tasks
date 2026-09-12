@@ -49,18 +49,39 @@ waits. You approve it here, in claude.ai, or on your phone — these are Remote 
 
 ## The three pages
 
-### tasks — the roadmap
+### tasks — the roadmap, as a table or a board
 
 ```
- ID      Pri  Status     Title                  Labels          When       Agent
- T-005   P0   planning   Sixth greeting file    demo greeting   2026-W38   🔔 codex T-005 · plan ready — approve it
- T-002   P0   backlog    Second greeting file                              ▶ start (s)
-                         3 finished task(s) hidden — h shows them
- ^w Search  n New task  s Start  p Pause  x Delete  d Done  i Edit file  h Show done  ? Help  q Leave
+ ID      Pri  Status     Title                         Labels          When         Agent
+                         backlog  (2)
+ T-002   P2   backlog    Retry failed uploads           api                         ▶ start (s)
+ T-003   P2   backlog    Ship the release notes         docs           2026-09-20   ▶ start (s)
+                         working  (1)
+ T-001   P2   working    Fix the BOM in the CSV import  import  bug    2026-W38     demo-T-001 · busy
+ ^w Search  n New task  s Start  p Pause  x Delete  d Done  i Edit file  h Show done  v Board/table  ? Help  q Leave
 ```
 
-Running agents first, then priority. `enter` opens the agent (or the task file when there is none), `s` starts
-one, `n` writes a new task, `ctrl+w` searches every column, a click on a title sorts it (up, down, off).
+Grouped by status, with running agents first. `enter` opens the agent (or the task file when there is none),
+`s` starts one, `n` writes a new task, `ctrl+w` searches every column, a click on a title sorts it (up, down,
+off), `g` changes what it groups by, `G` drops the headings.
+
+`v` turns it into a board:
+
+```
+╭─ backlog  2 ─────────────────╮ ╭─ planning  1 ────────────────╮ ╭─ working  1 ─────────────────╮ ╭─ blocked ───────╮
+│ ╭──────────────────────────╮ │ │ ╭──────────────────────────╮ │ │ ╭──────────────────────────╮ │ │                 │
+│ │ T-002  P2                │ │ │ │ T-004  P2                │ │ │ │ T-001  P2                │ │ │  nothing here   │
+│ │ Retry failed uploads     │ │ │ │ Cache the avatar         │ │ │ │ Fix the BOM in the CSV   │ │ │                 │
+│ │  api                     │ │ │ │ thumbnails               │ │ │ │ import                   │ │ │                 │
+│ │ ▶ start (s)              │ │ │ │  perf   api              │ │ │ │  import   bug            │ │ │                 │
+│ ╰──────────────────────────╯ │ │ │ demo-T-004 · busy        │ │ │ │ 2026-W38                 │ │ │                 │
+│ ╭──────────────────────────╮ │ │ ╰──────────────────────────╯ │ │ │ demo-T-001 · busy        │ │ │                 │
+│ │ T-003  P2                │ │ │                              │ │ ╰──────────────────────────╯ │ │                 │
+```
+
+Arrows move the selection, **shift+←/→ move the task**: on a status board that starts it, closes it or puts it
+back in the backlog; on a label board it moves the label. shift+↑/↓ move it up and down the backlog.
+`g` groups by status, labels, your scheduled date, or any field you defined.
 
 ### agents — what is running right now
 
@@ -149,7 +170,10 @@ Filter them: `supermanager tasks --label import`, `--field scheduled --value 202
 `ctrl+c` `ctrl+c` quit everything.
 
 **tasks:** `enter` open agent · `i` edit file · `n` new · `s` start · `p` pause · `d` done · `x` delete ·
-`X` stop agent · `r` requeue · `h` show finished · `J`/`K` reorder · `+`/`-` concurrency · `m` manager · `?` all keys.
+`X` stop agent · `r` requeue · `h` show finished · `v` board/table · `g` group by · `G` headings ·
+`J`/`K` reorder · `+`/`-` concurrency · `m` manager · `?` all keys.
+
+**board:** arrows select · `shift+←/→` move the task to another column · `shift+↑/↓` move it in the backlog.
 
 **agents:** `enter` open · `i` task file · `n` new free agent · `x` stop.
 
@@ -199,6 +223,9 @@ page marks what your local file overrides.
 | `tasks.in_git` | true | commit the task files, so the backlog is shared |
 | `tasks.hide_done` | true | finished tasks start hidden (`h` shows them) |
 | `tasks.fields` | labels, scheduled | the extra fields a task carries |
+| `tasks.view` | table | how the tasks page opens: `table` or `board` (`v` switches) |
+| `tasks.group_by` | status | what it groups by: `status` or a field name (`g` cycles) |
+| `tasks.group_rows` | true | headings per group in the table (`G` turns them off) |
 | `tasks.editor` | idea | what opens a task file (`idea`, `code`, `vim`…) |
 | `tasks.min_problem_chars` · `tasks.require_verification` | 60 · true | how strict the task check is |
 | `notify.bell` | true | ring the terminal bell when a session needs you |

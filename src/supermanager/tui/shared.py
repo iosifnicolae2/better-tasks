@@ -224,9 +224,12 @@ class TitleScreen(ModalScreen[str | None]):
         self.dismiss(self.query_one("#title", Input).value.strip() or None)
 
 
+GROUP_PREFIX = "\x00group\x00"   # the key of a heading row: never a task id, so nothing can collide with it
+
+
 class PageTable(DataTable):
     """A row-cursor table for a page: ← → go to the neighbouring pages instead of moving the cell cursor,
-    and a click on one of `action_columns` posts CellClicked (used for 'start / open the agent')."""
+    heading rows are stepped over, and a click on one of `action_columns` posts CellClicked."""
 
     class CellClicked(Message):
         def __init__(self, row_key, column: int):
@@ -240,6 +243,28 @@ class PageTable(DataTable):
 
     def on_resize(self) -> None:
         self.app.rerender()   # type: ignore[attr-defined]   # the wrapping column follows the table's width
+
+    def _on_heading(self) -> bool:
+        row = self.cursor_row
+        if not (0 <= row < self.row_count):
+            return False
+        return str(self.ordered_rows[row].key.value or "").startswith(GROUP_PREFIX)
+
+    def action_cursor_down(self) -> None:
+        super().action_cursor_down()
+        while self._on_heading() and self.cursor_row < self.row_count - 1:
+            super().action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        super().action_cursor_up()
+        while self._on_heading() and self.cursor_row > 0:
+            super().action_cursor_up()
+
+    def move_to_task(self, row: int) -> None:
+        """Put the cursor on a row, stepping off a heading if that is where it lands."""
+        self.move_cursor(row=row)
+        while self._on_heading() and self.cursor_row < self.row_count - 1:
+            super().action_cursor_down()
 
     def action_cursor_left(self) -> None:
         self.app.action_prev_page()   # type: ignore[attr-defined]

@@ -26,7 +26,8 @@ user names nothing concrete, or two readings of the request lead to opposite wor
 suggested default. The agent starts in plan mode, so the user reviews and corrects the details there.
 
 ## Your other jobs
-1. Keep the backlog ordered by importance (`reorder_backlog`, `update_task`).
+1. Keep the backlog ordered by importance (`reorder_backlog`, `update_task`), and call `record_request` whenever
+   the user says something more about an existing task — their words, copied, not your summary of them.
 2. Dispatch agents (`spawn_agent`) while respecting the concurrency limit shown by `get_status`.
 3. When the project notifies you that an agent finished, blocked, or was interrupted, read the details
    (`get_events`, `get_task`), tell the user plainly what happened, and dispatch the next task if a slot is free.
@@ -96,6 +97,8 @@ sessions; all coordination goes through the `supermanager` MCP tools.
    - `add_context` for anything you discover that the task should carry: a constraint, a file that matters,
      a decision and why, a surprise in the code.
    - `report_progress` at meaningful milestones (short notes).
+   - `record_request` when the user tells you something in the chat: their words, so the task keeps the request
+     itself and not only your reading of it.
    If you cannot continue without a human decision, call `block_task` with the question, then ask the user and wait.
 5. Before finishing, run the task's verification and check every acceptance criterion yourself.
 6. {commit_rule}

@@ -15,8 +15,8 @@ from pathlib import Path
 
 from .models import AgentInfo, Task
 
-SECTIONS = ("Problem", "Expected outcome", "Acceptance criteria", "Verification", "Context", "Plan", "Progress",
-            "Result")
+SECTIONS = ("Problem", "Expected outcome", "Acceptance criteria", "Verification", "Context", "Asked for",
+            "Plan", "Progress", "Result")
 STAMP = "%Y-%m-%d %H:%M"
 FRONT_KEYS = ("id", "title", "priority", "fields", "tool", "model", "effort", "status", "created_at",
               "updated_at", "blocked_reason", "result_ts", "agent", "sessions")
@@ -53,6 +53,8 @@ def render_task(t: Task) -> str:
     lines = ["---"] + [f"{k}: {json.dumps(v)}" for k, v in front.items()] + ["---", "", f"# {t.id} · {t.title}", ""]
     lines += ["## Problem", t.problem, "", "## Expected outcome", t.expected_outcome, "", "## Acceptance criteria"]
     lines += [f"- {c}" for c in t.acceptance_criteria] + ["", "## Verification", t.verification, "", "## Context", t.context, ""]
+    lines += ["## Asked for"] + [f"- {time.strftime(STAMP, time.localtime(r['ts']))} — {r['text']}"
+                                 for r in t.requests] + [""]
     lines += ["## Plan", t.plan, ""]
     lines += ["## Progress"] + [f"- {time.strftime(STAMP, time.localtime(p['ts']))} — {p['note']}" for p in t.progress] + [""]
     lines += ["## Result"]
@@ -102,6 +104,7 @@ def parse_task(text: str, source: str = "?") -> Task:
         agent=AgentInfo(**front["agent"]) if front.get("agent") else None,
         sessions=front.get("sessions") or [],
         progress=[_progress_item(l) for l in body["Progress"].splitlines() if l.startswith("- ")],
+        requests=[_logged_line(l) for l in body["Asked for"].splitlines() if l.startswith("- ")],
         result=result, blocked_reason=front.get("blocked_reason"),
         created_at=front.get("created_at", 0.0), updated_at=front.get("updated_at", 0.0),
     )
@@ -121,12 +124,18 @@ def _sections(body: str) -> dict[str, str]:
 
 
 def _progress_item(line: str) -> dict:
-    stamp, _, note = line[2:].partition(" — ")
+    entry = _logged_line(line)
+    return {"ts": entry["ts"], "note": entry["text"]}
+
+
+def _logged_line(line: str) -> dict:
+    """`- 2026-09-13 01:52 — what was said` back into {ts, text}."""
+    stamp, _, text = line[2:].partition(" — ")
     try:
         ts = time.mktime(time.strptime(stamp.strip(), STAMP))
     except ValueError:
-        ts, note = 0.0, line[2:]
-    return {"ts": ts, "note": note.strip()}
+        ts, text = 0.0, line[2:]
+    return {"ts": ts, "text": text.strip()}
 
 
 class TaskDir:

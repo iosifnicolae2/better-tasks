@@ -99,6 +99,9 @@ class TasksConfig:
     require_verification: bool = True
     hide_done: bool = True      # finished tasks (done, cancelled) stay out of the tasks page until you press h
     in_git: bool = True         # the task files are committed with the project, so the backlog is shared
+    view: str = "table"         # how the tasks page opens: table or board (v switches, g regroups)
+    group_by: str = "status"    # what the tasks are grouped by: status, or one of the fields below
+    group_rows: bool = True     # the table shows a heading per group; off = one flat list
     fields: list[dict] = field(default_factory=lambda: [dict(f) for f in DEFAULT_FIELDS])
     editor: str = "idea"        # command that opens a task file for editing (enter on the tasks page), e.g. idea, code, vim
 
@@ -236,6 +239,9 @@ SETTABLE_KEYS = {
     "tasks.require_verification": bool,
     "tasks.hide_done": bool,
     "tasks.in_git": bool,
+    "tasks.view": str,
+    "tasks.group_by": str,
+    "tasks.group_rows": bool,
     "tasks.editor": str,
     "notify.bell": bool,
 }
@@ -266,6 +272,9 @@ SETTING_HELP = {
     "tasks.require_verification": "A task must say how to check it before it is accepted.",
     "tasks.hide_done": "Hide finished tasks (done, cancelled) on the tasks page; h shows them for this session.",
     "tasks.in_git": "Commit the task files with the project, so the backlog is shared (off = a .gitignore keeps them local).",
+    "tasks.view": "How the tasks page opens: table (everything at a glance) or board (columns of cards). v switches.",
+    "tasks.group_by": "What tasks are grouped by: status, or the name of one of the fields below (the board's columns, the table's headings).",
+    "tasks.group_rows": "Show a heading per group in the table (off = one flat list). G switches it on the page.",
     "tasks.editor": "Command that opens a task file when you press enter on the tasks page (idea, code, vim, ...).",
     "notify.bell": "Ring the terminal bell and mark the window 🔔 when a session needs you.",
 }
@@ -296,6 +305,8 @@ def set_key(config: Config, dotted: str, raw: str) -> None:
         value = str(raw).strip()
         if key == "tool" and value not in TOOLS:
             raise ValueError(f"agents.tool must be one of {', '.join(TOOLS)}")
+        if key == "view" and value not in ("table", "board"):
+            raise ValueError("tasks.view must be table or board")
         if key == "effort" and value:
             tool = config.agents.tool if section == "agents" else "claude"
             if value not in EFFORT_LEVELS[tool]:

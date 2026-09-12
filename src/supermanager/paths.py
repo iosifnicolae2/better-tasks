@@ -101,6 +101,10 @@ help = "Which part of the system this touches."
 The manager fills them when you mention one, `supermanager tasks --label api` and
 `--field scheduled --value 2026-W38` filter by them, and `ctrl+w` on the tasks page searches every column.
 
+The tasks page groups by `tasks.group_by` (status by default) and can show the same tasks as a board — one
+column per group, cards you move with shift+arrows. `tasks.view` picks which one it opens with, `v` switches,
+`g` regroups, `G` turns the table's headings off.
+
 ## Making it yours: `config.local.toml`
 
 Settings you do not want to impose on the team go in `.supermanager/config.local.toml`. It is read on top of

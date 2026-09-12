@@ -55,6 +55,7 @@ class Daemon:
             "clean_worktrees": self.orch.clean_worktrees,
             "report_progress": self.orch.report_progress,
             "update_plan": self.orch.update_plan,
+            "record_request": self.orch.record_request,
             "add_context": self.orch.add_context,
             "block_task": self.orch.block_task,
             "complete_task": self.orch.complete_task,
