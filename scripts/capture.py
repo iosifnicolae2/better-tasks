@@ -10,6 +10,9 @@ from pathlib import Path
 from rich.console import Console
 from rich.text import Text
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from svg_tools import strip_chrome
+
 OUT = Path(__file__).resolve().parents[1] / "docs" / "screenshots"
 SESSION = "sm-acme-api"
 
@@ -27,7 +30,7 @@ def main() -> None:
     console = Console(record=True, width=max(len(l) for l in body.plain.splitlines()) + 2, file=open("/dev/null", "w"))
     console.print(body)
     OUT.mkdir(parents=True, exist_ok=True)
-    console.save_svg(str(OUT / f"{name}.svg"), title=f"{SESSION} · {window}")
+    (OUT / f"{name}.svg").write_text(strip_chrome(console.export_svg(title="")))
     print(f"{name}.svg")
 
 

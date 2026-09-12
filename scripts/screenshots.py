@@ -5,6 +5,7 @@ They are real renders of the real pages, so they are never out of date with what
 import asyncio, sys, tempfile, time
 from pathlib import Path as _P
 sys.path.insert(0, str(_P(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(_P(__file__).resolve().parent))
 from pathlib import Path
 from supermanager.config import Config, save_config
 from supermanager.models import AgentInfo, TaskStatus
@@ -13,6 +14,7 @@ from supermanager.paths import ProjectPaths
 from supermanager.tui.agents_page import AgentsApp
 from supermanager.tui.app import SupermanagerApp
 from supermanager.tui.config_page import ConfigApp
+from svg_tools import strip_chrome
 from textual.containers import Horizontal
 from textual.widgets import Static
 
@@ -103,15 +105,20 @@ async def with_bar(app, active, tasks, agents):
     await app.mount(bar(active, tasks, agents))
 
 
+def save(app, path) -> None:
+    """The page as it looks, with none of the window Rich likes to draw around it."""
+    path.write_text(strip_chrome(app.export_screenshot()))
+
+
 async def main():
     orch, paths = build()
     app = SupermanagerApp(orch)
     async with app.run_test(size=(150, 20)) as pilot:
         for _ in range(4):
             await pilot.pause()
-        app.save_screenshot(str(OUT / "tasks.svg"))
+        save(app, OUT / "tasks.svg")
         await pilot.press("v"); await pilot.pause(); await pilot.pause()
-        app.save_screenshot(str(OUT / "board.svg"))
+        save(app, OUT / "board.svg")
 
     agents = AgentsApp(paths)
     rows = sessions(orch)
@@ -123,7 +130,7 @@ async def main():
         await with_bar(agents, "agents", 5, 2)
         for _ in range(3):
             await pilot.pause()
-        agents.save_screenshot(str(OUT / "agents.svg"))
+        save(agents, OUT / "agents.svg")
 
     config = ConfigApp(paths)
     async with config.run_test(size=(150, 20)) as pilot:
@@ -132,7 +139,7 @@ async def main():
         await with_bar(config, "config", 5, 2)
         for _ in range(3):
             await pilot.pause()
-        config.save_screenshot(str(OUT / "config.svg"))
+        save(config, OUT / "config.svg")
     print("\n".join(f"{p.name}: {p.stat().st_size // 1024} KB" for p in sorted(OUT.glob('*.svg'))))
 
 asyncio.run(main())
