@@ -87,13 +87,16 @@ back in the backlog; on a label board it moves the label. shift+↑/↓ move it 
 ### agents — what is running right now
 
 ```
- Agent    Tool                   Phase  Task                      Status     Branch     Started  Active  Needs you
- T-005    codex gpt-6-astra low  idle   T-005 Sixth greeting file planning   sm/T-005   7m       1m      🔔 plan ready — approve it
+ Agent        Phase   Task                            Status     Branch     Started   Active   Needs you
+ demo-T-002   busy    T-002  Retry failed uploads     working    sm/T-002   1m        5s
+ demo-T-005   idle    T-005  Fix the BOM in the CSV   planning   sm/T-005   7m        1m       🔔 plan ready — approve it
+ demo-A-001   idle    no task · project root                                1h00m     15m
  ^w Search  n New agent  i Edit task  x Stop  q Leave
 ```
 
 Every notice lands here — plan ready, blocked, done, interrupted — so the roadmap stays quiet. `enter` jumps into
-a session, `n` starts a free agent (no task, just a session in the project root).
+a session, `n` starts a free agent (no task, just a session in the project root). Columns are as wide as what is
+in them; what an agent runs with (claude/codex, model, effort) is in its task file and in `supermanager events`.
 
 ### config — every setting, saved as you change it
 

@@ -25,7 +25,7 @@ from ..models import FINISHED_STATUSES, PRIORITIES, Event, Task, TaskStatus
 from ..orchestrator import Orchestrator, OrchestratorError
 from ..tmux import CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, inside_tmux_session
 from .board import CARD_WIDTH, NO_VALUE, Board, Card, field_grouping, label_chips, status_grouping
-from .shared import FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, local_time, wrap
+from .shared import AUTO, FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, local_time, wrap
 
 STATUS_STYLE = {
     TaskStatus.BACKLOG: "white", TaskStatus.PLANNING: "yellow", TaskStatus.WORKING: "bright_green",
@@ -35,9 +35,11 @@ STATUS_STYLE = {
 STARTABLE = {TaskStatus.BACKLOG, TaskStatus.INTERRUPTED}
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
 # bell or a longer status appears — the Agent column, last in the row, is where those show up.
-BASE_COLUMNS = (("ID", 6), ("Pri", 3), ("Status", 11), ("Title", FLEX))
+# AUTO columns are as wide as what is in them; Agent keeps a fixed width because its text changes with every
+# bell, and a column that resizes under your eyes is worse than a little empty space.
+BASE_COLUMNS = (("ID", AUTO), ("Pri", AUTO), ("Status", AUTO), ("Title", FLEX))
 AGENT_COLUMN_SPEC = ("Agent", 36)   # a click on this cell starts / opens the agent
-TIME_COLUMNS = (("Created", 16), ("Updated", 16))   # last, in this machine's own date format
+TIME_COLUMNS = (("Created", AUTO), ("Updated", AUTO))   # last, in this machine's own date format
 AGENT_WIDTH = 36
 
 HELP = """\
@@ -222,12 +224,18 @@ class SupermanagerApp(PageApp):
             return
         previous = self._selected_task
         fields = self._shown_fields()
-        columns = [*BASE_COLUMNS, *[(f.column, f.width) for f in fields], AGENT_COLUMN_SPEC, *TIME_COLUMNS]
+        columns = [*BASE_COLUMNS, *[(f.column, AUTO) for f in fields], AGENT_COLUMN_SPEC, *TIME_COLUMNS]
         table.action_columns = (len(columns) - 1 - len(TIME_COLUMNS),)   # the Agent column: fields shift it
         table.clear(columns=True)
-        self.add_columns(table, *columns)
-        width = self.flex_width
         tasks, hidden = self._visible_tasks(fields)
+        self.add_columns(table, *columns, content={
+            "ID": [t.id for t in tasks], "Pri": [t.priority for t in tasks],
+            "Status": [str(t.status) for t in tasks],
+            **{f.column: [_field_cell(f, t.fields.get(f.name)) for t in tasks] for f in fields},
+            "Created": [local_time(t.created_at) for t in tasks],
+            "Updated": [local_time(t.updated_at) for t in tasks],
+        })
+        width = self.flex_width
         filler = [""] * (len(fields) + len(TIME_COLUMNS))
 
         def row(t: Task) -> None:

@@ -60,6 +60,8 @@ class QuitTwice:
 
 # ------------------------------------------------------------------------------------- pages, search
 FLEX = None   # the column that takes the rest of the row (see PageApp.add_columns)
+AUTO = -1     # a column as wide as the widest thing in it
+AUTO_MAX = 40
 
 PAGE_BINDINGS = [
     Binding("left", "prev_page", "◀ page", show=False),
@@ -148,19 +150,29 @@ class PageApp(QuitTwice, App):
 
     flex_width = 40   # what the FLEX column got the last time the columns were built
 
-    def add_columns(self, table: DataTable, *columns: tuple[str, int | None]) -> list:
+    def add_columns(self, table: DataTable, *columns: tuple[str, int | None],
+                    content: dict[str, list] | None = None) -> list:
         """Build the columns from (name, width) pairs: keyed by name (so a header click knows which one),
         the sorted one marked ▲/▼.
 
-        Every width is fixed, so a bell, a longer status or a wrapped title never moves the other columns.
-        The one column with width FLEX takes whatever is left of the row and wraps inside it."""
-        fixed = sum(width for _, width in columns if width)
-        self.flex_width = max(16, table.size.width - fixed - 3 * len(columns) - 2)
+        A width is a number of cells, AUTO (as wide as its widest value — pass the values in `content`), or
+        FLEX for the one column that takes whatever is left of the row and wraps inside it. Widths are settled
+        here and not per row, so nothing shifts while the page refreshes in place."""
+        content = content or {}
+        sized = [(name, self._width(name, width, content.get(name, []))) for name, width in columns]
+        self.flex_width = max(16, table.size.width - sum(w for _, w in sized if w) - 3 * len(sized) - 2)
         keys = []
-        for name, width in columns:
+        for name, width in sized:
             mark = "" if not self.sort or self.sort.key != name else (" ▼" if self.sort.reverse else " ▲")
             keys.append(table.add_column(Text(name + mark, style="bold"), key=name, width=width or self.flex_width))
         return keys
+
+    @staticmethod
+    def _width(name: str, width: int | None, values: list) -> int | None:
+        if width != AUTO:
+            return width
+        longest = max([len(name)] + [len(_plain(v).split("\n")[0]) for v in values])
+        return min(longest + 1, AUTO_MAX)
 
     def sorted_rows(self, rows: list, value: Callable[[object, str], object]) -> list:
         if not self.sort:

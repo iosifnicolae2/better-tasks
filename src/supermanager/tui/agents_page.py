@@ -24,16 +24,16 @@ from ..client import DaemonClient, DaemonError, DaemonUnavailable
 from ..config import load_config
 from ..paths import ProjectPaths
 from ..tmux import AGENTS_WINDOW, Tmux, inside_tmux_session
-from .shared import FLEX, PageApp, PageTable, SearchBar, edit_task, wrap
+from .shared import AUTO, FLEX, PageApp, PageTable, SearchBar, edit_task, wrap
 
 PHASE_STYLE = {"starting": "dim", "busy": "yellow", "idle": "green", "ended": "dim"}
 STATUS_STYLE = {"planning": "yellow", "working": "bright_green", "blocked": "bright_red", "done": "green",
                 "interrupted": "magenta", "cancelled": "dim"}
-# (name, width); the Task column takes whatever is left. Every other width is fixed, so the 🔔 in the last
-# column — where every "needs you" ends up — never moves the rest of the row.
-COLUMNS = (("Agent", 24), ("Tool", 22), ("Phase", 8), ("Task", FLEX), ("Status", 11),
-           ("Branch", 12), ("Started", 7), ("Active", 6), ("Needs you", 30))
-PHASE_COLUMN = 2   # a click on the phase cell opens the agent
+# (name, width): AUTO fits the column to what is in it, FLEX takes whatever is left of the row. Widths are
+# settled when the list of agents changes, not on every refresh, so nothing shifts while you read.
+COLUMNS = (("Agent", AUTO), ("Phase", AUTO), ("Task", FLEX), ("Status", AUTO),
+           ("Branch", AUTO), ("Started", AUTO), ("Active", AUTO), ("Needs you", AUTO))
+PHASE_COLUMN = 1   # a click on the phase cell opens the agent
 FLEX_COLUMN = next(i for i, (_, width) in enumerate(COLUMNS) if width is FLEX)   # where a hint line goes
 NOTICE_KINDS = {"done": "information", "blocked": "warning", "interrupted": "warning", "error": "error",
                 "attention": "warning"}   # events that pop up here; the tasks page stays quiet
@@ -131,7 +131,7 @@ class AgentsApp(PageApp):
 
     def _render(self) -> None:
         """Rows are updated in place; the table is only rebuilt when the set or order of agents changes
-        (so clicks and the cursor hold)."""
+        (so clicks, the cursor and the column widths hold)."""
         table = self.query_one(DataTable)
         sessions = [s for s in self.sessions if self.matches(*self._cells(s, 200))]
         if self.sort:
@@ -143,7 +143,8 @@ class AgentsApp(PageApp):
         ids = [s["id"] for s in sessions]
         if ids != self.shown:
             table.clear(columns=True)
-            self.columns = self.add_columns(table, *COLUMNS)   # sets flex_width for the Task column
+            content = {name: [self._cells(s, 200)[i] for s in sessions] for i, (name, _) in enumerate(COLUMNS)}
+            self.columns = self.add_columns(table, *COLUMNS, content=content)   # also sets flex_width
             self.shown = ids
             for s in sessions:
                 table.add_row(*self._cells(s, self.flex_width), key=s["id"], height=None)
@@ -161,15 +162,16 @@ class AgentsApp(PageApp):
 
     @staticmethod
     def _cells(s: dict, width: int) -> tuple:
+        """One row. What the agent runs with (claude/codex, model, effort) is not here: it is in the task file
+        and in the events; this page is about what each session is doing."""
         a = s["agent"]
         phase = a["phase"]
-        tool = " ".join(part for part in (a.get("tool", "claude"), a.get("model", ""), a.get("effort", "")) if part)
         task = wrap(f"{s['id']}  {s['title']}", width) if s["task"] else Text("no task · project root", style="dim")
         status = s.get("status", "")
-        return (Text(a["rc_name"] or s["id"], style="bold"), Text(tool, style="cyan"),
+        return (Text(a["rc_name"] or s["id"], style="bold"),
                 Text(phase, style=PHASE_STYLE.get(phase, "dim")), task,
                 Text(status, style=STATUS_STYLE.get(status, "dim")),
-                a["branch"] or "", _age(a["started_at"]), _age(a["last_activity"]),
+                Text(a["branch"] or ""), Text(_age(a["started_at"])), Text(_age(a["last_activity"])),
                 Text(f"🔔 {a['attention']}" if a["attention"] else "", style="bold yellow"))
 
     @on(DataTable.RowHighlighted, "#agents-table")
@@ -273,6 +275,6 @@ class AgentsApp(PageApp):
 
 def _sort_value(s: dict, column: str) -> object:
     a = s["agent"]
-    return {"Agent": a["rc_name"] or s["id"], "Tool": a.get("tool", ""), "Phase": a["phase"],
+    return {"Agent": a["rc_name"] or s["id"], "Phase": a["phase"],
             "Task": s["id"] if s["task"] else "", "Status": s.get("status", ""), "Branch": a["branch"] or "",
             "Started": -a["started_at"], "Active": -a["last_activity"], "Needs you": a["attention"]}.get(column)
