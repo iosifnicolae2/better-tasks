@@ -54,6 +54,8 @@ DEFAULT_FIELDS = [
      "help": "Free tags: area, kind, whatever you sort your work by."},
     {"name": "scheduled", "type": "date", "column": "When", "width": 12,
      "help": "When you mean to do it: a date (2026-09-20) or a week (2026-W38)."},
+    {"name": "repo", "type": "text",
+     "help": "Another checkout this task works in (absolute path). No worktree is made; the agent works there."},
     {"name": "conflict_for", "type": "text",
      "help": "Set by supermanager on a task it created to resolve another task's merge conflict."},
 ]

@@ -116,8 +116,33 @@ sessions; all coordination goes through the `supermanager` MCP tools.
 """
 
 
-def manager_prompt(config: Config) -> str:
-    return MANAGER_PROMPT.format(project=config.project_name).strip()
+SELF_PROMPT = """
+
+## Changing supermanager itself
+supermanager runs from a checkout of its own at `{source}`. When the user asks for something about supermanager
+— a key that should do something else, a column, a setting, a bug in the pages or in the agents — that is a task
+like any other, with one difference: put `fields={{"repo": "{source}"}}` on it. The agent then works in that
+checkout instead of this project, with no worktree of its own, and commits there as its CLAUDE.md says.
+Say plainly that the change lands in supermanager, not in "{project}", and that open workspaces keep running the
+old code until they are restarted.{contribute}
+"""
+
+CONTRIBUTE_PROMPT = """
+When such a task is done, ask the user one question: "This is a fork of {upstream}. Do you want to contribute
+this to the main repo?" If they say yes, create a follow-up task whose agent opens the pull request with the
+`gh` CLI from `{source}` (`gh pr create --repo {upstream}`), with a title and a body describing the change.
+Never open a pull request without that yes."""
+
+
+def manager_prompt(config: Config, install=None) -> str:
+    """`install` is what supermanager itself runs from (supermanager.upgrade.install()), or None when it was not
+    installed from a checkout the user can edit."""
+    text = MANAGER_PROMPT.format(project=config.project_name)
+    if install and install.editable:
+        contribute = ("" if not install.can_contribute else
+                      CONTRIBUTE_PROMPT.format(upstream=install.upstream, source=install.source))
+        text += SELF_PROMPT.format(source=install.source, project=config.project_name, contribute=contribute)
+    return text.strip()
 
 
 CLAUDE_PLAN_RULE = ("You start in plan mode. Explore, then present a plan. A human reviews it through Remote Control "

@@ -133,6 +133,7 @@ up — click it for the list. A session that needs you rings 🔔 there and in y
 | **Free the disk** | worktrees are deleted when their task is done (`supermanager clean` sweeps the rest) |
 | **Sort your work** | labels and a scheduled date on every task, filterable — plus any field you define |
 | **Share the backlog** | task files are plain Markdown in git; a teammate clones and sees the same roadmap |
+| **Change supermanager itself** | when you run it from your own clone, ask the manager for a key, a column or a fix and it puts an agent on supermanager's own source |
 
 ---
 
@@ -265,6 +266,20 @@ page marks what your local file overrides.
 it starts as soon as a slot frees. Side exits: `blocked` (needs you),
 `interrupted` (the session ended early; `spawn_agent` resumes it with its worktree and conversation) and
 `cancelled`.
+
+## Asking supermanager to change itself
+
+When you run it from a clone of your own (`./install.sh` in your checkout), the manager knows where that source
+is. Ask it in plain words, in any project:
+
+> *"On the tasks page, `p` should pause every running agent, not just the selected one."*
+
+It writes the task with `repo` set to supermanager's own path, so the agent works in that checkout — no worktree,
+it commits there — and tells you the change lands in supermanager rather than in the project you are in. Restart
+the workspace to run the new code.
+
+If your clone is a **public fork** of the original, the manager asks once the task is done whether to contribute
+the change upstream, and opens the pull request with `gh` only if you say yes.
 
 ## Updating a running workspace
 

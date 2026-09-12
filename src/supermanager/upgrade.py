@@ -158,6 +158,48 @@ def _reinstall(source: Path) -> str:
         f"Dependencies changed and the reinstall failed: {proc.stderr.strip()[:200]}"
 
 
+@dataclass
+class Install:
+    """What supermanager runs from, as far as the manager needs to know it."""
+    source: Path
+    kind: str                    # managed (install.sh) | checkout (you cloned it)
+    origin: str
+    is_fork: bool
+    public: bool | None          # None when we could not tell
+    upstream: str = UPSTREAM_URL
+
+    @property
+    def editable(self) -> bool:
+        """A clone of your own is yours to change; a managed install is replaced by the next upgrade."""
+        return self.kind == "checkout"
+
+    @property
+    def can_contribute(self) -> bool:
+        return self.is_fork and self.public is not False
+
+
+def install() -> Install | None:
+    """Where supermanager itself lives and whether its remote is a public fork of the original. None when it was
+    not installed from a git checkout. Costs one `gh repo view` (5 s at most) and nothing when gh is missing."""
+    status = check(remote=False)
+    if not status:
+        return None
+    public = _is_public(status.origin) if status.origin else None
+    return Install(source=status.source, kind=status.kind, origin=status.origin,
+                   is_fork=status.is_fork, public=public)
+
+
+def _is_public(origin: str) -> bool | None:
+    if not shutil.which("gh"):
+        return None
+    try:
+        proc = subprocess.run(["gh", "repo", "view", origin, "--json", "isPrivate"],
+                              capture_output=True, text=True, timeout=5)
+        return not json.loads(proc.stdout)["isPrivate"] if proc.returncode == 0 else None
+    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+        return None
+
+
 def due() -> bool:
     """True when the last look is older than a day, so starting a workspace stays quiet and cheap."""
     try:

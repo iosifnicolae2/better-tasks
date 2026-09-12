@@ -17,7 +17,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from . import launcher, prompts, taskfiles, worktree
+from . import launcher, prompts, taskfiles, upgrade, worktree
 from .config import Config, get_key, local_keys, save_config, set_key, settings_snapshot
 from .launcher import AgentSettings
 from .models import (ACTIVE_STATUSES, FINISHED_STATUSES, PRIORITIES, WAITING_STATUSES, AgentInfo, Event,
@@ -500,6 +500,12 @@ class Orchestrator:
             self._attend(agent_id, _attention_reason(payload, event))
 
     def _prepare_workdir(self, task: Task) -> tuple[Path, Path | None, str | None]:
+        elsewhere = str(task.fields.get("repo") or "").strip()
+        if elsewhere:
+            path = Path(elsewhere).expanduser()
+            if not path.is_dir():
+                raise OrchestratorError(f"{task.id} says repo={elsewhere}, but there is no such folder.")
+            return path, None, None   # another checkout: the agent works in it, we make no worktree there
         if not self.config.agents.worktrees or task.fields.get("conflict_for"):
             return self.paths.root, None, None   # a conflict is resolved where the branches meet: the checkout
         if not self.paths.is_git_repo():
@@ -1062,7 +1068,7 @@ class Orchestrator:
             pending = list(self.state.pending_manager_events)
             kickoff = prompts.manager_kickoff(pending, len(self.state.tasks))
             argv = launcher.manager_argv(self.config, self.paths, session_id, kickoff, do_resume,
-                                         prompts.manager_prompt(self.config))
+                                         prompts.manager_prompt(self.config, upgrade.install()))
             self.tmux.ensure_session(self.paths.root)
             window = self.tmux.new_window(MANAGER_WINDOW, self.paths.root, argv, launcher.session_env(self.paths, None),
                                           first=True)
