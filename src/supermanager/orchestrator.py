@@ -5,6 +5,7 @@ Open this when a task's status, a slot count, or a manager notification is not w
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -1336,10 +1337,71 @@ class Orchestrator:
 
     def screen(self, task_id: str | None, lines: int = 40) -> str:
         if task_id:
-            task = self._task(task_id)
-            return self.tmux.capture(task.agent.tmux_window, lines) if task.agent else ""
+            info = self._session_info(task_id)
+            return self.tmux.capture(info.tmux_window, lines) if info else ""
         m = self.state.manager
         return self.tmux.capture(m.tmux_window, lines) if m else ""
+
+    # ------------------------------------------------------- talking to agents
+    def message_agent(self, target: str, text: str) -> dict[str, Any]:
+        """Type a line into an agent's session, as the manager relaying what the user said.
+
+        The agent sees it in its chat like anything else you type there, so it answers there; watch the reply
+        with read_agent. A task agent also keeps the line in its task's "Asked for" log."""
+        text = " ".join((text or "").split())
+        if not text:
+            raise OrchestratorError("Pass the message to send.")
+        info = self._session_info(target)
+        if not info or not info.session_open or not self.tmux.window_alive(info.tmux_window):
+            raise OrchestratorError(f"No live session for {target}. list_agents shows what is running.")
+        try:
+            self.tmux.send_text(info.tmux_window, f"[supermanager] From the user, through the manager: {text}")
+        except TmuxError as exc:
+            raise OrchestratorError(f"Could not reach {target}: {exc}") from exc
+        with self._lock:
+            info.attention = ""   # it has something to do now; it is not waiting for you
+            self.save()
+        if target.upper() in self.state.tasks:
+            self.record_request(target, text)
+        self._emit("agent", f"Sent to {target}: {text[:120]}", target if target != "manager" else None)
+        return {"target": target, "sent": text}
+
+    def read_agent(self, target: str, lines: int = 40) -> dict[str, Any]:
+        """The last lines of a session's screen, as they are right now."""
+        info = self._session_info(target)
+        if not info:
+            raise OrchestratorError(f"No session for {target}.")
+        return {"target": target, "phase": info.phase, "attention": info.attention,
+                "screen": self.tmux.capture(info.tmux_window, max(5, min(int(lines), 200)))}
+
+    def search_sessions(self, text: str, limit: int = 20, transcripts: bool = True) -> dict[str, Any]:
+        """Look for something across the sessions: what is on their screens now, and what the finished ones
+        wrote (their transcripts). Returns the matching lines with the session they came from."""
+        needle = (text or "").strip().lower()
+        if len(needle) < 3:
+            raise OrchestratorError("Give at least three characters to search for.")
+        hits: list[dict[str, Any]] = []
+        for target, info in self._open_sessions():
+            for line in self.tmux.capture(info.tmux_window, 200).splitlines():
+                if needle in line.lower():
+                    hits.append({"where": target, "source": "screen", "line": " ".join(line.split())[:200]})
+                    if len(hits) >= limit:
+                        return {"query": text, "hits": hits, "more": True}
+        if transcripts:
+            for path in sorted(self.paths.agents_dir.glob("*/transcripts/*.jsonl")):
+                for line in _matching_lines(path, needle):
+                    hits.append({"where": path.parent.parent.name, "source": path.name, "line": line[:200]})
+                    if len(hits) >= limit:
+                        return {"query": text, "hits": hits, "more": True}
+        return {"query": text, "hits": hits, "more": False}
+
+    def _open_sessions(self) -> list[tuple[str, AgentInfo | ManagerInfo]]:
+        rows: list[tuple[str, AgentInfo | ManagerInfo]] = []
+        if self.state.manager and self.state.manager.session_open:
+            rows.append(("manager", self.state.manager))
+        rows += [(t.id, t.agent) for t in self.state.tasks.values() if t.agent and t.agent.session_open]
+        rows += [(aid, a) for aid, a in self.state.free_agents.items() if a.session_open]
+        return rows
 
     def _auto_accept_dialogs(self, window_id: str, tool: str = "claude", seconds: int = 90) -> None:
         """New folders (every worktree) make Claude Code and Codex ask 'do you trust this folder?'. Answer yes."""
@@ -1386,6 +1448,58 @@ def _field_matches(stored: Any, wanted: str) -> bool:
     if isinstance(stored, list):
         return wanted in stored
     return str(stored or "").startswith(wanted)
+
+
+def _matching_lines(path: Path, needle: str, budget: int = 4_000_000) -> list[str]:
+    """What a transcript says around `needle`. A transcript is JSON per line, so the matching sentence is dug
+    out of it; the read is capped so a huge file cannot stall the daemon."""
+    out = []
+    try:
+        with path.open(errors="replace") as f:
+            read = 0
+            for line in f:
+                read += len(line)
+                if read > budget:
+                    break
+                if needle in line.lower():
+                    out.append(_readable(line, needle))
+    except OSError:
+        return []
+    return out
+
+
+def _readable(line: str, needle: str) -> str:
+    """The sentence that matched, not the JSON around it."""
+    try:
+        found: list[str] = []
+        _strings(json.loads(line), needle, found)
+        if found:
+            return _around(min(found, key=len), needle)
+    except (ValueError, RecursionError):
+        pass
+    return " ".join(line.split())
+
+
+def _around(text: str, needle: str, width: int = 160) -> str:
+    """The needle with some of its sentence around it, not a page of transcript."""
+    flat = " ".join(text.split())
+    at = flat.lower().find(needle)
+    if at < 0 or len(flat) <= width:
+        return flat[:width]
+    start = max(0, at - width // 3)
+    return ("…" if start else "") + flat[start:start + width] + ("…" if start + width < len(flat) else "")
+
+
+def _strings(value: Any, needle: str, found: list[str]) -> None:
+    if isinstance(value, str):
+        if needle in value.lower():
+            found.append(value)
+    elif isinstance(value, dict):
+        for item in value.values():
+            _strings(item, needle, found)
+    elif isinstance(value, list):
+        for item in value:
+            _strings(item, needle, found)
 
 
 def _session_record(agent: AgentInfo) -> dict[str, Any]:

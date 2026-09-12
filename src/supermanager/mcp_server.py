@@ -159,6 +159,28 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
         return call("clean_worktrees", force=force)
 
     @mcp.tool()
+    def message_agent(task_id: str, text: str) -> str:
+        """Say something to a running agent, in the user's words. Use it only when the user asks you to tell an
+        agent something ("tell T-003 to skip the migration", "ask it why it changed the schema"); the agent reads
+        it in its own chat and answers there, so follow up with read_agent. task_id is a task (T-003) or a free
+        agent (A-001). It is also kept in that task's "Asked for" log."""
+        return call("message_agent", target=task_id, text=text)
+
+    @mcp.tool()
+    def read_agent(task_id: str, lines: int = 40) -> str:
+        """What a session's screen says right now — the last `lines` of it, up to 200. Use it to see what an
+        agent answered, what it is asking for, or where it got stuck. Works for a task (T-003), a free agent
+        (A-001) and "manager"."""
+        return call("read_agent", target=task_id, lines=lines)
+
+    @mcp.tool()
+    def search_sessions(text: str, limit: int = 20, transcripts: bool = True) -> str:
+        """Search across the sessions: what is on the running ones' screens, and what the finished ones wrote
+        (their saved transcripts). Returns the matching lines and which session each came from. Use it to answer
+        "did anyone touch the parser?" or "which agent mentioned the timeout?"."""
+        return call("search_sessions", text=text, limit=limit, transcripts=transcripts)
+
+    @mcp.tool()
     def get_events(limit: int = 30) -> str:
         """Recent events (done, blocked, interrupted, progress...). Also clears the 'pending' notification queue."""
         return call("get_events", limit=limit)

@@ -88,6 +88,7 @@ so the roadmap stays quiet.
 | **Approve from your phone** | the plan waiting in your terminal is the same one in the Claude app |
 | **Merges you approved** | and a conflict becomes its own urgent task that an agent resolves |
 | **The whole story** | each task file keeps your words, the plan, what the agent found, and every session that touched it |
+| **A manager that can look** | ask it what an agent is doing, tell it to pass something on, or search every session and transcript for a word |
 | **A tidy disk** | copies of the repo are deleted when their task is done |
 | **Your own fields** | labels and a date come as standard; add whatever else you sort work by |
 | **A shared backlog** | plain Markdown in git: your teammate clones and sees the same board |

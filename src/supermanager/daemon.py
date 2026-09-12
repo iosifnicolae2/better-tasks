@@ -71,6 +71,9 @@ class Daemon:
             "acknowledge": self.orch.acknowledge,
             "pause_session": self.orch.pause_session,
             "screen": self.orch.screen,
+            "message_agent": self.orch.message_agent,
+            "read_agent": self.orch.read_agent,
+            "search_sessions": self.orch.search_sessions,
             "quit_all": self.orch.request_exit,
         }
 

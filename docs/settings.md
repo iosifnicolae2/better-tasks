@@ -69,6 +69,18 @@ The manager fills them when you mention one. Filter with `supermanager tasks --l
   logs/               what the restart helper wrote, if anything went wrong
 ```
 
+## What the manager can do about a running agent
+
+Ask it in plain words and it uses these, in the user's name only:
+
+- *"what is T-003 doing?"* → it reads that session's screen.
+- *"tell T-003 to skip the migration"* → it types your words into that agent's chat and reports the answer.
+  The line also lands in the task's "Asked for" log, so the task keeps the instruction.
+- *"which agent mentioned the timeout?"* → it searches every running session's screen and every saved
+  transcript, and says where each hit came from.
+
+It never messages an agent on its own: if it thinks one needs redirecting, it tells you and waits.
+
 ## How the pieces talk
 
 - One tmux workspace per project, on supermanager's own tmux server, so your tmux config is untouched.
