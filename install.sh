@@ -1,10 +1,9 @@
 #!/usr/bin/env sh
-# Installs the `supermanager` / `sm` commands and links them to a source checkout (editable install).
+# Installs the `supermanager` / `sm` commands and links them to this checkout (an editable install, so your
+# edits are live). The usual way to run it is `make install` from a clone.
 #
-# One command, no clone needed (clones into ~/.local/share/supermanager/src, or updates it):
-#   curl -fsSL https://raw.githubusercontent.com/bringes/supermanager/main/install.sh | sh
-# Or from inside your own checkout, to link that folder instead:
-#   ./install.sh
+# Run from anywhere without a clone and it clones into ~/.local/share/supermanager/src (or updates it) — that
+# is the "managed" install that follows releases; see supermanager upgrade.
 set -eu
 
 REPO_URL="${SUPERMANAGER_REPO:-https://github.com/bringes/supermanager}"
