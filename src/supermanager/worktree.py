@@ -17,8 +17,17 @@ class GitError(RuntimeError):
 def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     proc = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
     if check and proc.returncode != 0:
-        raise GitError(proc.stderr.strip() or f"git {' '.join(args)} failed")
+        # A failed merge says what went wrong on stdout ("CONFLICT ... Automatic merge failed"), not on stderr;
+        # the lines that name the problem are the ones worth passing on.
+        detail = proc.stderr.strip() or _problem_lines(proc.stdout)
+        raise GitError(detail or f"git {' '.join(args)} failed")
     return proc
+
+
+def _problem_lines(output: str) -> str:
+    lines = [l.strip() for l in output.splitlines() if l.strip()]
+    named = [l for l in lines if l.startswith(("CONFLICT", "error:", "fatal:")) or "failed" in l.lower()]
+    return " ".join(named or lines[-2:])
 
 
 def branch_exists(root: Path, branch: str) -> bool:
@@ -35,6 +44,46 @@ def add_worktree(root: Path, path: Path, branch: str, base: str) -> None:
     else:
         git(root, "worktree", "add", "-b", branch, str(path), base)
     copy_context_files(root, path)
+
+
+def current_branch(root: Path) -> str:
+    return git(root, "rev-parse", "--abbrev-ref", "HEAD", check=False).stdout.strip()
+
+
+def is_dirty(path: Path, untracked: bool = True) -> bool:
+    """Changes in a checkout. `untracked=False` counts only tracked files — that is what blocks a merge;
+    untracked ones (`.supermanager/` among them) do not."""
+    args = ["status", "--porcelain"] + ([] if untracked else ["--untracked-files=no"])
+    return bool(git(path, *args, check=False).stdout.strip())
+
+
+def commit_all(path: Path, message: str) -> bool:
+    """Commit everything in a worktree. False when there was nothing to commit."""
+    if not is_dirty(path):
+        return False
+    git(path, "add", "-A")
+    git(path, "commit", "-m", message)
+    return True
+
+
+def merge_branch(root: Path, branch: str, into: str, message: str) -> str:
+    """Merge an agent's branch into `into` in the main checkout. Raises GitError with git's own words when it
+    cannot: a dirty checkout, a conflict (the merge is aborted first), an unknown branch."""
+    if not branch_exists(root, branch):
+        raise GitError(f"branch {branch} does not exist")
+    if is_dirty(root, untracked=False):
+        raise GitError(f"the project checkout has uncommitted changes; commit or stash them, then merge {branch}")
+    here = current_branch(root)
+    if here != into:
+        git(root, "checkout", into)
+    try:
+        git(root, "merge", "--no-ff", "-m", message, branch)
+    except GitError:
+        git(root, "merge", "--abort", check=False)
+        if here != into:
+            git(root, "checkout", here, check=False)
+        raise
+    return git(root, "log", "-1", "--oneline", check=False).stdout.strip()
 
 
 def remove_worktree(root: Path, path: Path, force: bool = False) -> None:

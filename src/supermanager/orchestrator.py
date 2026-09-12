@@ -7,24 +7,38 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import signal
 import subprocess
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from . import launcher, prompts, worktree
+from . import launcher, prompts, taskfiles, worktree
 from .config import Config, save_config, set_key, settings_snapshot
-from .models import ACTIVE_STATUSES, PRIORITIES, AgentInfo, Event, ManagerInfo, State, Task, TaskStatus
+from .launcher import AgentSettings
+from .models import ACTIVE_STATUSES, FINISHED_STATUSES, PRIORITIES, AgentInfo, Event, ManagerInfo, State, Task, TaskStatus
 from .paths import ProjectPaths
 from .store import StateStore
-from .tmux import MANAGER_WINDOW, Tmux, TmuxError
+from .tmux import AGENTS_WINDOW, DASHBOARD_WINDOW, MANAGER_WINDOW, Tmux, TmuxError
 
-EDITABLE_FIELDS = {"title", "problem", "expected_outcome", "acceptance_criteria", "verification", "context", "priority"}
+EDITABLE_FIELDS = {"title", "problem", "expected_outcome", "acceptance_criteria", "verification", "context", "plan",
+                   "priority", "tool", "model", "effort"}
+AGENT_SETTING_FIELDS = ("tool", "model", "effort")
 RESUME_GRACE_SECONDS = 25
-STARTUP_DIALOGS = ("Yes, I trust this folder", "Yes, I accept")  # both list "No" first, so Down+Enter picks Yes
+IDLE_RECHECK_SECONDS = 20   # how long to wait before looking again at a session that ended its turn while busy
+IDLE_RECHECKS = 3
+# What a session's status line says while it is still working: "1 shell, 1 monitor", "2 tasks", "esc to interrupt".
+BACKGROUND_WORK = re.compile(r"\b\d+\s+(shell|monitor|task|job)s?\b|esc to interrupt", re.I)
+# Startup dialogs a fresh session may show, and the keys that answer "yes". Claude lists "No" first (Down+Enter);
+# Codex preselects "Yes" (Enter).
+STARTUP_DIALOGS = {
+    "claude": {"Yes, I trust this folder": ("Down", "Enter"), "Yes, I accept": ("Down", "Enter")},
+    "codex": {"Do you trust the contents of this directory?": ("Enter",)},
+}
 
 
 class OrchestratorError(Exception):
@@ -41,6 +55,8 @@ class Orchestrator:
         self._lock = threading.RLock()
         self._listeners: list[Callable[[Event], None]] = []
         self._manager_resume_pending = False
+        self.on_exit_request: Callable[[str], None] | None = None   # set by the tasks page / headless loop
+        self.exit_requested: str | None = None
 
     # ------------------------------------------------------------------ infra
     def subscribe(self, callback: Callable[[Event], None]) -> None:
@@ -74,6 +90,7 @@ class Orchestrator:
     # ----------------------------------------------------------------- status
     def free_slots(self) -> int:
         active = sum(1 for t in self.state.tasks.values() if t.is_active)
+        active += sum(1 for a in self.state.free_agents.values() if a.session_open)
         return max(0, self.config.agents.concurrency - active)
 
     def manager_alive(self) -> bool:
@@ -98,6 +115,8 @@ class Orchestrator:
                 "session_id": m.session_id, "connected": m.connected,
             },
             "task_counts": counts,
+            "free_agents": sum(1 for a in self.state.free_agents.values() if a.session_open),
+            "agent_defaults": {f: getattr(self.config.agents, f) for f in AGENT_SETTING_FIELDS},
             "backlog_order": [tid for tid in self.state.order if self.state.tasks[tid].status == TaskStatus.BACKLOG],
             "pending_manager_events": len(self.state.pending_manager_events),
         }
@@ -111,6 +130,8 @@ class Orchestrator:
             save_config(self.paths.config, self.config)
             if key == "tasks.path":
                 self.store.relocate(self.state, self.paths.tasks_dir(self.config.tasks.path))
+            if key in ("tasks.path", "tasks.gitignore_transcripts"):
+                self._apply_transcripts_gitignore()
         self._emit("config", f"Setting changed: {key} = {value}")
         if key in ("agents.concurrency", "agents.auto_dispatch"):
             self._auto_dispatch()
@@ -118,6 +139,26 @@ class Orchestrator:
 
     def get_config(self) -> dict[str, dict]:
         return settings_snapshot(self.config)
+
+    def _agent_settings(self, task: Task | None = None, **overrides: str | None) -> AgentSettings:
+        """Config defaults, then the task's own fields, then explicit overrides; validated."""
+        values = {f: getattr(self.config.agents, f) for f in AGENT_SETTING_FIELDS}
+        for field in AGENT_SETTING_FIELDS:
+            for value in (getattr(task, field, "") if task else "", overrides.get(field)):
+                if value:
+                    values[field] = str(value).strip()
+        settings = AgentSettings(**values)
+        try:
+            settings.validate()
+        except ValueError as exc:
+            raise OrchestratorError(str(exc)) from exc
+        return settings
+
+    def update_bar_counts(self) -> None:
+        """Show how many tasks are open and how many agents run next to the page names in the tmux bar."""
+        tasks = sum(1 for t in self.state.tasks.values() if t.status not in FINISHED_STATUSES)
+        agents = len(self.list_agents())
+        self.tmux.set_counts({DASHBOARD_WINDOW: tasks, AGENTS_WINDOW: agents})
 
     # ------------------------------------------------------------------ tasks
     def validate_task(self, title: str, problem: str, expected_outcome: str, acceptance_criteria: list[str],
@@ -145,18 +186,21 @@ class Orchestrator:
         return errors
 
     def create_task(self, title: str, problem: str, expected_outcome: str, acceptance_criteria: list[str],
-                    verification: str, context: str = "", priority: str = "P2") -> Task:
+                    verification: str, context: str = "", priority: str = "P2",
+                    tool: str = "", model: str = "", effort: str = "") -> Task:
         priority = (priority or "P2").upper()
         errors = self.validate_task(title, problem, expected_outcome, acceptance_criteria, verification, priority)
         if errors:
             raise OrchestratorError("Task is not clear enough yet. Ask the user, then fix: " + " ".join(errors))
+        settings = {f: (v or "").strip() for f, v in zip(AGENT_SETTING_FIELDS, (tool, model, effort))}
+        self._agent_settings(None, **settings)   # rejects an unknown tool or effort before the task exists
         with self._lock:
             task_id = f"T-{self.state.next_task_number:03d}"
             self.state.next_task_number += 1
             task = Task(
                 id=task_id, title=title.strip(), problem=problem.strip(), expected_outcome=expected_outcome.strip(),
                 acceptance_criteria=[c.strip() for c in acceptance_criteria if c.strip()],
-                verification=verification.strip(), context=(context or "").strip(), priority=priority,
+                verification=verification.strip(), context=(context or "").strip(), priority=priority, **settings,
             )
             self.state.tasks[task_id] = task
             self.state.order.append(task_id)
@@ -164,6 +208,23 @@ class Orchestrator:
         self._emit("task", f"Created {task_id} [{priority}] {task.title}", task_id)
         self._auto_dispatch()
         return task
+
+    def create_task_from_template(self, title: str, priority: str = "P2") -> Task:
+        """A backlog entry with the template body, meant to be edited by hand. No clarity checks here."""
+        if not title or len(title.strip()) < 3:
+            raise OrchestratorError("Give the task a title (at least 3 characters).")
+        with self._lock:
+            task_id = f"T-{self.state.next_task_number:03d}"
+            self.state.next_task_number += 1
+            task = taskfiles.task_from_template(task_id, title, taskfiles.load_template(self.paths.home), priority)
+            self.state.tasks[task_id] = task
+            self.state.order.append(task_id)
+            self._sort_by_priority()
+        self._emit("task", f"Created {task_id} from the template: {task.title}. Fill in its file before starting it.", task_id)
+        return task
+
+    def task_file(self, task_id: str) -> Path:
+        return self.store.tasks.path / f"{self._task(task_id).id}.md"
 
     def _sort_by_priority(self) -> None:
         """Stable sort: priority first, manual order second."""
@@ -182,6 +243,7 @@ class Orchestrator:
                                         merged["acceptance_criteria"], merged["verification"], merged["priority"])
             if errors:
                 raise OrchestratorError("Update rejected: " + " ".join(errors))
+            self._agent_settings(None, **{f: merged[f] for f in AGENT_SETTING_FIELDS})
             for f, v in merged.items():
                 setattr(task, f, v.strip() if isinstance(v, str) else v)
             task.touch()
@@ -216,6 +278,20 @@ class Orchestrator:
             task.status = TaskStatus.CANCELLED
             task.touch()
         self._emit("task", f"Cancelled {task.id}. {reason}".strip(), task.id)
+        return task
+
+    def close_task(self, task_id: str) -> Task:
+        """x on the tasks page: the task is finished as far as you are concerned. Its agent (if any) is stopped."""
+        task = self._task(task_id)
+        if task.agent and task.agent.session_open:
+            self.stop_agent(task.id)
+        with self._lock:
+            task.status = TaskStatus.DONE
+            task.blocked_reason = None
+            task.result = {"summary": "Closed from the tasks page.", "verification_notes": "", "ts": time.time()}
+            task.touch()
+        self._emit("done", f"{task.id} '{task.title}' closed.", task.id)
+        self._auto_dispatch()
         return task
 
     def delete_task(self, task_id: str) -> None:
@@ -255,7 +331,9 @@ class Orchestrator:
         return tasks
 
     # --------------------------------------------------------------- dispatch
-    def spawn_agent(self, task_id: str | None = None, resume: bool | None = None) -> Task:
+    def spawn_agent(self, task_id: str | None = None, resume: bool | None = None,
+                    tool: str | None = None, model: str | None = None, effort: str | None = None) -> Task:
+        """Start an agent on a task. tool/model/effort given here are saved on the task, then used."""
         self._require_tmux()
         with self._lock:
             task = self._task(task_id) if task_id else self.next_backlog_task()
@@ -268,29 +346,104 @@ class Orchestrator:
             if self.free_slots() <= 0:
                 raise OrchestratorError(
                     f"All {self.config.agents.concurrency} slots are busy. Wait for a task to finish or raise agents.concurrency.")
+            settings = self._agent_settings(task, tool=tool, model=model, effort=effort)
+            for field, value in zip(AGENT_SETTING_FIELDS, (tool, model, effort)):
+                if value:
+                    setattr(task, field, value.strip())
 
             cwd, wt_path, branch = self._prepare_workdir(task)
-            can_resume = bool(task.agent and task.agent.session_id and task.agent.cwd == str(cwd))
+            previous = task.agent
+            can_resume = bool(previous and previous.session_id and previous.cwd == str(cwd)
+                              and previous.tool == settings.tool)
             do_resume = can_resume if resume is None else (resume and can_resume)
-            session_id = task.agent.session_id if do_resume else launcher.new_session_id()
+            session_id = previous.session_id if do_resume else launcher.new_session_id() if settings.tool == "claude" else ""
 
-            system_prompt = prompts.agent_prompt(self.config, task, str(wt_path) if wt_path else None, branch)
-            argv = launcher.agent_argv(self.config, self.paths, task.id, session_id, prompts.agent_kickoff(task),
-                                       do_resume, system_prompt)
+            system_prompt = prompts.agent_prompt(self.config, task, str(wt_path) if wt_path else None, branch,
+                                                 settings.tool, self.base_branch())
+            argv = launcher.agent_argv(self.config, self.paths, task.id, cwd, settings, session_id,
+                                       prompts.agent_kickoff(task), do_resume, system_prompt)
             self.tmux.ensure_session(self.paths.root)
             window = self.tmux.new_window(task.id, cwd, argv, launcher.session_env(self.paths, task.id))
-            self._auto_accept_dialogs(window)
+            self._auto_accept_dialogs(window, settings.tool)
             task.agent = AgentInfo(
-                session_id=session_id, tmux_window=window, cwd=str(cwd), rc_name=self.config.agent_rc_name(task.id),
+                session_id=session_id, tmux_window=window, cwd=str(cwd),
+                rc_name=self.config.agent_rc_name(task.id) if settings.tool == "claude" else "",
                 worktree=str(wt_path) if wt_path else None, branch=branch,
+                tool=settings.tool, model=settings.model, effort=settings.effort,
             )
+            if do_resume and task.sessions:
+                task.sessions[-1]["ended_at"] = None   # the same conversation continues
+            else:
+                task.sessions.append(_session_record(task.agent))
             task.status = TaskStatus.PLANNING
             task.blocked_reason = None
             task.touch()
         verb = "Resumed" if do_resume else "Started"
         where = f"worktree {branch}" if branch else "project root"
-        self._emit("agent", f"{verb} agent for {task.id} in {where} (RC: {task.agent.rc_name}). Waiting for plan approval.", task.id)
+        rc = f", RC: {task.agent.rc_name}" if task.agent.rc_name else ""
+        self._emit("agent", f"{verb} {settings.label()} agent for {task.id} in {where}{rc}. Waiting for plan approval.", task.id)
         return task
+
+    # ------------------------------------------------------------ free agents
+    def spawn_free_agent(self, tool: str | None = None, model: str | None = None, effort: str | None = None) -> dict[str, Any]:
+        """A Claude or Codex session in the project root with no task ("New agent" on the agents page)."""
+        self._require_tmux()
+        with self._lock:
+            if self.free_slots() <= 0:
+                raise OrchestratorError(
+                    f"All {self.config.agents.concurrency} slots are busy. Wait for a session to end or raise agents.concurrency.")
+            settings = self._agent_settings(None, tool=tool, model=model, effort=effort)
+            agent_id = f"A-{self.state.next_agent_number:03d}"
+            self.state.next_agent_number += 1
+            session_id = launcher.new_session_id() if settings.tool == "claude" else ""
+            argv = launcher.free_agent_argv(self.config, self.paths, agent_id, settings, session_id)
+            self.tmux.ensure_session(self.paths.root)
+            window = self.tmux.new_window(agent_id, self.paths.root, argv, launcher.session_env(self.paths, agent_id))
+            self._auto_accept_dialogs(window, settings.tool)
+            self.state.free_agents[agent_id] = AgentInfo(
+                session_id=session_id, tmux_window=window, cwd=str(self.paths.root),
+                rc_name=self.config.agent_rc_name(agent_id) if settings.tool == "claude" else "",
+                tool=settings.tool, model=settings.model, effort=settings.effort)
+            self.save()
+        self._emit("agent", f"Started {settings.label()} agent {agent_id} in the project root.")
+        return {"id": agent_id, **asdict(self.state.free_agents[agent_id])}
+
+    def stop_free_agent(self, agent_id: str) -> None:
+        with self._lock:
+            info = self.state.free_agents.get(agent_id.upper())
+            if not info:
+                raise OrchestratorError(f"No agent {agent_id}.")
+            self.tmux.kill_window(info.tmux_window)
+            del self.state.free_agents[agent_id.upper()]
+            self.save()
+        self._emit("agent", f"Stopped agent {agent_id}.")
+
+    def list_agents(self) -> list[dict[str, Any]]:
+        """Every open session for the agents page: task agents (with their task's status) and free agents."""
+        rows = [{"id": t.id, "title": t.title, "task": True, "status": str(t.status), "agent": asdict(t.agent)}
+                for t in self.state.tasks.values() if t.agent and t.agent.session_open]
+        rows += [{"id": aid, "title": "agent (no task)", "task": False, "status": "", "agent": asdict(a)}
+                 for aid, a in self.state.free_agents.items() if a.session_open]
+        return rows
+
+    def _free_agent_hook(self, agent_id: str, info: AgentInfo, event: str, payload: dict[str, Any]) -> None:
+        with self._lock:
+            info.last_activity = time.time()
+            self._track_session_id(info, payload)
+            if event in ("idle", "busy", "cleared"):
+                info.phase = "idle" if event == "cleared" else event
+                if event == "busy":
+                    info.attention = ""
+            elif event == "session-end":
+                info.session_open = False
+                info.phase = "ended"
+                info.attention = ""
+                info.finished_at = time.time()
+            self.save()
+        if event == "idle":
+            self._attend(agent_id, "waiting for your reply", when_idle=True)
+        elif event in ("notification", "permission"):
+            self._attend(agent_id, _attention_reason(payload, event))
 
     def _prepare_workdir(self, task: Task) -> tuple[Path, Path | None, str | None]:
         if not self.config.agents.worktrees:
@@ -314,9 +467,11 @@ class Orchestrator:
             task.agent.session_open = False
             task.agent.phase = "ended"
             task.agent.finished_at = time.time()
+            self._sync_session_record(task, ended=True)
             if task.is_active:
                 task.status = TaskStatus.BACKLOG if requeue else TaskStatus.INTERRUPTED
             task.touch()
+        self._keep_transcript(task)
         self._emit("agent", f"Stopped agent for {task.id} (now {task.status}).", task.id)
         self._auto_dispatch()
         return task
@@ -329,7 +484,9 @@ class Orchestrator:
             self.tmux.kill_window(task.agent.tmux_window)
             task.agent.session_open = False
             task.agent.phase = "ended"
+            self._sync_session_record(task, ended=True)
             self.save()
+            self._keep_transcript(task)
             self._emit("agent", f"Closed the finished session of {task.id}.", task.id)
         return task
 
@@ -360,6 +517,31 @@ class Orchestrator:
                 return
 
     # ---------------------------------------------------------- agent reports
+    def update_plan(self, task_id: str, plan: str) -> Task:
+        """The agent writes (or rewrites) the Plan section of its task file."""
+        task = self._task(task_id)
+        if not (plan or "").strip():
+            raise OrchestratorError("Give the plan itself (the steps you intend to take).")
+        with self._lock:
+            task.plan = plan.strip()
+            task.touch()
+            self.save()
+        self._emit("task", f"{task.id}: plan updated.", task.id)
+        return task
+
+    def add_context(self, task_id: str, note: str) -> Task:
+        """Append something the agent learned (a constraint, a file, a decision) to the task's Context."""
+        task = self._task(task_id)
+        note = " ".join((note or "").split())
+        if len(note) < 10:
+            raise OrchestratorError("Say what you found in one or two sentences.")
+        with self._lock:
+            task.context = f"{task.context.rstrip()}\n- {note}".strip()
+            task.touch()
+            self.save()
+        self._emit("task", f"{task.id}: context updated — {note[:80]}", task.id)
+        return task
+
     def report_progress(self, task_id: str, note: str) -> Task:
         task = self._task(task_id)
         with self._lock:
@@ -384,8 +566,32 @@ class Orchestrator:
         self._attend(task.id, f"blocked: {reason.strip()[:80]}")
         return task
 
-    def complete_task(self, task_id: str, summary: str, verification_notes: str) -> Task:
+    def base_branch(self) -> str:
+        """Where an agent's work is merged when you approve it: agents.merge_into, or the branch the project is on."""
+        return self.config.agents.merge_into or worktree.current_branch(self.paths.root) or "main"
+
+    def merge_task(self, task_id: str) -> dict[str, Any]:
+        """Commit whatever is left in the agent's worktree and merge its branch into the base branch.
+        The agent calls this only after the user said yes."""
         task = self._task(task_id)
+        agent = task.agent
+        if not agent or not agent.worktree or not agent.branch:
+            raise OrchestratorError(f"{task.id} has no worktree branch to merge (worktrees are off for it).")
+        base = self.base_branch()
+        if base == agent.branch:
+            raise OrchestratorError(f"{task.id} is already on {base}; nothing to merge.")
+        path = Path(agent.worktree)
+        try:
+            committed = worktree.commit_all(path, f"{task.id} {task.title}")
+            head = worktree.merge_branch(self.paths.root, agent.branch, base, f"Merge {agent.branch}: {task.title}")
+        except worktree.GitError as exc:
+            raise OrchestratorError(f"Could not merge {agent.branch} into {base}: {exc}") from exc
+        self._emit("agent", f"{task.id}: merged {agent.branch} into {base} ({head}).", task.id, notify_manager=True)
+        return {"task_id": task.id, "branch": agent.branch, "into": base, "committed": committed, "head": head}
+
+    def complete_task(self, task_id: str, summary: str, verification_notes: str, merge: bool = False) -> Task:
+        task = self._task(task_id)
+        merged = self.merge_task(task_id) if merge else None
         with self._lock:
             task.status = TaskStatus.DONE
             task.blocked_reason = None
@@ -395,12 +601,18 @@ class Orchestrator:
                 task.agent.attention = ""
             task.touch()
         branch_note = ""
-        if task.agent and task.agent.worktree:
-            branch_note = f" Work is on branch {task.agent.branch} ({worktree.worktree_summary(self.paths.root, Path(task.agent.worktree))})."
+        if merged:
+            branch_note = f" Merged into {merged['into']} ({merged['head']})."
+        elif task.agent and task.agent.worktree:
+            branch_note = (f" Work is on branch {task.agent.branch} "
+                           f"({worktree.worktree_summary(self.paths.root, Path(task.agent.worktree))}); not merged.")
         self._emit("done", f"{task.id} '{task.title}' is DONE.{branch_note} Summary: {summary.strip()[:400]}",
                    task.id, notify_manager=True)
-        if self.config.agents.auto_close_done and task.agent:
-            threading.Timer(20, self._safe_close, args=(task.id,)).start()
+        if task.agent:
+            # The work is finished: close the session so its slot frees. The worktree, the branch and the
+            # session record in the task file stay, so nothing is lost.
+            self._keep_transcript(task)
+            threading.Timer(self.config.agents.close_done_after, self._safe_close, args=(task.id,)).start()
         self._auto_dispatch()
         return task
 
@@ -429,18 +641,80 @@ class Orchestrator:
         return {"ok": True}
 
     def handle_hook(self, role: str, task_id: str | None, event: str, payload: dict[str, Any]) -> None:
+        if event == "session-end" and payload.get("reason") == "clear":
+            event = "cleared"   # /clear starts a new conversation in the same window; the session is not gone
         if role == "manager":
             self._manager_hook(event, payload)
         elif task_id and task_id.upper() in self.state.tasks:
             self._agent_hook(self.state.tasks[task_id.upper()], event, payload)
+        elif task_id and task_id.upper() in self.state.free_agents:
+            self._free_agent_hook(task_id.upper(), self.state.free_agents[task_id.upper()], event, payload)
+
+    @staticmethod
+    def _track_session_id(info: ManagerInfo | AgentInfo, payload: dict[str, Any]) -> None:
+        """Every hook carries the session's own id and transcript file: remember both. (/clear gives Claude a new
+        session id, and a Codex session only tells us its id once it starts, so this is how we learn them.)"""
+        sid = payload.get("session_id")
+        if sid and sid != info.session_id:
+            info.session_id = sid
+        path = payload.get("transcript_path")
+        if path and isinstance(info, AgentInfo):
+            info.transcript = str(path)
+
+    def _apply_transcripts_gitignore(self) -> None:
+        """tasks.gitignore_transcripts: a .gitignore in the sessions folder keeps the copies out of git."""
+        folder = self.store.tasks.path / "sessions"
+        if not folder.is_dir():
+            return
+        ignore = folder / ".gitignore"
+        if self.config.tasks.gitignore_transcripts:
+            if not ignore.exists():
+                ignore.write_text("# transcripts of the agent sessions; tasks.gitignore_transcripts turns this off\n*\n")
+        elif ignore.exists():
+            ignore.unlink()
+
+    def _sync_session_record(self, task: Task, ended: bool = False) -> None:
+        """Copy what we now know about the running agent into the task's session list (the task file keeps it)."""
+        if not task.agent or not task.sessions:
+            return
+        record = task.sessions[-1]
+        record.update(session_id=task.agent.session_id, transcript=task.agent.transcript)
+        if ended and not record.get("ended_at"):
+            record["ended_at"] = time.time()
+
+    def _keep_transcript(self, task: Task) -> None:
+        """Copy the finished session's transcript next to the task files, so the record survives the tool's own
+        history (tasks.keep_transcripts; tasks.gitignore_transcripts decides whether it is committed)."""
+        if not self.config.tasks.keep_transcripts or not task.agent or not task.sessions:
+            return
+        source = Path(task.agent.transcript or "")
+        if not source.is_file():
+            return
+        folder = self.store.tasks.path / "sessions" / task.id
+        folder.mkdir(parents=True, exist_ok=True)
+        self._apply_transcripts_gitignore()
+        target = folder / f"{task.agent.session_id or source.stem}{source.suffix or '.jsonl'}"
+        try:
+            shutil.copy2(source, target)
+        except OSError as exc:
+            self._emit("error", f"Could not copy the transcript of {task.id}: {exc}", task.id)
+            return
+        with self._lock:
+            task.sessions[-1]["copy"] = str(target)
+            self.save()
 
     def _manager_hook(self, event: str, payload: dict[str, Any]) -> None:
         m = self.state.manager
         if not m:
             return
         with self._lock:
+            if event == "session-end" and not m.session_open:
+                return   # we closed it ourselves (stop_manager); nothing more to do
             m.last_activity = time.time()
-            if event == "session-end":
+            self._track_session_id(m, payload)
+            if event == "cleared":
+                m.phase = "idle"
+            elif event == "session-end":
                 m.session_open = False
                 m.phase = "ended"
                 m.attention = ""
@@ -449,10 +723,13 @@ class Orchestrator:
                 if event == "busy":
                     m.attention = ""
             self.save()
-        if event == "session-end":
+        if event == "cleared":
+            self._emit("manager", "Manager conversation cleared (/clear); the session stays up.")
+        elif event == "session-end":
             self._emit("manager", "Manager session ended.")
+            self._manager_closed_by_user()
         elif event == "idle":
-            self._attend("manager", "waiting for your reply")
+            self._attend("manager", "waiting for your reply", when_idle=True)
         elif event == "notification":
             self._attend("manager", _attention_reason(payload))
 
@@ -461,9 +738,14 @@ class Orchestrator:
         if not agent:
             return
         notify = None
+        ended = event == "session-end"
         with self._lock:
             agent.last_activity = time.time()
-            if event == "plan-approved" and task.status == TaskStatus.PLANNING:
+            self._track_session_id(agent, payload)
+            self._sync_session_record(task, ended=ended)
+            if event == "cleared":
+                agent.phase = "idle"
+            elif event == "plan-approved" and task.status == TaskStatus.PLANNING:
                 task.status = TaskStatus.WORKING
                 agent.attention = ""
                 notify = f"{task.id}: plan approved, agent is now implementing."
@@ -482,24 +764,45 @@ class Orchestrator:
                               "You can resume it with spawn_agent (it keeps its worktree and conversation).")
             task.touch()
             self.save()
+        if ended:
+            self._keep_transcript(task)
         if event == "plan-approved":
             self._emit("agent", notify or "", task.id)
         elif notify:
             self._emit("interrupted", notify, task.id, notify_manager=True)
             self._auto_dispatch()
         elif event == "idle" and task.is_active and not (task.status == TaskStatus.BLOCKED and agent.attention):
-            self._attend(task.id, "waiting for your reply")
-        elif event == "notification" and task.is_active:
-            self._attend(task.id, _attention_reason(payload))
+            self._attend(task.id, "plan ready — approve it" if task.status == TaskStatus.PLANNING
+                         else "waiting for your reply", when_idle=True)
+        elif event in ("notification", "permission") and task.is_active:
+            self._attend(task.id, _attention_reason(payload, event))
+
+    def plan_approved(self, task_id: str) -> Task:
+        """A Codex agent has no plan mode: it calls this MCP tool once the user approved its plan in the chat."""
+        task = self._task(task_id)
+        if task.status != TaskStatus.PLANNING:
+            raise OrchestratorError(f"{task.id} is {task.status}, not waiting for a plan approval.")
+        self._agent_hook(task, "plan-approved", {})
+        return task
 
     # -------------------------------------------------------------- attention
-    def _attend(self, target: str, reason: str) -> None:
-        """Mark a session ("manager" or a task id) as waiting for the user and ring its tmux window once."""
+    def _attend(self, target: str, reason: str, when_idle: bool = False, tries: int = IDLE_RECHECKS) -> None:
+        """Mark a session ("manager" or a task id) as waiting for the user and ring its tmux window once.
+
+        `when_idle` means the session just ended a turn. That is not always the end of its work: a shell or a
+        monitor it started in the background may still be running, and it will speak again by itself. In that
+        case we stay quiet and look again in a few seconds."""
         if not reason:
             return
         with self._lock:
             info = self._session_info(target)
             if not info or not info.session_open or info.attention == reason:
+                return
+            if when_idle and self._still_working(info):
+                info.phase = "busy"   # its turn ended, but it is working, not waiting for you
+                self.save()
+                if tries > 0:
+                    threading.Timer(IDLE_RECHECK_SECONDS, self._attend_later, args=(target, reason, tries - 1)).start()
                 return
             info.attention = reason
             self.save()
@@ -509,6 +812,26 @@ class Orchestrator:
                 self.tmux.ring(info.tmux_window)
             except TmuxError:
                 pass
+
+    def _attend_later(self, target: str, reason: str, tries: int) -> None:
+        """The second look at a session that ended its turn while a background shell or monitor was still running."""
+        info = self._session_info(target)
+        if not info or not info.session_open:
+            return
+        if not self._still_working(info):
+            with self._lock:
+                info.phase = "idle"
+                self.save()
+        self._attend(target, reason, when_idle=True, tries=tries)
+
+    def _still_working(self, info: ManagerInfo | AgentInfo) -> bool:
+        """True while the session's own status line says work is still running (a background shell, a monitor, a
+        turn in flight). Only the last lines are read: that is where both Claude Code and Codex put it."""
+        try:
+            pane = self.tmux.capture(info.tmux_window, 8)
+        except TmuxError:
+            return False
+        return bool(BACKGROUND_WORK.search("\n".join(pane.splitlines()[-4:])))
 
     def pause_session(self, target: str) -> str:
         """Press Esc in a session ("manager" or a task id): Claude stops its current turn and waits for you."""
@@ -534,6 +857,8 @@ class Orchestrator:
     def _session_info(self, target: str) -> ManagerInfo | AgentInfo | None:
         if target == "manager":
             return self.state.manager
+        if target.upper() in self.state.free_agents:
+            return self.state.free_agents[target.upper()]
         task = self.state.tasks.get(target.upper())
         return task.agent if task else None
 
@@ -578,12 +903,27 @@ class Orchestrator:
         m = self.state.manager
         if not m:
             raise OrchestratorError("No manager session exists.")
-        self.tmux.kill_window(m.tmux_window)
-        with self._lock:
+        with self._lock:   # mark it closed first, so the session-end hook knows this was us, not the user
             m.session_open = False
             m.phase = "ended"
             self.save()
+        self.tmux.kill_window(m.tmux_window)
         self._emit("manager", "Manager stopped.")
+
+    def _manager_closed_by_user(self) -> None:
+        """The manager chat was closed from inside (ctrl+c, /exit): take supermanager down with it if configured."""
+        if self.config.manager.exit_closes_all:
+            self.request_exit("manager chat closed")
+
+    def request_exit(self, why: str = "quit requested") -> None:
+        """Take supermanager down: agents back to the backlog, manager stopped, tmux workspace closed.
+        Used by the manager's exit and by ctrl+c ctrl+c on any page."""
+        if self.exit_requested:
+            return
+        self.exit_requested = why
+        self._emit("manager", f"Stopping supermanager ({why}); agents go back to the backlog.")
+        if self.on_exit_request:
+            self.on_exit_request(why)
 
     def ensure_manager(self) -> None:
         if self.config.manager.autostart and not self.manager_alive():
@@ -600,6 +940,9 @@ class Orchestrator:
                     self.stop_agent(task.id, requeue=True)
                 except OrchestratorError:
                     pass
+        for agent_id in list(self.state.free_agents):
+            if stop_agents:
+                self.stop_free_agent(agent_id)
         if self.manager_alive():
             self.stop_manager()
         self.kill_strays(agents=stop_agents)
@@ -610,6 +953,7 @@ class Orchestrator:
         patterns = [f"--mcp-config {home}/manager/"]
         if agents:
             patterns.append(f"--mcp-config {home}/agents/")
+            patterns.append(f"--settings {home}/agents/")   # free agents have no MCP config
         killed = 0
         for pattern in patterns:
             killed += _pkill_claude(pattern)
@@ -628,6 +972,7 @@ class Orchestrator:
         for t in self.state.tasks.values():
             if t.agent and t.agent.session_open:
                 wins.add(t.agent.tmux_window)
+        wins.update(a.tmux_window for a in self.state.free_agents.values() if a.session_open)
         return wins
 
     def ask_manager_to_start(self, task_id: str) -> Task:
@@ -672,9 +1017,18 @@ class Orchestrator:
             recent = self.state.events[-limit:]
         return [{"ts": e.ts, "kind": e.kind, "task_id": e.task_id, "message": e.message} for e in recent]
 
+    def events_since(self, ts: float, limit: int = 100) -> list[dict[str, Any]]:
+        """Events newer than ts (for the agents page, which runs in its own process)."""
+        with self._lock:
+            new = [e for e in self.state.events if e.ts > ts][-limit:]
+        return [{"ts": e.ts, "kind": e.kind, "task_id": e.task_id, "message": e.message} for e in new]
+
     # ------------------------------------------------------------- reconcile
-    def reconcile(self) -> None:
-        """Compare what state.json believes with what tmux actually has; fix the differences."""
+    def reconcile(self, startup: bool = False) -> None:
+        """Compare what state.json believes with what tmux actually has; fix the differences.
+
+        `startup`: a manager missing at boot is a leftover from an older run, not the user closing the chat.
+        """
         changed = False
         with self._lock:
             m = self.state.manager
@@ -691,6 +1045,11 @@ class Orchestrator:
                     m.connected = False
                     self.start_manager(resume=False)
                     return
+                self.save()
+                if not startup:
+                    self._manager_closed_by_user()
+                if self.exit_requested:
+                    return
             for task in self.state.tasks.values():
                 a = task.agent
                 if a and a.session_open and not self.tmux.window_alive(a.tmux_window):
@@ -703,6 +1062,12 @@ class Orchestrator:
                         task.status = TaskStatus.INTERRUPTED
                         self._emit("interrupted", f"{task.id} '{task.title}' was INTERRUPTED (its session is gone). "
                                    "spawn_agent resumes it.", task.id, notify_manager=True)
+            for agent_id, a in list(self.state.free_agents.items()):
+                if a.session_open and not self.tmux.window_alive(a.tmux_window):
+                    a.session_open = False
+                    changed = True
+                    self._close_dead_window(a.tmux_window, agent_id)
+                    del self.state.free_agents[agent_id]
             if changed:
                 self.save()
         self._sweep_dead_windows()
@@ -718,6 +1083,12 @@ class Orchestrator:
             a = task.agent
             if a and not a.session_open and self.tmux.dead_status(a.tmux_window) is not None:
                 self._close_dead_window(a.tmux_window, task.id, quiet=True)
+        for agent_id, a in list(self.state.free_agents.items()):
+            if not a.session_open and self.tmux.dead_status(a.tmux_window) is not None:
+                self._close_dead_window(a.tmux_window, agent_id, quiet=True)
+                with self._lock:
+                    del self.state.free_agents[agent_id]
+                    self.save()
 
     def _close_dead_window(self, window_id: str, who: str, quiet: bool = False) -> None:
         """A finished Claude leaves a 'Pane is dead' window behind. Close it; keep its last lines if it crashed."""
@@ -740,20 +1111,27 @@ class Orchestrator:
         m = self.state.manager
         return self.tmux.capture(m.tmux_window, lines) if m else ""
 
-    def _auto_accept_dialogs(self, window_id: str, seconds: int = 90) -> None:
-        """New folders (every worktree) make Claude Code ask 'do you trust this folder?'. Answer yes for it."""
+    def _auto_accept_dialogs(self, window_id: str, tool: str = "claude", seconds: int = 90) -> None:
+        """New folders (every worktree) make Claude Code and Codex ask 'do you trust this folder?'. Answer yes."""
         if not self.config.agents.auto_trust:
             return
+        dialogs = STARTUP_DIALOGS.get(tool, {})
+
+        def session_up(pane: str) -> bool:   # the empty input prompt: no dialog will come any more
+            if tool == "codex":
+                return "Ask Codex" in pane
+            return any(line.strip() == "❯" for line in pane.splitlines())
 
         def watch() -> None:
             deadline = time.time() + seconds
             while time.time() < deadline and self.tmux.window_alive(window_id):
                 pane = self.tmux.capture(window_id, 60)
-                if any(marker in pane for marker in STARTUP_DIALOGS):
-                    self.tmux.send_keys(window_id, "Down", "Enter")
+                keys = next((keys for marker, keys in dialogs.items() if marker in pane), None)
+                if keys:
+                    self.tmux.send_keys(window_id, *keys)
                     time.sleep(3)
                     continue
-                if any(line.strip() == "❯" for line in pane.splitlines()):  # empty input prompt: session is up
+                if session_up(pane):
                     return
                 time.sleep(1)
 
@@ -773,8 +1151,18 @@ ATTENTION_REASONS = {
 }
 
 
-def _attention_reason(payload: dict[str, Any]) -> str:
-    """Turn a Claude Code Notification hook payload into a short 'why it needs you' text ('' = it does not)."""
+def _session_record(agent: AgentInfo) -> dict[str, Any]:
+    """One line of a task's history: which tool, which conversation, where its transcript is."""
+    return {"tool": agent.tool, "model": agent.model, "effort": agent.effort, "session_id": agent.session_id,
+            "rc_name": agent.rc_name, "cwd": agent.cwd, "branch": agent.branch, "transcript": agent.transcript,
+            "copy": "", "started_at": agent.started_at, "ended_at": None}
+
+
+def _attention_reason(payload: dict[str, Any], event: str = "notification") -> str:
+    """Turn a Notification (Claude) or PermissionRequest (Codex) hook payload into a short 'why it needs you'
+    text ('' = it does not)."""
+    if event == "permission":
+        return ATTENTION_REASONS["permission_prompt"]
     reason = ATTENTION_REASONS.get(str(payload.get("notification_type", "")))
     if not reason:
         return ""

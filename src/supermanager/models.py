@@ -1,4 +1,6 @@
-"""Data shapes: Task, AgentInfo, ManagerInfo, Event, State. Open this to see what a task can contain."""
+"""Data shapes: Task, AgentInfo, ManagerInfo, Event, State. Open this to see what a task can contain.
+
+A free agent (A-001…) is an AgentInfo without a task: a plain Claude session you opened from the agents page."""
 
 from __future__ import annotations
 
@@ -28,9 +30,13 @@ class AgentInfo:
     session_id: str
     tmux_window: str
     cwd: str
-    rc_name: str
+    rc_name: str               # Remote Control name (claude only; "" for codex)
     worktree: str | None = None
     branch: str | None = None
+    tool: str = "claude"       # what runs in the window: claude or codex
+    model: str = ""            # "" = the tool's default
+    effort: str = ""
+    transcript: str = ""       # the tool's own transcript file, as its hooks report it
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     phase: str = "starting"    # starting | busy | idle | ended
@@ -61,9 +67,14 @@ class Task:
     acceptance_criteria: list[str]
     verification: str
     context: str = ""
+    plan: str = ""             # how the agent intends to do it; the agent keeps it current (update_plan)
     priority: str = "P2"
+    tool: str = ""             # per-task agent settings; "" = the agents.* default from config
+    model: str = ""
+    effort: str = ""
     status: str = TaskStatus.BACKLOG
     agent: AgentInfo | None = None
+    sessions: list[dict[str, Any]] = field(default_factory=list)   # every agent session that worked on this task
     progress: list[dict[str, Any]] = field(default_factory=list)
     result: dict[str, Any] | None = None
     blocked_reason: str | None = None
@@ -83,6 +94,8 @@ class Task:
             "title": self.title,
             "priority": self.priority,
             "status": self.status,
+            "tool": self.tool, "model": self.model, "effort": self.effort,
+            "sessions": len(self.sessions),
             "agent_phase": self.agent.phase if self.agent else None,
             "branch": self.agent.branch if self.agent else None,
         }
@@ -104,6 +117,8 @@ class State:
     manager: ManagerInfo | None = None
     events: list[Event] = field(default_factory=list)
     pending_manager_events: list[str] = field(default_factory=list)
+    free_agents: dict[str, AgentInfo] = field(default_factory=dict)   # id "A-001" -> session, no task
+    next_agent_number: int = 1
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -114,6 +129,7 @@ class State:
         for tid, td in d.get("tasks", {}).items():
             agent = td.get("agent")
             td = {**td, "agent": AgentInfo(**agent) if agent else None}
+            td.setdefault("sessions", [])
             tasks[tid] = Task(**td)
         manager = d.get("manager")
         return cls(
@@ -123,4 +139,6 @@ class State:
             manager=ManagerInfo(**manager) if manager else None,
             events=[Event(**e) for e in d.get("events", [])],
             pending_manager_events=list(d.get("pending_manager_events", [])),
+            free_agents={aid: AgentInfo(**a) for aid, a in d.get("free_agents", {}).items()},
+            next_agent_number=d.get("next_agent_number", 1),
         )

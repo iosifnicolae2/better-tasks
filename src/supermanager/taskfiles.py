@@ -15,26 +15,67 @@ from pathlib import Path
 
 from .models import AgentInfo, Task
 
-SECTIONS = ("Problem", "Expected outcome", "Acceptance criteria", "Verification", "Context", "Progress", "Result")
+SECTIONS = ("Problem", "Expected outcome", "Acceptance criteria", "Verification", "Context", "Plan", "Progress",
+            "Result")
 STAMP = "%Y-%m-%d %H:%M"
-FRONT_KEYS = ("id", "title", "priority", "status", "created_at", "updated_at", "blocked_reason", "result_ts", "agent")
+FRONT_KEYS = ("id", "title", "priority", "tool", "model", "effort", "status", "created_at", "updated_at",
+              "blocked_reason", "result_ts", "agent", "sessions")
+TEMPLATE_NAME = "task-template.md"   # put one in .supermanager/ to override DEFAULT_TEMPLATE for a project
+
+DEFAULT_TEMPLATE = """\
+## Problem
+What is wrong or wanted, where it shows up, and how it manifests today.
+
+## Expected outcome
+What "done" looks like once the task is finished.
+
+## Acceptance criteria
+- An observable statement a person or a command can confirm true or false.
+- Another one.
+
+## Verification
+How to check it: a command (tests, script, build) or precise manual steps.
+
+## Context
+Files, modules, links, constraints, and anything from CLAUDE.md the agent must respect.
+"""
 
 
 def render_task(t: Task) -> str:
     front = {
-        "id": t.id, "title": t.title, "priority": t.priority, "status": str(t.status),
+        "id": t.id, "title": t.title, "priority": t.priority,
+        "tool": t.tool, "model": t.model, "effort": t.effort, "status": str(t.status),
         "created_at": t.created_at, "updated_at": t.updated_at, "blocked_reason": t.blocked_reason,
         "result_ts": t.result.get("ts") if t.result else None,
         "agent": t.agent.__dict__ if t.agent else None,
+        "sessions": t.sessions,
     }
     lines = ["---"] + [f"{k}: {json.dumps(v)}" for k, v in front.items()] + ["---", "", f"# {t.id} · {t.title}", ""]
     lines += ["## Problem", t.problem, "", "## Expected outcome", t.expected_outcome, "", "## Acceptance criteria"]
     lines += [f"- {c}" for c in t.acceptance_criteria] + ["", "## Verification", t.verification, "", "## Context", t.context, ""]
+    lines += ["## Plan", t.plan, ""]
     lines += ["## Progress"] + [f"- {time.strftime(STAMP, time.localtime(p['ts']))} — {p['note']}" for p in t.progress] + [""]
     lines += ["## Result"]
     if t.result:
         lines += [t.result["summary"], "", "### Verification notes", t.result["verification_notes"]]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def load_template(home: Path) -> str:
+    """The project's task template (.supermanager/task-template.md) or the built-in one."""
+    custom = home / TEMPLATE_NAME
+    return custom.read_text() if custom.is_file() else DEFAULT_TEMPLATE
+
+
+def task_from_template(task_id: str, title: str, template: str, priority: str = "P2") -> Task:
+    """A task whose body comes straight from the template; the user fills it in with an editor."""
+    body = _sections(template)
+    return Task(
+        id=task_id, title=title.strip(), priority=priority,
+        problem=body["Problem"], expected_outcome=body["Expected outcome"],
+        acceptance_criteria=[l[2:].strip() for l in body["Acceptance criteria"].splitlines() if l.startswith("- ")],
+        verification=body["Verification"], context=body["Context"],
+    )
 
 
 def parse_task(text: str, source: str = "?") -> Task:
@@ -53,10 +94,12 @@ def parse_task(text: str, source: str = "?") -> Task:
         result = {"summary": summary.strip(), "verification_notes": notes.strip(), "ts": front.get("result_ts") or 0}
     return Task(
         id=front["id"], title=front["title"], priority=front.get("priority", "P2"), status=front.get("status", "backlog"),
+        tool=front.get("tool") or "", model=front.get("model") or "", effort=front.get("effort") or "",
         problem=body["Problem"], expected_outcome=body["Expected outcome"],
         acceptance_criteria=[l[2:].strip() for l in body["Acceptance criteria"].splitlines() if l.startswith("- ")],
-        verification=body["Verification"], context=body["Context"],
+        verification=body["Verification"], context=body["Context"], plan=body["Plan"],
         agent=AgentInfo(**front["agent"]) if front.get("agent") else None,
+        sessions=front.get("sessions") or [],
         progress=[_progress_item(l) for l in body["Progress"].splitlines() if l.startswith("- ")],
         result=result, blocked_reason=front.get("blocked_reason"),
         created_at=front.get("created_at", 0.0), updated_at=front.get("updated_at", 0.0),

@@ -103,7 +103,7 @@ def init(project: Optional[Path] = PROJECT_OPT,
         f"Created [bold]{paths.config}[/bold]\n\n"
         f"concurrency = {config.agents.concurrency}   worktrees = {config.agents.worktrees}\n"
         f"Manager RC name: [cyan]{config.manager_rc_name()}[/cyan]\n\n"
-        "Next: run [bold]supermanager[/bold] to open the manager chat; [bold]ctrl+a[/bold] opens the admin.",
+        "Next: run [bold]supermanager[/bold] to open the manager chat; [bold]ctrl+a[/bold] cycles through the pages.",
         title="supermanager", border_style="green"))
     if not (paths.root / "CLAUDE.md").exists():
         console.print("[yellow]Tip:[/yellow] this project has no CLAUDE.md. The manager and agents read it for "
@@ -114,7 +114,7 @@ def init(project: Optional[Path] = PROJECT_OPT,
 def up(project: Optional[Path] = PROJECT_OPT,
        headless: bool = typer.Option(False, help="Run the daemon in this terminal, no tmux, no dashboard."),
        no_attach: bool = typer.Option(False, "--no-attach", help="Start everything but stay in this shell."),
-       dashboard: bool = typer.Option(False, "--dashboard", "-d", help="Open the admin (dashboard) instead of the manager chat.")):
+       dashboard: bool = typer.Option(False, "--dashboard", "-d", help="Open the tasks page instead of the manager chat.")):
     """Start everything and drop you into the manager chat (default command)."""
     paths = _paths(project)
     if paths.root in (Path.home().resolve(), Path("/")):
@@ -131,7 +131,7 @@ def up(project: Optional[Path] = PROJECT_OPT,
 
     from .daemon import is_daemon_running
     from .launcher import supermanager_argv
-    from .tmux import DASHBOARD_WINDOW, KEY, MANAGER_WINDOW, Tmux, inside_tmux_session
+    from .tmux import AGENTS_WINDOW, CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, MANAGER_WINDOW, Tmux, inside_tmux_session
     if not Tmux.available():
         console.print("[red]tmux is required[/red] (it hosts the Claude sessions): brew install tmux")
         raise typer.Exit(1)
@@ -140,7 +140,7 @@ def up(project: Optional[Path] = PROJECT_OPT,
     if not is_daemon_running(paths.socket):
         argv = [*supermanager_argv(), "dashboard", "-C", str(paths.root)]
         if tmux.session_exists():
-            for name in (DASHBOARD_WINDOW, "dashboard"):   # "dashboard" was the admin window's old name
+            for name in (DASHBOARD_WINDOW, AGENTS_WINDOW, CONFIG_WINDOW, "events", "admin", "dashboard"):   # incl. older names
                 old = tmux.find_window(name)
                 if old:
                     tmux.kill_window(old)
@@ -150,6 +150,9 @@ def up(project: Optional[Path] = PROJECT_OPT,
         with console.status("Starting supermanager..."):
             _wait(lambda: is_daemon_running(paths.socket), 20, "the daemon did not start; run `supermanager dashboard` to see why")
 
+    for name, command in ((AGENTS_WINDOW, "agents-page"), (CONFIG_WINDOW, "config-page")):
+        if tmux.session_exists() and not tmux.find_window(name):
+            tmux.new_window(name, paths.root, [*supermanager_argv(), command, "-C", str(paths.root)], {})
     if not tmux.session_exists():
         console.print("[red]A supermanager daemon is running, but its workspace is not on this tmux server[/red] "
                       "(probably an older version). Stop it, then start again:\n"
@@ -159,14 +162,14 @@ def up(project: Optional[Path] = PROJECT_OPT,
     if config.manager.autostart:
         with console.status("Starting the manager Claude..."):
             _wait(lambda: (client.call("get_status").get("manager") or {}).get("running"), 30,
-                  "the manager did not start; press ctrl+a to open the admin and read the events")
+                  "the manager did not start; press ctrl+a for the tasks page and read the events")
     st = client.call("get_status")
     console.print(Panel.fit(
         f"[bold]{config.project_name}[/bold] is up.\n\n"
         f"  manager  → chat opens now; also in claude.ai as [cyan]{config.manager_rc_name()}[/cyan]\n"
         f"  agents   → {st['concurrency'] - st['free_slots']}/{st['concurrency']} running\n\n"
-        f"  [bold]{KEY}[/bold] opens the admin; [bold]{KEY}[/bold] again returns to the manager. Every other key goes to Claude.\n"
-        "  In the admin: enter opens a session, q leaves everything running, Q stops it all.",
+        f"  [bold]{KEY}[/bold] cycles manager → tasks → agents → config. Every other key goes to Claude.\n"
+        "  On the tasks page: enter opens a session, q leaves everything running, Q stops it all.",
         title="supermanager", border_style="green"))
     if no_attach:
         return
@@ -206,6 +209,24 @@ def dashboard(project: Optional[Path] = PROJECT_OPT):
     SupermanagerApp(Orchestrator(paths, config)).run()
 
 
+@app.command("agents-page", hidden=True)
+def agents_page(project: Optional[Path] = PROJECT_OPT):
+    """Run the agents page in this terminal (the `agents` window)."""
+    paths = _paths(project)
+    _require_config(paths)
+    from .tui.agents_page import AgentsApp
+    AgentsApp(paths).run()
+
+
+@app.command("config-page", hidden=True)
+def config_page(project: Optional[Path] = PROJECT_OPT):
+    """Run the config page in this terminal (the `config` window)."""
+    paths = _paths(project)
+    _require_config(paths)
+    from .tui.config_page import ConfigApp
+    ConfigApp(paths).run()
+
+
 def _auto_init(paths: ProjectPaths) -> None:
     """First run in a folder: create the config with defaults, no questions. Everything can be changed later."""
     config = Config(project_name=paths.root.name)   # worktrees on by default
@@ -225,11 +246,11 @@ async def _run_headless(orch) -> None:
     await daemon.start()
     orch.subscribe(lambda ev: console.print(f"[dim]{time.strftime('%H:%M:%S', time.localtime(ev.ts))}[/dim] "
                                             f"[bold]{ev.kind}[/bold] {ev.message}"))
-    orch.reconcile()
+    orch.reconcile(startup=True)
     orch.ensure_manager()
     console.print(f"supermanager daemon listening on {orch.paths.socket} (Ctrl-C to stop)")
     try:
-        while True:
+        while not orch.exit_requested:
             await asyncio.sleep(5)
             await asyncio.to_thread(orch.reconcile)
     except (KeyboardInterrupt, asyncio.CancelledError):
@@ -307,6 +328,9 @@ def _task_markdown(t) -> str:
     if t.agent:
         lines += ["", f"[bold]Agent[/bold] phase={t.agent.phase} RC={t.agent.rc_name} branch={t.agent.branch or '-'} "
                       f"worktree={t.agent.worktree or '-'}"]
+    for s in t.sessions:
+        lines += ["", f"[bold]Session[/bold] {s.get('tool', '?')} {s.get('model', '')} {s.get('effort', '')} "
+                      f"id={s.get('session_id') or '-'}\n  transcript: {s.get('copy') or s.get('transcript') or '-'}"]
     if t.blocked_reason:
         lines += ["", f"[bold red]Blocked:[/bold red] {t.blocked_reason}"]
     if t.result:
@@ -347,11 +371,16 @@ def add(project: Optional[Path] = PROJECT_OPT):
 
 @app.command()
 def spawn(task_id: Optional[str] = typer.Argument(None), project: Optional[Path] = PROJECT_OPT,
-          resume: Optional[bool] = typer.Option(None, help="Resume the previous conversation if there is one.")):
+          resume: Optional[bool] = typer.Option(None, help="Resume the previous conversation if there is one."),
+          tool: Optional[str] = typer.Option(None, help="claude or codex (saved on the task)."),
+          model: Optional[str] = typer.Option(None, help="Model for this task's agent (saved on the task)."),
+          effort: Optional[str] = typer.Option(None, help="Effort for this task's agent (saved on the task).")):
     """Start an agent for a task (top of backlog if omitted)."""
     paths = _paths(project)
-    t = _call(paths, "spawn_agent", task_id=task_id, resume=resume)
-    console.print(f"[green]Agent started for {t['id']}[/green] (RC: {t['agent']['rc_name']})")
+    t = _call(paths, "spawn_agent", task_id=task_id, resume=resume, tool=tool, model=model, effort=effort)
+    a = t["agent"]
+    console.print(f"[green]Agent started for {t['id']}[/green] ({a['tool']} {a['model']} {a['effort']}".rstrip()
+                  + (f", RC: {a['rc_name']}" if a["rc_name"] else "") + ")")
 
 
 @app.command()
@@ -445,23 +474,24 @@ def config_keys():
 @app.command(hidden=True)
 def mcp(role: str = typer.Option(..., help="manager or agent"),
         project: Path = typer.Option(..., help="Project root"),
-        task: Optional[str] = typer.Option(None, help="Task id (agents only)")):
-    """MCP stdio bridge loaded by Claude sessions (internal)."""
+        task: Optional[str] = typer.Option(None, help="Task id (agents only)"),
+        tool: str = typer.Option("claude", help="claude or codex: which tools the agent gets")):
+    """MCP stdio bridge loaded by Claude and Codex sessions (internal)."""
     from .mcp_server import run
-    run(project, role, task)
+    run(project, role, task, tool)
 
 
 @app.command(hidden=True)
 def hook(event: str = typer.Argument(...), project: Path = typer.Option(...),
          task: Optional[str] = typer.Option(None)):
-    """Claude Code hook receiver (internal). Reads the hook JSON on stdin and forwards it to the daemon."""
+    """Claude Code / Codex hook receiver (internal). Reads the hook JSON on stdin and forwards it to the daemon."""
     payload: dict = {}
     try:
         raw = sys.stdin.read()
         payload = json.loads(raw) if raw.strip() else {}
     except (json.JSONDecodeError, OSError):
         pass
-    keep = ("session_id", "hook_event_name", "tool_name", "reason", "notification_type", "message")
+    keep = ("session_id", "transcript_path", "hook_event_name", "tool_name", "reason", "notification_type", "message")
     slim = {k: payload.get(k) for k in keep if k in payload}
     try:
         DaemonClient(ProjectPaths(project).socket).call(
