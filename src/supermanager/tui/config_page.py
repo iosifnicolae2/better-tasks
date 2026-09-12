@@ -16,9 +16,30 @@ from ..client import DaemonClient, DaemonError, DaemonUnavailable
 from ..config import SETTABLE_KEYS, SETTING_HELP, get_key, load_config, local_keys, save_config, set_key
 from ..paths import ProjectPaths
 from ..tmux import CONFIG_WINDOW, Tmux, inside_tmux_session
-from .shared import FLEX, PageApp, PageTable, SearchBar, wrap
+from .shared import AUTO, FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, wrap
 
-COLUMNS = (("Setting", 30), ("Value", 20), ("What it does", FLEX))
+COLUMNS = (("Setting", AUTO), ("Value", AUTO), ("What it does", FLEX))
+SECTIONS = ("manager", "tasks", "agents")   # the ones you reach for; anything else follows, in name order
+SECTION_ABOUT = {
+    "manager": "the Claude that plans and dispatches — it never edits your code",
+    "tasks": "the backlog: where the task files live, what they carry, how the page shows them",
+    "agents": "what runs the work: how many, on what, in which copy of the repo, and what happens when they finish",
+    "notify": "how it asks for you",
+    "tmux": "the workspace itself",
+}
+
+
+def _sections(keys: list[str]) -> list[str]:
+    """The sections that have something to show: the ones worth reaching for first, then the rest by name."""
+    here = {k.split(".", 1)[0] for k in keys}
+    return [s for s in SECTIONS if s in here] + sorted(here - set(SECTIONS))
+
+
+def _sort_value(config):
+    def value(key: str, column: str) -> object:
+        return {"Setting": key, "Value": str(get_key(config, key)),
+                "What it does": SETTING_HELP.get(key, "")}.get(column)
+    return value
 
 
 def _shown(key: str, value: object) -> Text:
@@ -65,25 +86,40 @@ class ConfigApp(PageApp):
     def _render(self) -> None:
         table = self.query_one(DataTable)
         table.clear(columns=True)
-        self.add_columns(table, *COLUMNS)
-        width = self.flex_width
         keys = [k for k in SETTABLE_KEYS if self.matches(k, str(get_key(self.config, k)), SETTING_HELP.get(k, ""))]
-        keys = self.sorted_rows(keys, lambda k, column: {"Setting": k, "Value": str(get_key(self.config, k)),
-                                                          "What it does": SETTING_HELP.get(k, "")}.get(column))
+        self.add_columns(table, *COLUMNS, content={
+            "Setting": [k.split(".", 1)[1] for k in keys],
+            "Value": [_shown(k, get_key(self.config, k)) for k in keys],
+        })
+        width = self.flex_width
         overridden = local_keys(self.paths.config)
-        for key in keys:
+
+        def row(key: str) -> None:
             help_text = SETTING_HELP.get(key, "")
             if key in overridden:
                 help_text = f"[from config.local.toml] {help_text}"
-            table.add_row(key, _shown(key, get_key(self.config, key)), wrap(help_text, width, "dim"),
-                          key=key, height=None)
-        if self.selected in keys:
-            table.move_cursor(row=keys.index(self.selected))
+            table.add_row(key.split(".", 1)[1], _shown(key, get_key(self.config, key)),
+                          wrap(help_text, width, "dim"), key=key, height=None)
+
+        if self.sort:   # sorting is across everything; the sections would only get in the way
+            for key in self.sorted_rows(keys, _sort_value(self.config)):
+                row(key)
+        else:
+            for section in _sections(keys):
+                in_section = [k for k in keys if k.startswith(f"{section}.")]
+                table.add_row(Text(section, style="bold reverse"), "",
+                              Text(SECTION_ABOUT.get(section, ""), style="bold"), key=GROUP_PREFIX + section)
+                for key in in_section:
+                    row(key)
+        rows = [str(r.key.value) for r in table.ordered_rows]
+        table.move_to_task(rows.index(self.selected) if self.selected in rows else 0)   # never on a heading
 
     # ------------------------------------------------------------------ edit
     @on(DataTable.RowHighlighted)
     def _row(self, event: DataTable.RowHighlighted) -> None:
-        self.selected = str(event.row_key.value) if event.row_key else None
+        key = str(event.row_key.value or "") if event.row_key else ""
+        if key and not key.startswith(GROUP_PREFIX):
+            self.selected = key
 
     @on(DataTable.RowSelected)
     def _row_chosen(self, event: DataTable.RowSelected) -> None:
@@ -91,7 +127,7 @@ class ConfigApp(PageApp):
 
     def action_edit(self) -> None:
         key = self.selected
-        if not key or self.editing:
+        if not key or key not in SETTABLE_KEYS or self.editing:
             return
         if SETTABLE_KEYS[key] is bool:
             self._save(key, str(not get_key(self.config, key)))
