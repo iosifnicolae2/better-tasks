@@ -26,7 +26,9 @@ UPSTREAM_URL = "https://github.com/bringes/supermanager"
 MANAGED_DIR = Path.home() / ".local" / "share" / "supermanager" / "src"
 CHECK_EVERY = 24 * 3600            # how often `supermanager up` looks for a new release
 STAMP = RUNTIME_DIR.parent / "upgrade.json"
-TAG = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+# A release is a tag written `v0.1.0` — that shape and no other. The package's own version has no `v`
+# (pyproject.toml cannot), so `release()` puts it back whenever a version is shown or compared.
+RELEASE_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 
 class UpgradeError(RuntimeError):
@@ -47,8 +49,14 @@ def _git(root: Path | None, *args: str, check: bool = True) -> str:
     return proc.stdout.strip()
 
 
+def release(version: str) -> str:
+    """A version as a release is written: v0.1.0."""
+    version = version.strip()
+    return version if version.startswith("v") else f"v{version}"
+
+
 def _version(text: str) -> tuple[int, int, int] | None:
-    m = TAG.match(text.strip())
+    m = RELEASE_TAG.match(release(text))
     return (int(m[1]), int(m[2]), int(m[3])) if m else None
 
 
@@ -59,7 +67,7 @@ def latest_release(url: str) -> str | None:
     except OSError:
         return None
     tags = [line.split("refs/tags/")[-1] for line in out.splitlines() if "refs/tags/" in line]
-    versions = sorted((v, t) for t in tags if (v := _version(t)))
+    versions = sorted((v, t) for t in tags if RELEASE_TAG.match(t) and (v := _version(t)))
     return versions[-1][1] if versions else None
 
 
@@ -88,9 +96,9 @@ class Status:
     def notice(self) -> str:
         """One line for `supermanager up`, or "" when there is nothing worth saying."""
         if self.kind == "managed" and self.behind_release:
-            return f"supermanager {self.release} is out (you run {__version__}) — run `supermanager upgrade`."
+            return f"supermanager {self.release} is out (you run {release(__version__)}) — run `supermanager upgrade`."
         if self.is_fork and self.behind_upstream:
-            return (f"Your fork is on {__version__}; upstream released {self.upstream_release} — "
+            return (f"Your fork is on {release(__version__)}; upstream released {self.upstream_release} — "
                     f"`git -C {self.source} pull {UPSTREAM_URL} main` to catch up.")
         return ""
 
@@ -138,7 +146,7 @@ def upgrade() -> str:
     if status.dirty:
         raise UpgradeError(f"{status.source} has uncommitted changes; commit or stash them first.")
     if not status.behind_release:
-        return f"Already on the newest release ({__version__})."
+        return f"Already on the newest release ({release(__version__)})."
     before = _git(status.source, "rev-parse", "HEAD")
     _git(status.source, "fetch", "--tags", "--quiet", "origin")
     _git(status.source, "checkout", "--quiet", status.release or "main")

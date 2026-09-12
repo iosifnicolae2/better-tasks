@@ -423,8 +423,10 @@ def upgrade(check_only: bool = typer.Option(False, "--check", help="Only say whe
             if not status:
                 console.print("Not a git install; run install.sh to update.")
                 return
+            from .upgrade import release
             console.print(status.notice() or
-                          f"{status.kind} install on {__version__} ({status.release or 'no releases'} is the newest).")
+                          f"{status.kind} install on {release(__version__)} "
+                          f"({status.release or 'no releases'} is the newest).")
             return
         console.print(do_upgrade())
     except UpgradeError as exc:
