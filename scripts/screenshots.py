@@ -13,6 +13,7 @@ from supermanager.paths import ProjectPaths
 from supermanager.tui.agents_page import AgentsApp
 from supermanager.tui.app import SupermanagerApp
 from supermanager.tui.config_page import ConfigApp
+from textual.containers import Horizontal
 from textual.widgets import Static
 
 OUT = _P(__file__).resolve().parents[1] / "docs" / "screenshots"
@@ -70,9 +71,16 @@ def sessions(orch):
                            "tool": "claude", "model": "", "effort": "", "session_open": True}})
     return rows
 
-class Bar(Static):
-    """The strip tmux draws under every page: the workspace's windows, and the key that cycles them."""
-    DEFAULT_CSS = "Bar { dock: bottom; height: 1; background: #303030; color: #bcbcbc; padding: 0 1; }"
+class Bar(Horizontal):
+    """The strip tmux draws under every page: the pages on the left, whatever rings for you on the right."""
+    DEFAULT_CSS = """
+    Bar { dock: bottom; height: 1; background: #303030; color: #bcbcbc; }
+    Bar > .left { width: 1fr; padding: 0 1; }
+    Bar > .right { width: auto; padding: 0 1; }
+    """
+
+    def __init__(self, left: str, right: str) -> None:
+        super().__init__(Static(left, classes="left"), Static(right, classes="right"))
 
 
 def bar(active: str, tasks: int, agents: int) -> Static:
@@ -81,7 +89,9 @@ def bar(active: str, tasks: int, agents: int) -> Static:
         return f"[black on #5fd7ff] {label} [/]" if name == active else f" {label} "
     left = f"[b #5fd7ff] acme-api [/][#585858]│[/]"
     tabs = "".join(tab(n, c) for n, c in (("manager", 0), ("tasks", tasks), ("agents", agents), ("config", 0)))
-    return Bar(f"{left}{tabs}[#585858]{'':>6}[/][#8a8a8a]ctrl+a / ← → pages[/]")
+    # An agent that rings for you sits on the right, where tmux puts it, next to the key that cycles the pages.
+    right = "[bold #ffaf00] 🔔 T-001 [/]  [#8a8a8a]ctrl+a / ← → pages[/]"
+    return Bar(f"{left}{tabs}", right)
 
 
 async def with_bar(app, active, tasks, agents):

@@ -34,10 +34,16 @@ SERVER_OPTIONS = (
 # one blank space, which left a gap between the page names. This loop simply skips windows whose format is empty.
 STATUS_LEFT = ("#[align=left range=left #{E:status-left-style}]#[push-default]"
                "#{T;=/#{status-left-length}:status-left}#[pop-default]#[norange default]")
-STATUS_WINDOWS = ("#{W:#[range=window|#{window_index}]"
-                  "#{?window_active,#{E:window-status-current-format},#{E:window-status-format}}"
-                  "#[norange default]}")
-STATUS_RIGHT = ("#[align=right range=right #{E:status-right-style}]#[push-default]"
+IS_PAGE = "#{m/r:^(" + "|".join((MANAGER_WINDOW, *PAGE_WINDOWS)) + ")$,#{window_name}}"
+_TAB = ("#[range=window|#{window_index}]"
+        "#{?window_active,#{E:window-status-current-format},#{E:window-status-format}}"
+        "#[norange default]")
+# The pages on the left, in order. An agent window has no tab of its own here.
+STATUS_WINDOWS = "#{W:#{?" + IS_PAGE + "," + _TAB + ",}}"
+# An agent that rings for you goes on the right, next to the key that cycles the pages — the middle of the bar
+# stays empty rather than pushing the pages around every time something needs you.
+STATUS_RINGING = "#{W:#{?" + IS_PAGE + ",,#{?window_bell_flag," + _TAB + ",}}}"
+STATUS_RIGHT = ("#[align=right range=right #{E:status-right-style}]" + STATUS_RINGING + "#[push-default]"
                 "#{T;=/#{status-right-length}:status-right}#[pop-default]#[norange default]")
 
 
