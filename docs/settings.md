@@ -33,7 +33,8 @@ models, fewer agents on a laptop. The config page shows both and marks what your
 | `tasks.path` | .supermanager/tasks | where the task files live |
 | `tasks.in_git` | true | commit the task files, so the backlog is shared |
 | `tasks.hide_done` | true | finished tasks start collapsed (`h` shows them) |
-| `tasks.view` · `tasks.group_by` · `tasks.group_rows` | table · status · true | how the tasks page opens |
+| `tasks.view` | table | how the tasks page opens: `table` (a list) or `board` (a kanban) — `list` and `kanban` work too |
+| `tasks.group_by` · `tasks.group_rows` | status · true | what it groups by, and whether the table shows the headings |
 | `tasks.fields` | labels, scheduled | the extra fields a task carries |
 | `tasks.editor` | idea | what opens a task file (`idea`, `code`, `vim`…) |
 | `tasks.min_problem_chars` · `tasks.require_verification` | 60 · true | how strict the check on a new task is |
