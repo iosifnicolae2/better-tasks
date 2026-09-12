@@ -26,7 +26,8 @@ from ..models import FINISHED_STATUSES, PRIORITIES, WAITING_STATUSES, Event, Tas
 from ..orchestrator import Orchestrator, OrchestratorError
 from ..tmux import CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, inside_tmux_session
 from .board import CARD_WIDTH, NO_VALUE, Board, Card, field_grouping, label_chips, status_grouping
-from .shared import AUTO, FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, local_time, wrap
+from .shared import (AUTO, FLEX, GROUP_PREFIX, HelpScreen, PageApp, PageTable, SearchBar, TitleScreen, edit_task,
+                     local_time, wrap)
 
 # Light enough to read on the row's background and on the cursor's tint, so a selected row keeps its colours.
 MUTED = "#9aa0a6"
@@ -48,24 +49,50 @@ AGENT_WIDTH = 22
 STATE_WIDTH = 34
 PHASE_STYLE = {"starting": MUTED, "busy": "yellow", "idle": "green", "ended": MUTED}
 
-HELP = """\
-[b]tasks[/b]   enter / click  open the task's agent; without one, edit the task file in your editor
-         n  new task (a title, then the file opens in your editor)      i  edit the task file
-         s  start an agent on it     p  pause its agent (Esc: it stops and waits for you)     o  open its agent
-         h  show / hide the finished tasks (done, cancelled; hidden by default — tasks.hide_done on the config page)
-         order: running agents first, then priority, then the backlog order. Click a column title to sort by it instead.
-         x  delete the task     d  mark it done (its agent is stopped)     X  stop the agent, task back to backlog
-         r  requeue a finished task     D  cancel     c  close a finished session / remove its worktree
-         J/K  move it down/up the backlog     +/-  concurrency     m  manager start/stop     t  ask the manager to start it
-         v  table ⇄ board      g  what it groups by (status, labels, your own fields)      G  headings on/off
-         on the board: arrows move the selection, shift+←/→ move the task to another column (status, or the
-         field the board groups by), shift+↑/↓ move it up and down the backlog
-         ctrl+w  search (type, esc clears)     click a column title to sort     ← →  pages     , config
-         q  leave (everything keeps running)     Q or ctrl+c ctrl+c (any page)  quit all: manager, agents, tmux
-
-{KEY} cycles manager → tasks → agents → config. In the bar at the bottom, `agents` lights up while you are in an
-agent's window; click a name there to jump to it. Inside a Claude window every other key goes to Claude.
-"""
+HELP_SECTIONS = [
+    ("The task you are on", [
+        ("enter / click", "open its agent — or its file in your editor, when nothing runs on it"),
+        ("i", "edit the task file"),
+        ("s", "start an agent on it, or queue it when every slot is busy"),
+        ("t", "ask the manager to start it instead, so it knows"),
+        ("p", "pause its agent: Esc goes to the session, it stops and waits for you"),
+        ("o", "open its agent's window"),
+    ]),
+    ("Changing a task", [
+        ("n", "a new one: you type a title, the file opens in your editor"),
+        ("d", "mark it done (its agent is stopped first)"),
+        ("x", "delete it, file and all"),
+        ("X", "stop its agent and put the task back in the backlog"),
+        ("r", "requeue a finished one"),
+        ("D", "cancel it"),
+        ("c", "close a finished session, or remove the copy of the repo it worked in"),
+        ("J / K", "move it down or up the backlog"),
+    ]),
+    ("What you see", [
+        ("v", "the table or the board"),
+        ("g", "what it groups by: status, labels, a date, any field you added"),
+        ("G", "the headings in the table, on or off"),
+        ("h", "the finished tasks, shown or hidden"),
+        ("ctrl+w", "search every column (type; esc clears it)"),
+        ("click a title", "sort by that column: up, down, then back to the page's own order"),
+        ("", "which is running agents first, then queued, then priority"),
+    ]),
+    ("On the board", [
+        ("arrows", "move the selection between cards and columns"),
+        ("shift+← →", "move the task itself: to another status, or to another label"),
+        ("shift+↑ ↓", "move it up or down the backlog"),
+    ]),
+    ("The workspace", [
+        ("ctrl+a  ← →", "the next page: manager → tasks → agents → config"),
+        (",", "straight to the config page"),
+        ("m", "start or stop the manager"),
+        ("+ / -", "how many agents may run at once"),
+        ("q", "leave: the manager and the agents keep running"),
+        ("Q  ctrl+c ctrl+c", "stop everything: the manager, the agents, the workspace"),
+    ]),
+]
+HELP_NOTE = ("In the bar at the bottom, `agents` lights up while you are inside an agent's window — click a name "
+             "there to jump to it. Inside a session, every key but ctrl+a belongs to Claude or Codex.")
 
 class FinishedStrip(Static):
     """The line above the keys: how many finished tasks there are, and whether they are shown. Click it or
@@ -101,15 +128,6 @@ class ConfirmScreen(ModalScreen[bool]):
         with Vertical(id="confirm"):
             yield Static(self.question)
             yield Static("[dim]y yes · n / esc no[/dim]")
-
-
-class HelpScreen(ModalScreen[None]):
-    BINDINGS = [Binding("escape,q,question_mark", "dismiss", "Close")]
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="help"):
-            yield Static(HELP.replace("{KEY}", KEY))
-            yield Static("[dim]esc to close[/dim]")
 
 
 # ---------------------------------------------------------------------------------------------- app
@@ -447,7 +465,7 @@ class SupermanagerApp(PageApp):
         self.action_toggle_done()
 
     def action_help(self) -> None:
-        self.push_screen(HelpScreen())
+        self.push_screen(HelpScreen(f"{self.orch.config.project_name} · the tasks page", HELP_SECTIONS, HELP_NOTE))
 
     def action_refresh(self) -> None:
         self.orch.reconcile()

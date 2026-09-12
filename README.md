@@ -46,7 +46,7 @@ copy of the repo. Say no and the branch waits for you.
 
 **4. Your backlog keeps up.** Press `ctrl+a` any time to see it: what is running, what is queued, what needs you.
 
-<img src="docs/screenshots/walkthrough-tasks.svg" alt="The tasks page during a run" width="100%">
+<img src="docs/screenshots/tasks.svg" alt="The tasks page during a run" width="100%">
 
 That is the whole loop. Ask for three things at once and three agents run at once, each in its own copy of the
 repo; ask for ten and the rest queue up and start by themselves.

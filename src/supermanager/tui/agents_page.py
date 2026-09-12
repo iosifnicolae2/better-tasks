@@ -25,7 +25,7 @@ from ..config import load_config
 from ..paths import ProjectPaths
 from ..tmux import AGENTS_WINDOW, Tmux, inside_tmux_session
 from .app import MUTED, PHASE_STYLE, STATUS_STYLE   # one palette for both pages
-from .shared import AUTO, FLEX, PageApp, PageTable, SearchBar, edit_task, wrap
+from .shared import AUTO, FLEX, HelpScreen, PageApp, PageTable, SearchBar, edit_task, wrap
 
 # (name, width): AUTO fits the column to what is in it, FLEX takes whatever is left of the row. Widths are
 # settled when the list of agents changes, not on every refresh, so nothing shifts while you read.
@@ -35,6 +35,25 @@ PHASE_COLUMN = 1   # a click on the phase cell opens the agent
 FLEX_COLUMN = next(i for i, (_, width) in enumerate(COLUMNS) if width is FLEX)   # where a hint line goes
 NOTICE_KINDS = {"done": "information", "blocked": "warning", "interrupted": "warning", "error": "error",
                 "attention": "warning"}   # events that pop up here; the tasks page stays quiet
+HELP_SECTIONS = [
+    ("The session you are on", [
+        ("enter / click", "open its window: you are in the session, talking to it"),
+        ("i", "edit the task it works on (a free agent has no task file)"),
+        ("x", "stop it — a task agent's task goes back to the backlog"),
+    ]),
+    ("This page", [
+        ("n", "a new agent with no task: a plain session in the project root"),
+        ("ctrl+w", "search every column (type; esc clears it)"),
+        ("click a title", "sort by that column: up, down, then back to newest first"),
+    ]),
+    ("The workspace", [
+        ("ctrl+a  ← →", "the next page: manager → tasks → agents → config"),
+        ("q", "leave: everything keeps running"),
+        ("ctrl+c ctrl+c", "stop everything: the manager, the agents, the workspace"),
+    ]),
+]
+HELP_NOTE = ("Everything that needs you appears here — a plan to approve, a question, a task that finished or "
+             "was interrupted. The tasks page stays quiet on purpose.")
 
 
 def _age(ts: float) -> str:
@@ -72,6 +91,7 @@ class AgentsApp(PageApp):
         Binding("x", "stop_selected", "Stop"),
         Binding("q", "detach", "Leave"),
         Binding("o", "open_agent", "Open agent", show=False),
+        Binding("question_mark", "help", "Help", show=False),
     ]
 
     def __init__(self, paths: ProjectPaths):
@@ -185,6 +205,9 @@ class AgentsApp(PageApp):
     def _phase_clicked(self, event: PageTable.CellClicked) -> None:
         self.selected = str(event.row_key.value)
         self.action_open_agent()
+
+    def action_help(self) -> None:
+        self.push_screen(HelpScreen(f"{self.config.project_name} · the agents page", HELP_SECTIONS, HELP_NOTE))
 
     def action_edit_task(self) -> None:
         """i: the task file opens in your editor (a free agent has none)."""

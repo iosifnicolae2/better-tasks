@@ -6,5 +6,8 @@ install:   ## install the supermanager / sm commands, linked to this checkout
 uninstall:
 	uv tool uninstall supermanager
 
-screenshots:   ## redraw docs/screenshots from the real pages
-	uv run --with textual --with tomli-w --with typer --with rich --with mcp python scripts/screenshots.py
+RUN = uv run --with textual --with tomli-w --with typer --with rich --with mcp python
+
+screenshots:   ## redraw docs/screenshots: the pages, and the walkthrough
+	$(RUN) scripts/screenshots.py
+	$(RUN) scripts/walkthrough.py

@@ -1,4 +1,4 @@
-<svg class="rich-terminal" viewBox="0 0 2739 164.39999999999998" xmlns="http://www.w3.org/2000/svg">
+<svg class="rich-terminal" viewBox="0 0 1848 237.60000000000002" xmlns="http://www.w3.org/2000/svg">
     <!-- Generated with Rich https://www.textualize.io -->
     <style>
 
@@ -19,61 +19,69 @@
         font-weight: 700;
     }
 
-    .terminal-2179664999-matrix {
+    .terminal-1559924270-matrix {
         font-family: Fira Code, monospace;
         font-size: 20px;
         line-height: 24.4px;
         font-variant-east-asian: full-width;
     }
 
-    .terminal-2179664999-title {
+    .terminal-1559924270-title {
         font-size: 18px;
         font-weight: bold;
         font-family: arial;
     }
 
-    .terminal-2179664999-r1 { fill: #c5c8c6 }
-.terminal-2179664999-r2 { fill: #68a0b3 }
-.terminal-2179664999-r3 { fill: #868887 }
-.terminal-2179664999-r4 { fill: #c5c8c6;font-weight: bold }
-.terminal-2179664999-r5 { fill: #f6e2b7 }
-.terminal-2179664999-r6 { fill: #f2b590 }
-.terminal-2179664999-r7 { fill: #e990a9 }
-.terminal-2179664999-r8 { fill: #9cded3 }
+    .terminal-1559924270-r1 { fill: #c5c8c6 }
+.terminal-1559924270-r2 { fill: #e0e0e0 }
+.terminal-1559924270-r3 { fill: #fd971f }
+.terminal-1559924270-r4 { fill: #e0e0e0;font-weight: bold }
+.terminal-1559924270-r5 { fill: #7fc08a }
     </style>
 
     <defs>
-    <clipPath id="terminal-2179664999-clip-terminal">
-      <rect x="0" y="0" width="2719.6" height="145.39999999999998" />
+    <clipPath id="terminal-1559924270-clip-terminal">
+      <rect x="0" y="0" width="1829.0" height="218.6" />
     </clipPath>
-    <clipPath id="terminal-2179664999-line-0">
-    <rect x="0" y="1.5" width="2720.6" height="24.65"/>
+    <clipPath id="terminal-1559924270-line-0">
+    <rect x="0" y="1.5" width="1830" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2179664999-line-1">
-    <rect x="0" y="25.9" width="2720.6" height="24.65"/>
+<clipPath id="terminal-1559924270-line-1">
+    <rect x="0" y="25.9" width="1830" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2179664999-line-2">
-    <rect x="0" y="50.3" width="2720.6" height="24.65"/>
+<clipPath id="terminal-1559924270-line-2">
+    <rect x="0" y="50.3" width="1830" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2179664999-line-3">
-    <rect x="0" y="74.7" width="2720.6" height="24.65"/>
+<clipPath id="terminal-1559924270-line-3">
+    <rect x="0" y="74.7" width="1830" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2179664999-line-4">
-    <rect x="0" y="99.1" width="2720.6" height="24.65"/>
+<clipPath id="terminal-1559924270-line-4">
+    <rect x="0" y="99.1" width="1830" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-1559924270-line-5">
+    <rect x="0" y="123.5" width="1830" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-1559924270-line-6">
+    <rect x="0" y="147.9" width="1830" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-1559924270-line-7">
+    <rect x="0" y="172.3" width="1830" height="24.65"/>
             </clipPath>
     </defs>
 
-    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="2737" height="162.4" rx="8"/>
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1846" height="235.60000000000002" rx="8"/>
         
-    <g transform="translate(9, 9)" clip-path="url(#terminal-2179664999-clip-terminal)">
-    
-    <g class="terminal-2179664999-matrix">
-    <text class="terminal-2179664999-r1" x="0" y="20" textLength="183" clip-path="url(#terminal-2179664999-line-0)">•&#160;Committed&#160;as&#160;</text><text class="terminal-2179664999-r2" x="183" y="20" textLength="85.4" clip-path="url(#terminal-2179664999-line-0)">6b131a6</text><text class="terminal-2179664999-r1" x="268.4" y="20" textLength="24.4" clip-path="url(#terminal-2179664999-line-0)">;&#160;</text><text class="terminal-2179664999-r2" x="292.8" y="20" textLength="244" clip-path="url(#terminal-2179664999-line-0)">python3&#160;-m&#160;pytest&#160;-q</text><text class="terminal-2179664999-r1" x="536.8" y="20" textLength="1061.4" clip-path="url(#terminal-2179664999-line-0)">&#160;passes&#160;(1&#160;test).&#160;The&#160;merge&#160;would&#160;add&#160;correct&#160;UTF-8&#160;BOM&#160;handling&#160;and&#160;a&#160;regression&#160;test.</text><text class="terminal-2179664999-r1" x="2720.6" y="20" textLength="12.2" clip-path="url(#terminal-2179664999-line-0)">
-</text><text class="terminal-2179664999-r1" x="0" y="44.4" textLength="231.8" clip-path="url(#terminal-2179664999-line-1)">&#160;&#160;Commit&#160;and&#160;merge&#160;</text><text class="terminal-2179664999-r2" x="231.8" y="44.4" textLength="97.6" clip-path="url(#terminal-2179664999-line-1)">sm/T-001</text><text class="terminal-2179664999-r1" x="329.4" y="44.4" textLength="73.2" clip-path="url(#terminal-2179664999-line-1)">&#160;into&#160;</text><text class="terminal-2179664999-r2" x="402.6" y="44.4" textLength="48.8" clip-path="url(#terminal-2179664999-line-1)">main</text><text class="terminal-2179664999-r1" x="451.4" y="44.4" textLength="12.2" clip-path="url(#terminal-2179664999-line-1)">?</text><text class="terminal-2179664999-r1" x="2720.6" y="44.4" textLength="12.2" clip-path="url(#terminal-2179664999-line-1)">
-</text><text class="terminal-2179664999-r3" x="0" y="68.8" textLength="2696.2" clip-path="url(#terminal-2179664999-line-2)">─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text><text class="terminal-2179664999-r1" x="2720.6" y="68.8" textLength="12.2" clip-path="url(#terminal-2179664999-line-2)">
-</text><text class="terminal-2179664999-r1" x="2720.6" y="93.2" textLength="12.2" clip-path="url(#terminal-2179664999-line-3)">
-</text><text class="terminal-2179664999-r4" x="0" y="117.6" textLength="12.2" clip-path="url(#terminal-2179664999-line-4)">›</text><text class="terminal-2179664999-r3" x="24.4" y="117.6" textLength="292.8" clip-path="url(#terminal-2179664999-line-4)">Ask&#160;Codex&#160;to&#160;do&#160;anything</text><text class="terminal-2179664999-r1" x="2720.6" y="117.6" textLength="12.2" clip-path="url(#terminal-2179664999-line-4)">
-</text><text class="terminal-2179664999-r5" x="24.4" y="142" textLength="183" clip-path="url(#terminal-2179664999-line-5)">gpt-6-astra&#160;low</text><text class="terminal-2179664999-r3" x="207.4" y="142" textLength="36.6" clip-path="url(#terminal-2179664999-line-5)">&#160;·&#160;</text><text class="terminal-2179664999-r6" x="244" y="142" textLength="183" clip-path="url(#terminal-2179664999-line-5)">Context&#160;8%&#160;used</text><text class="terminal-2179664999-r3" x="427" y="142" textLength="36.6" clip-path="url(#terminal-2179664999-line-5)">&#160;·&#160;</text><text class="terminal-2179664999-r7" x="463.6" y="142" textLength="183" clip-path="url(#terminal-2179664999-line-5)">weekly&#160;82%&#160;left</text><text class="terminal-2179664999-r3" x="646.6" y="142" textLength="36.6" clip-path="url(#terminal-2179664999-line-5)">&#160;·&#160;</text><text class="terminal-2179664999-r8" x="683.2" y="142" textLength="439.2" clip-path="url(#terminal-2179664999-line-5)">01a097e1-9205-7681-a177-c37c43799c48</text><text class="terminal-2179664999-r1" x="2720.6" y="142" textLength="12.2" clip-path="url(#terminal-2179664999-line-5)">
+    <g transform="translate(9, 9)" clip-path="url(#terminal-1559924270-clip-terminal)">
+    <rect fill="#1e1e1e" x="0" y="1.5" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="1.5" width="1207.8" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1220" y="1.5" width="597.8" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="1.5" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="25.9" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="25.9" width="402.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="414.8" y="25.9" width="1403" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="25.9" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="50.3" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="50.3" width="0" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="50.3" width="1805.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="50.3" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="74.7" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="74.7" width="463.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="475.8" y="74.7" width="1342" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="74.7" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="99.1" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="99.1" width="0" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="99.1" width="1805.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="99.1" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="123.5" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="123.5" width="195.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="207.4" y="123.5" width="1610.4" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="123.5" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="147.9" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="147.9" width="0" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="147.9" width="1805.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="147.9" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="172.3" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="172.3" width="805.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="817.4" y="172.3" width="1000.4" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="172.3" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="0" y="196.7" width="12.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="196.7" width="0" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="12.2" y="196.7" width="1805.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#1e1e1e" x="1817.8" y="196.7" width="12.2" height="24.65" shape-rendering="crispEdges"/>
+    <g class="terminal-1559924270-matrix">
+    <text class="terminal-1559924270-r2" x="12.2" y="20" textLength="1207.8" clip-path="url(#terminal-1559924270-line-0)">•&#160;Committed&#160;as&#160;6b131a6;&#160;python3&#160;-m&#160;pytest&#160;-q&#160;passes&#160;(1&#160;test).&#160;The&#160;merge&#160;would&#160;add&#160;correct&#160;UTF-8&#160;BOM</text><text class="terminal-1559924270-r1" x="1830" y="20" textLength="12.2" clip-path="url(#terminal-1559924270-line-0)">
+</text><text class="terminal-1559924270-r2" x="12.2" y="44.4" textLength="402.6" clip-path="url(#terminal-1559924270-line-1)">&#160;&#160;handling&#160;and&#160;a&#160;regression&#160;test.</text><text class="terminal-1559924270-r1" x="1830" y="44.4" textLength="12.2" clip-path="url(#terminal-1559924270-line-1)">
+</text><text class="terminal-1559924270-r1" x="1830" y="68.8" textLength="12.2" clip-path="url(#terminal-1559924270-line-2)">
+</text><text class="terminal-1559924270-r3" x="12.2" y="93.2" textLength="463.6" clip-path="url(#terminal-1559924270-line-3)">&#160;&#160;Commit&#160;and&#160;merge&#160;sm/T-001&#160;into&#160;main?</text><text class="terminal-1559924270-r1" x="1830" y="93.2" textLength="12.2" clip-path="url(#terminal-1559924270-line-3)">
+</text><text class="terminal-1559924270-r1" x="1830" y="117.6" textLength="12.2" clip-path="url(#terminal-1559924270-line-4)">
+</text><text class="terminal-1559924270-r4" x="12.2" y="142" textLength="195.2" clip-path="url(#terminal-1559924270-line-5)">›&#160;Yes,&#160;merge&#160;it.</text><text class="terminal-1559924270-r1" x="1830" y="142" textLength="12.2" clip-path="url(#terminal-1559924270-line-5)">
+</text><text class="terminal-1559924270-r1" x="1830" y="166.4" textLength="12.2" clip-path="url(#terminal-1559924270-line-6)">
+</text><text class="terminal-1559924270-r5" x="12.2" y="190.8" textLength="805.2" clip-path="url(#terminal-1559924270-line-7)">•&#160;Merged&#160;into&#160;main&#160;(2d72a0e).&#160;T-001&#160;is&#160;done;&#160;closing&#160;this&#160;session.</text><text class="terminal-1559924270-r1" x="1830" y="190.8" textLength="12.2" clip-path="url(#terminal-1559924270-line-7)">
 </text>
     </g>
     </g>

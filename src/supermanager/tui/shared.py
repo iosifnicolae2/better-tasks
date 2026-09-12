@@ -14,11 +14,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from rich.table import Table
 from rich.text import Text
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.coordinate import Coordinate
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
@@ -255,6 +256,52 @@ class TitleScreen(ModalScreen[str | None]):
 
 
 GROUP_PREFIX = "\x00group\x00"   # the key of a heading row: never a task id, so nothing can collide with it
+
+
+# ------------------------------------------------------------------------------------------ help
+class HelpScreen(ModalScreen[None]):
+    """The keys of a page, as a table: a group of related keys, then what each one does.
+
+    Pages pass `sections` — [(heading, [(keys, what it does), …]), …] — and a closing line."""
+
+    BINDINGS = [Binding("escape,q,question_mark", "dismiss", "Close")]
+    DEFAULT_CSS = """
+    HelpScreen { align: center middle; }
+    HelpScreen > Vertical {
+        width: 96; max-width: 96%; height: auto; max-height: 90%;
+        border: round $primary; background: $surface; padding: 1 2;
+    }
+    HelpScreen .help-title { text-style: bold; padding-bottom: 1; }
+    HelpScreen .help-note { color: $text-muted; padding-top: 1; }
+    HelpScreen VerticalScroll { height: auto; max-height: 100%; }
+    """
+
+    def __init__(self, title: str, sections: list[tuple[str, list[tuple[str, str]]]], note: str = "") -> None:
+        super().__init__()
+        self.help_title = title
+        self.sections = sections
+        self.note = note
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Static(self.help_title, classes="help-title")
+            with VerticalScroll():
+                yield Static(self._table())
+            if self.note:
+                yield Static(self.note, classes="help-note")
+            yield Static("[dim]esc to close[/dim]", classes="help-note")
+
+    def _table(self) -> Table:
+        table = Table(box=None, show_header=False, pad_edge=False, padding=(0, 2, 0, 0))
+        table.add_column("keys", style="bold cyan", no_wrap=True)
+        table.add_column("does", ratio=1, overflow="fold")
+        for i, (heading, rows) in enumerate(self.sections):
+            if i:
+                table.add_row("", "")
+            table.add_row("", Text(heading, style="bold"))
+            for keys, what in rows:
+                table.add_row(keys, what)
+        return table
 
 
 class PageTable(DataTable):

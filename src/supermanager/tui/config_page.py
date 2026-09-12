@@ -16,10 +16,28 @@ from ..client import DaemonClient, DaemonError, DaemonUnavailable
 from ..config import SETTABLE_KEYS, SETTING_HELP, get_key, load_config, local_keys, save_config, set_key
 from ..paths import ProjectPaths
 from ..tmux import CONFIG_WINDOW, Tmux, inside_tmux_session
-from .shared import AUTO, FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, wrap
+from .shared import AUTO, FLEX, GROUP_PREFIX, HelpScreen, PageApp, PageTable, SearchBar, wrap
 
 COLUMNS = (("Setting", AUTO), ("Value", AUTO), ("What it does", FLEX))
 SECTIONS = ("manager", "tasks", "agents")   # the ones you reach for; anything else follows, in name order
+HELP_SECTIONS = [
+    ("The setting you are on", [
+        ("enter / space", "a switch flips; anything else opens a line to type the new value"),
+        ("enter", "save what you typed"),
+        ("esc", "leave it as it was"),
+    ]),
+    ("This page", [
+        ("ctrl+w", "search the names, the values and what they do"),
+        ("click a title", "sort by that column; the sections come back when you sort again"),
+    ]),
+    ("The workspace", [
+        ("ctrl+a  ← →", "the next page: manager → tasks → agents → config"),
+        ("q", "leave: everything keeps running"),
+        ("ctrl+c ctrl+c", "stop everything: the manager, the agents, the workspace"),
+    ]),
+]
+HELP_NOTE = ("A change is saved the moment you make it, in .supermanager/config.toml. A setting marked "
+             "[from config.local.toml] is overridden by your own file, and that is what runs.")
 SECTION_ABOUT = {
     "manager": "the Claude that plans and dispatches — it never edits your code",
     "tasks": "the backlog: where the task files live, what they carry, how the page shows them",
@@ -55,6 +73,7 @@ class ConfigApp(PageApp):
     BINDINGS = [
         Binding("enter,space", "edit", "Toggle / edit"),
         Binding("q", "detach", "Leave"),
+        Binding("question_mark", "help", "Help", show=False),
     ]
 
     def __init__(self, paths: ProjectPaths):
@@ -146,6 +165,9 @@ class ConfigApp(PageApp):
         self.action_cancel_edit()
         if key:
             self._save(key, value)
+
+    def action_help(self) -> None:
+        self.push_screen(HelpScreen(f"{self.config.project_name} · the config page", HELP_SECTIONS, HELP_NOTE))
 
     def action_clear_search(self) -> None:
         """esc: first closes the value editor, otherwise clears the search."""

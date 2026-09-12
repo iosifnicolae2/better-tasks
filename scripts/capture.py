@@ -1,20 +1,25 @@
 """Turn a live tmux pane into an SVG for the README: `python scripts/capture.py <window> <name> [lines]`.
 
-The pages are drawn by scripts/screenshots.py; this one is for the sessions themselves (the manager chat, an
-agent presenting its plan), which only exist while something is really running.
+It renders through Textual, at the same width as the page screenshots, so a picture of a session and a picture
+of a page look like the same terminal.
 """
+from __future__ import annotations
+
+import asyncio
 import subprocess
 import sys
 from pathlib import Path
 
-from rich.console import Console
 from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.widgets import Static
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from svg_tools import strip_chrome
 
 OUT = Path(__file__).resolve().parents[1] / "docs" / "screenshots"
 SESSION = "sm-acme-api"
+WIDTH = 150   # the width every screenshot is drawn at
 
 
 def pane(window: str, lines: int) -> str:
@@ -24,13 +29,30 @@ def pane(window: str, lines: int) -> str:
     return "\n".join(kept[-lines:])
 
 
+class Screen(App):
+    """One widget: the captured text, on the terminal's own background."""
+    CSS = "Screen { background: $surface; } Static { padding: 0 1; }"
+
+    def __init__(self, body: Text) -> None:
+        super().__init__()
+        self.body = body
+
+    def compose(self) -> ComposeResult:
+        yield Static(self.body)
+
+
+async def render(body: Text, path: Path) -> None:
+    app = Screen(body)
+    async with app.run_test(size=(WIDTH, len(body.plain.splitlines()) + 1)) as pilot:
+        await pilot.pause()
+        await pilot.pause()
+        path.write_text(strip_chrome(app.export_screenshot()))
+
+
 def main() -> None:
     window, name, lines = sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 20
-    body = Text.from_ansi(pane(window, lines))
-    console = Console(record=True, width=max(len(l) for l in body.plain.splitlines()) + 2, file=open("/dev/null", "w"))
-    console.print(body)
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / f"{name}.svg").write_text(strip_chrome(console.export_svg(title="")))
+    asyncio.run(render(Text.from_ansi(pane(window, lines)), OUT / f"{name}.svg"))
     print(f"{name}.svg")
 
 
