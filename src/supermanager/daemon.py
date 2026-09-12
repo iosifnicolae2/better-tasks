@@ -52,6 +52,7 @@ class Daemon:
             "stop_agent": self.orch.stop_agent,
             "close_agent_session": self.orch.close_agent_session,
             "remove_worktree": self.orch.remove_worktree,
+            "clean_worktrees": self.orch.clean_worktrees,
             "report_progress": self.orch.report_progress,
             "update_plan": self.orch.update_plan,
             "add_context": self.orch.add_context,

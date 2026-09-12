@@ -18,8 +18,8 @@ from .models import AgentInfo, Task
 SECTIONS = ("Problem", "Expected outcome", "Acceptance criteria", "Verification", "Context", "Plan", "Progress",
             "Result")
 STAMP = "%Y-%m-%d %H:%M"
-FRONT_KEYS = ("id", "title", "priority", "tool", "model", "effort", "status", "created_at", "updated_at",
-              "blocked_reason", "result_ts", "agent", "sessions")
+FRONT_KEYS = ("id", "title", "priority", "fields", "tool", "model", "effort", "status", "created_at",
+              "updated_at", "blocked_reason", "result_ts", "agent", "sessions")
 TEMPLATE_NAME = "task-template.md"   # put one in .supermanager/ to override DEFAULT_TEMPLATE for a project
 
 DEFAULT_TEMPLATE = """\
@@ -43,7 +43,7 @@ Files, modules, links, constraints, and anything from CLAUDE.md the agent must r
 
 def render_task(t: Task) -> str:
     front = {
-        "id": t.id, "title": t.title, "priority": t.priority,
+        "id": t.id, "title": t.title, "priority": t.priority, "fields": t.fields,
         "tool": t.tool, "model": t.model, "effort": t.effort, "status": str(t.status),
         "created_at": t.created_at, "updated_at": t.updated_at, "blocked_reason": t.blocked_reason,
         "result_ts": t.result.get("ts") if t.result else None,
@@ -95,6 +95,7 @@ def parse_task(text: str, source: str = "?") -> Task:
     return Task(
         id=front["id"], title=front["title"], priority=front.get("priority", "P2"), status=front.get("status", "backlog"),
         tool=front.get("tool") or "", model=front.get("model") or "", effort=front.get("effort") or "",
+        fields=front.get("fields") or {},
         problem=body["Problem"], expected_outcome=body["Expected outcome"],
         acceptance_criteria=[l[2:].strip() for l in body["Acceptance criteria"].splitlines() if l.startswith("- ")],
         verification=body["Verification"], context=body["Context"], plan=body["Plan"],

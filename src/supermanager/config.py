@@ -10,6 +10,7 @@ from pathlib import Path
 import tomli_w
 
 TOOLS = ("claude", "codex")   # what an agent session runs; the manager is always Claude
+LOCAL_NAME = "config.local.toml"   # per-user overrides, never committed
 EFFORT_LEVELS = {
     "claude": ("low", "medium", "high", "xhigh", "max"),
     "codex": ("minimal", "low", "medium", "high", "xhigh"),
@@ -35,6 +36,8 @@ class AgentsConfig:
     worktree_base: str = "HEAD"
     tool: str = "claude"          # claude or codex; a task can override it
     merge_into: str = ""          # branch an agent merges into when you say yes ("" = the branch the project is on)
+    clean_worktrees: bool = True  # delete a finished task's worktree; its branch keeps the work
+    keep_transcripts: bool = True # copy each finished session's transcript into .supermanager/agents/<id>/
     model: str = ""               # empty = the tool's own default; must be a model of that tool
     effort: str = ""              # claude: low..max, codex: minimal..xhigh; empty = the tool's default
     allow_skip_permissions: bool = True
@@ -46,14 +49,57 @@ class AgentsConfig:
     codex_extra_args: list[str] = field(default_factory=list)   # appended to every `codex` agent command line
 
 
+DEFAULT_FIELDS = [
+    {"name": "labels", "type": "list", "column": "Labels", "width": 22,
+     "help": "Free tags: area, kind, whatever you sort your work by."},
+    {"name": "scheduled", "type": "date", "column": "When", "width": 12,
+     "help": "When you mean to do it: a date (2026-09-20) or a week (2026-W38)."},
+    {"name": "conflict_for", "type": "text",
+     "help": "Set by supermanager on a task it created to resolve another task's merge conflict."},
+]
+
+
+@dataclass
+class FieldSpec:
+    """One extra thing a task can carry. Projects add their own in config.toml:
+
+        [[tasks.fields]]
+        name = "component"
+        type = "text"      # text | list | date | number
+        column = "Part"    # a column on the tasks page; leave it out to keep the field off the table
+        width = 14
+        help = "Which part of the system this touches."
+    """
+    name: str
+    type: str = "text"
+    column: str = ""
+    width: int = 14
+    help: str = ""
+
+    def parse(self, raw):
+        """A value as the user typed it (or as an MCP client sent it) turned into what the task stores."""
+        if self.type == "list":
+            if isinstance(raw, str):
+                return [part.strip() for part in raw.replace(",", " ").split() if part.strip()]
+            return [str(part).strip() for part in (raw or []) if str(part).strip()]
+        if self.type == "number":
+            return None if raw in ("", None) else float(raw) if "." in str(raw) else int(raw)
+        return str(raw or "").strip()
+
+    def show(self, value) -> str:
+        if self.type == "list":
+            return " ".join(value or [])
+        return "" if value in (None, "") else str(value)
+
+
 @dataclass
 class TasksConfig:
     path: str = ".supermanager/tasks"
     min_problem_chars: int = 60
     require_verification: bool = True
     hide_done: bool = True      # finished tasks (done, cancelled) stay out of the tasks page until you press h
-    keep_transcripts: bool = True       # copy each finished session's transcript next to the task files
-    gitignore_transcripts: bool = True  # ...and keep those copies out of git
+    in_git: bool = True         # the task files are committed with the project, so the backlog is shared
+    fields: list[dict] = field(default_factory=lambda: [dict(f) for f in DEFAULT_FIELDS])
     editor: str = "idea"        # command that opens a task file for editing (enter on the tasks page), e.g. idea, code, vim
 
 
@@ -92,6 +138,18 @@ class Config:
             notify=_section(NotifyConfig, d.get("notify")),
         )
 
+    def task_fields(self) -> list[FieldSpec]:
+        """The extra fields a task can carry, as defined in config.toml (labels and a date by default)."""
+        out = []
+        for spec in self.tasks.fields or []:
+            known = {k: v for k, v in spec.items() if k in {f.name for f in dataclasses_fields(FieldSpec)}}
+            if known.get("name"):
+                out.append(FieldSpec(**known))
+        return out
+
+    def field(self, name: str) -> FieldSpec | None:
+        return next((f for f in self.task_fields() if f.name == name), None)
+
     def fmt(self, template: str, **extra: str) -> str:
         return template.format(project=self.project_name, **extra)
 
@@ -118,8 +176,34 @@ def _slug(value: str) -> str:
 
 
 def load_config(path: Path) -> Config:
+    """config.toml, with config.local.toml on top.
+
+    config.toml is the project's own settings and belongs in git; config.local.toml is yours alone (it is
+    gitignored) and overrides single keys — your editor, your models, a smaller concurrency on a laptop."""
+    data = _read(path)
+    for section, values in _read(local_path(path)).items():
+        if isinstance(values, dict) and isinstance(data.get(section), dict):
+            data[section] = {**data[section], **values}
+        else:
+            data[section] = values
+    return Config.from_dict(data)
+
+
+def local_path(path: Path) -> Path:
+    return path.parent / LOCAL_NAME
+
+
+def local_keys(path: Path) -> set[str]:
+    """The dotted settings config.local.toml overrides, so a change to config.toml can say when it is shadowed."""
+    return {f"{section}.{key}" for section, values in _read(local_path(path)).items()
+            if isinstance(values, dict) for key in values}
+
+
+def _read(path: Path) -> dict:
+    if not path.is_file():
+        return {}
     with path.open("rb") as f:
-        return Config.from_dict(tomllib.load(f))
+        return tomllib.load(f)
 
 
 def save_config(path: Path, config: Config) -> None:
@@ -133,6 +217,8 @@ SETTABLE_KEYS = {
     "agents.worktree_base": str,
     "agents.tool": str,
     "agents.merge_into": str,
+    "agents.clean_worktrees": bool,
+    "agents.keep_transcripts": bool,
     "agents.model": str,
     "agents.effort": str,
     "agents.allow_skip_permissions": bool,
@@ -149,8 +235,7 @@ SETTABLE_KEYS = {
     "tasks.min_problem_chars": int,
     "tasks.require_verification": bool,
     "tasks.hide_done": bool,
-    "tasks.keep_transcripts": bool,
-    "tasks.gitignore_transcripts": bool,
+    "tasks.in_git": bool,
     "tasks.editor": str,
     "notify.bell": bool,
 }
@@ -162,6 +247,8 @@ SETTING_HELP = {
     "agents.worktree_base": "What new agent branches start from (HEAD or a branch name).",
     "agents.tool": "What agents run by default: claude or codex. A task can say otherwise.",
     "agents.merge_into": "Branch an agent merges its work into when you approve at the end (empty = whatever branch the project is on).",
+    "agents.clean_worktrees": "Delete a task's worktree once it is done or cancelled (the branch keeps the work). A worktree with uncommitted changes is kept.",
+    "agents.keep_transcripts": "Copy a session's transcript into .supermanager/agents/<id>/transcripts/ when it ends (that folder is never in git).",
     "agents.model": "Default model for agents (empty = the tool's default), e.g. opus, or gpt-6-astra for codex.",
     "agents.effort": "Default effort for agents (empty = the tool's default). claude: low/medium/high/xhigh/max, codex: minimal/low/medium/high/xhigh.",
     "agents.allow_skip_permissions": "Let you choose 'bypass permissions' when approving an agent's plan.",
@@ -178,8 +265,7 @@ SETTING_HELP = {
     "tasks.min_problem_chars": "Minimum length of a task's problem description.",
     "tasks.require_verification": "A task must say how to check it before it is accepted.",
     "tasks.hide_done": "Hide finished tasks (done, cancelled) on the tasks page; h shows them for this session.",
-    "tasks.keep_transcripts": "Copy each agent session's transcript into <tasks>/sessions/<task-id>/ when it ends.",
-    "tasks.gitignore_transcripts": "Keep those transcript copies out of git (off = they are committed with the tasks).",
+    "tasks.in_git": "Commit the task files with the project, so the backlog is shared (off = a .gitignore keeps them local).",
     "tasks.editor": "Command that opens a task file when you press enter on the tasks page (idea, code, vim, ...).",
     "notify.bell": "Ring the terminal bell and mark the window 🔔 when a session needs you.",
 }

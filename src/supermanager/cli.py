@@ -19,7 +19,7 @@ from rich.table import Table
 
 from . import __version__
 from .client import DaemonClient, DaemonError, DaemonUnavailable
-from .config import SETTABLE_KEYS, Config, load_config, save_config, set_key
+from .config import SETTABLE_KEYS, Config, load_config, local_keys, local_path, save_config, set_key
 from .models import State
 from .paths import ProjectPaths, find_project_root
 from .store import StateStore
@@ -33,6 +33,15 @@ app.add_typer(config_app, name="config")
 console = Console()
 
 PROJECT_OPT = typer.Option(None, "--project", "-C", help="Project folder (default: found from the current dir).")
+
+
+def _session_project(project: Optional[Path]) -> Path:
+    """Which project a hook or an MCP bridge belongs to: the flag, then the session's own environment, then the
+    folder it runs in (a worktree resolves to the project it was made from)."""
+    if project:
+        return project
+    from_env = os.environ.get("SUPERMANAGER_PROJECT")
+    return Path(from_env) if from_env else find_project_root()
 
 
 def _paths(project: Optional[Path]) -> ProjectPaths:
@@ -164,6 +173,7 @@ def up(project: Optional[Path] = PROJECT_OPT,
             _wait(lambda: (client.call("get_status").get("manager") or {}).get("running"), 30,
                   "the manager did not start; press ctrl+a for the tasks page and read the events")
     st = client.call("get_status")
+    _upgrade_notice()
     console.print(Panel.fit(
         f"[bold]{config.project_name}[/bold] is up.\n\n"
         f"  manager  → chat opens now; also in claude.ai as [cyan]{config.manager_rc_name()}[/cyan]\n"
@@ -179,6 +189,25 @@ def up(project: Optional[Path] = PROJECT_OPT,
             tmux.select_window(target)
         return
     os.execvp("tmux", tmux.attach_argv(target))
+
+
+def _upgrade_notice() -> None:
+    """Once a day: a released version you do not have yet. Silent for a checkout of your own, unless it is a
+    fork whose upstream published one. SUPERMANAGER_AUTO_UPGRADE=1 installs it instead of saying so."""
+    from .upgrade import UpgradeError, check as check_upgrade, due, upgrade as do_upgrade
+    if os.environ.get("SUPERMANAGER_NO_UPGRADE_CHECK") or not due():
+        return
+    try:
+        status = check_upgrade()
+        notice = status.notice() if status else ""
+        if not notice:
+            return
+        if os.environ.get("SUPERMANAGER_AUTO_UPGRADE") == "1" and status.kind == "managed" and not status.dirty:
+            console.print(f"[green]{do_upgrade()}[/green]")
+            return
+        console.print(f"[yellow]{notice}[/yellow]")
+    except (UpgradeError, OSError):
+        pass
 
 
 def _wait(condition, seconds: float, failure: str) -> None:
@@ -288,21 +317,35 @@ def status(project: Optional[Path] = PROJECT_OPT):
 
 
 @app.command()
-def tasks(project: Optional[Path] = PROJECT_OPT, status_filter: Optional[str] = typer.Option(None, "--status")):
-    """List tasks in backlog order."""
+def tasks(project: Optional[Path] = PROJECT_OPT, status_filter: Optional[str] = typer.Option(None, "--status"),
+          label: Optional[str] = typer.Option(None, "--label", help="Only tasks carrying this label."),
+          field: Optional[str] = typer.Option(None, "--field", help="Filter by another field, with --value."),
+          value: Optional[str] = typer.Option(None, "--value", help="What --field must contain (or start with).")):
+    """List tasks in backlog order. --label / --field filter by the project's own task fields."""
     paths = _paths(project)
-    _require_config(paths)
+    config = _require_config(paths)
     state = _load_state(paths)
+    fields = [f for f in config.task_fields() if f.column]
     table = Table(box=box.SIMPLE_HEAD)
-    for col in ("ID", "Pri", "Status", "Title", "Agent"):
+    for col in ("ID", "Pri", "Status", "Title", *[f.column for f in fields], "Agent"):
         table.add_column(col)
     for tid in state.order:
         t = state.tasks[tid]
         if status_filter and t.status != status_filter:
             continue
+        if label and label not in (t.fields.get("labels") or []):
+            continue
+        if field and value is not None and not _field_matches(t.fields.get(field), value):
+            continue
         agent = f"{t.agent.phase} · {t.agent.branch or 'root'}" if t.agent else ""
-        table.add_row(t.id, t.priority, t.status, t.title, agent)
+        table.add_row(t.id, t.priority, t.status, t.title, *[f.show(t.fields.get(f.name)) for f in fields], agent)
     console.print(table)
+
+
+def _field_matches(stored, wanted: str) -> bool:
+    if isinstance(stored, list):
+        return wanted in stored
+    return str(stored or "").startswith(wanted)
 
 
 @app.command()
@@ -367,6 +410,47 @@ def add(project: Optional[Path] = PROJECT_OPT):
     task = _call(paths, "create_task", title=title, problem=problem, expected_outcome=outcome,
                  acceptance_criteria=criteria, verification=verification, context=context, priority=priority)
     console.print(f"[green]Created {task['id']}[/green] {task['title']}")
+
+
+@app.command()
+def upgrade(check_only: bool = typer.Option(False, "--check", help="Only say whether a newer release exists.")):
+    """Update supermanager itself to the newest release (an install.sh install; your own clone is left alone)."""
+    from .upgrade import UpgradeError, check as check_upgrade, upgrade as do_upgrade
+    try:
+        if check_only:
+            status = check_upgrade()
+            if not status:
+                console.print("Not a git install; run install.sh to update.")
+                return
+            console.print(status.notice() or
+                          f"{status.kind} install on {__version__} ({status.release or 'no releases'} is the newest).")
+            return
+        console.print(do_upgrade())
+    except UpgradeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def clean(project: Optional[Path] = PROJECT_OPT,
+          force: bool = typer.Option(False, "--force", help="Also remove worktrees with uncommitted changes.")):
+    """Free disk space: remove the worktrees of finished tasks (their branches are kept)."""
+    paths = _paths(project)
+    result = _call(paths, "clean_worktrees", force=force)
+    for row in result["removed"]:
+        console.print(f"[green]removed[/green] {row['task']}  {_size(row['freed'])}  [dim]branch {row['branch']} kept[/dim]")
+    for row in result["kept"]:
+        console.print(f"[yellow]kept[/yellow]    {row['task']}  [dim]{row['why']}[/dim]")
+    if not result["removed"] and not result["kept"]:
+        console.print("Nothing to clean: no finished task has a worktree.")
+    else:
+        console.print(f"\n[bold]{result['freed_human']} freed.[/bold]"
+                      + ("  [dim]--force removes the ones kept above.[/dim]" if result["kept"] and not force else ""))
+
+
+def _size(value: int) -> str:
+    from .worktree import human_size
+    return human_size(value)
 
 
 @app.command()
@@ -437,10 +521,14 @@ def manager_stop(project: Optional[Path] = PROJECT_OPT):
 
 @config_app.command("show")
 def config_show(project: Optional[Path] = PROJECT_OPT):
-    """Print the current config."""
+    """Print the current config (config.toml, and what config.local.toml overrides on this machine)."""
     paths = _paths(project)
     _require_config(paths)
     console.print(paths.config.read_text())
+    if local_path(paths.config).is_file():
+        console.print(f"[dim]# {local_path(paths.config)} overrides "
+                      f"{', '.join(sorted(local_keys(paths.config))) or 'nothing'}[/dim]")
+        console.print(local_path(paths.config).read_text())
 
 
 @config_app.command("set")
@@ -461,6 +549,9 @@ def config_set(key: str, value: str, project: Optional[Path] = PROJECT_OPT):
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1)
     console.print(f"{key} = {value}")
+    if key in local_keys(paths.config):
+        console.print(f"[yellow]config.local.toml still overrides {key} on this machine[/yellow] "
+                      f"[dim]({local_path(paths.config)})[/dim]")
 
 
 @config_app.command("keys")
@@ -473,18 +564,24 @@ def config_keys():
 # ---------------------------------------------------------------------------------- internal plumbing
 @app.command(hidden=True)
 def mcp(role: str = typer.Option(..., help="manager or agent"),
-        project: Path = typer.Option(..., help="Project root"),
-        task: Optional[str] = typer.Option(None, help="Task id (agents only)"),
+        project: Optional[Path] = typer.Option(None, help="Project root (default: $SUPERMANAGER_PROJECT)"),
+        task: Optional[str] = typer.Option(None, help="Task id (default: $SUPERMANAGER_TASK; agents only)"),
         tool: str = typer.Option("claude", help="claude or codex: which tools the agent gets")):
     """MCP stdio bridge loaded by Claude and Codex sessions (internal)."""
     from .mcp_server import run
-    run(project, role, task, tool)
+    run(_session_project(project), role, task or os.environ.get("SUPERMANAGER_TASK") or None, tool)
 
 
 @app.command(hidden=True)
-def hook(event: str = typer.Argument(...), project: Path = typer.Option(...),
-         task: Optional[str] = typer.Option(None)):
-    """Claude Code / Codex hook receiver (internal). Reads the hook JSON on stdin and forwards it to the daemon."""
+def hook(event: str = typer.Argument(...),
+         project: Optional[Path] = typer.Option(None, help="Project root (default: $SUPERMANAGER_PROJECT)"),
+         task: Optional[str] = typer.Option(None, help="Task id (default: $SUPERMANAGER_TASK)")):
+    """Claude Code / Codex hook receiver (internal). Reads the hook JSON on stdin and forwards it to the daemon.
+
+    Both --project and --task default to the environment a session runs in, so the generated hook commands hold
+    no path from the machine that wrote them."""
+    project = _session_project(project)
+    task = task or os.environ.get("SUPERMANAGER_TASK") or None
     payload: dict = {}
     try:
         raw = sys.stdin.read()

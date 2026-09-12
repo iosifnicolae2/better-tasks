@@ -34,8 +34,8 @@ STATUS_STYLE = {
 STARTABLE = {TaskStatus.BACKLOG, TaskStatus.INTERRUPTED}
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
 # bell or a longer status appears — the Agent column, last in the row, is where those show up.
-COLUMNS = (("ID", 6), ("Pri", 3), ("Status", 11), ("Title", FLEX), ("Agent", 36))
-AGENT_COLUMN = 4              # a click on this cell starts / opens the agent
+BASE_COLUMNS = (("ID", 6), ("Pri", 3), ("Status", 11), ("Title", FLEX))
+AGENT_COLUMN_SPEC = ("Agent", 36)   # always last; a click on this cell starts / opens the agent
 AGENT_WIDTH = 36
 
 HELP = """\
@@ -124,7 +124,7 @@ class SupermanagerApp(PageApp):
 
     # ----------------------------------------------------------------- layout
     def compose(self) -> ComposeResult:
-        yield PageTable(id="tasks-table", action_columns=(AGENT_COLUMN,))
+        yield PageTable(id="tasks-table")   # its action column is set on every render (fields shift it)
         yield SearchBar()
         yield Footer()
 
@@ -184,26 +184,38 @@ class SupermanagerApp(PageApp):
     def rerender(self) -> None:
         self._refresh_tasks()
 
+    def _shown_fields(self) -> list:
+        """The project's own task fields that asked for a column (labels and a date, unless config.toml says else)."""
+        return [f for f in self.orch.config.task_fields() if f.column]
+
     def _refresh_tasks(self) -> None:
         table = self.query_one("#tasks-table", DataTable)
         previous = self._selected_task
+        fields = self._shown_fields()
+        columns = [*BASE_COLUMNS, *[(f.column, f.width) for f in fields], AGENT_COLUMN_SPEC]
+        table.action_columns = (len(columns) - 1,)   # the Agent column moves when fields are added
         table.clear(columns=True)
-        self.add_columns(table, *COLUMNS)
+        self.add_columns(table, *columns)
         width = self.flex_width
-        tasks = [t for t in self.orch.list_tasks() if self.matches(t.id, t.priority, t.status, t.title, _agent_cell(t))]
+        tasks = [t for t in self.orch.list_tasks()
+                 if self.matches(t.id, t.priority, t.status, t.title, _agent_cell(t),
+                                 *(f.show(t.fields.get(f.name)) for f in fields))]
         hidden = 0
         if not self.show_done:
             hidden = sum(1 for t in tasks if t.status in FINISHED_STATUSES)
             tasks = [t for t in tasks if t.status not in FINISHED_STATUSES]
-        tasks = self.sorted_rows(tasks, _sort_value) if self.sort else sorted(tasks, key=_default_order)
+        tasks = self.sorted_rows(tasks, _sort_value(fields)) if self.sort else sorted(tasks, key=_default_order)
         for t in tasks:
             table.add_row(t.id, t.priority, Text(t.status, style=STATUS_STYLE.get(t.status, "white")),
-                          wrap(t.title, width), _agent_cell(t, AGENT_WIDTH), key=t.id, height=None)
+                          wrap(t.title, width),
+                          *(wrap(f.show(t.fields.get(f.name)), f.width, "cyan") for f in fields),
+                          _agent_cell(t, AGENT_WIDTH), key=t.id, height=None)
+        filler = [""] * len(fields)
         if not tasks and not hidden:
             hint = "No task matches the search." if self.query else "No tasks yet: n creates one, or tell the manager what you want."
-            table.add_row("", "", "", Text(hint, style="dim"), "")
+            table.add_row("", "", "", Text(hint, style="dim"), *filler, "")
         if hidden:
-            table.add_row("", "", "", Text(f"{hidden} finished task(s) hidden — h shows them", style="dim"), "")
+            table.add_row("", "", "", Text(f"{hidden} finished task(s) hidden — h shows them", style="dim"), *filler, "")
         ids = [t.id for t in tasks]
         self._selected_task = previous if previous in ids else (ids[0] if ids else None)
         if self._selected_task:
@@ -503,6 +515,12 @@ def _default_order(t: Task) -> tuple:
     return (running, PRIORITIES.index(t.priority) if t.priority in PRIORITIES else len(PRIORITIES))
 
 
-def _sort_value(t: Task, column: str) -> object:
-    return {"ID": t.id, "Pri": t.priority, "Status": str(t.status), "Title": t.title,
-            "Agent": _agent_cell(t).plain}.get(column)
+def _sort_value(fields: list):
+    """How each column sorts, the project's own fields included."""
+    def value(t: Task, column: str) -> object:
+        for f in fields:
+            if f.column == column:
+                return f.show(t.fields.get(f.name))
+        return {"ID": t.id, "Pri": t.priority, "Status": str(t.status), "Title": t.title,
+                "Agent": _agent_cell(t).plain}.get(column)
+    return value

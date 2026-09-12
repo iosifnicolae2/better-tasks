@@ -52,13 +52,18 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
     @mcp.tool()
     def get_status() -> str:
         """Project overview: concurrency limit, free slots, worktree mode, manager state, task counts, backlog order,
-        and agent_defaults (the tool/model/effort an agent gets unless its task says otherwise)."""
+        agent_defaults (the tool/model/effort an agent gets unless its task says otherwise) and task_fields
+        (the extra fields this project's tasks carry, such as labels and scheduled)."""
         return call("get_status")
 
     @mcp.tool()
-    def list_tasks(status: str | None = None) -> str:
-        """List tasks in backlog order. Optional status filter: backlog, planning, working, blocked, done, interrupted, cancelled."""
-        return call("list_tasks", status=status)
+    def list_tasks(status: str | None = None, label: str | None = None,
+                   field: str | None = None, value: str | None = None) -> str:
+        """List tasks in backlog order. Filters, all optional: status (backlog, planning, working, blocked, done,
+        interrupted, cancelled), label (one of a task's labels), or field+value for any other field the project
+        defines — a list field matches when it contains the value, a text or date one when it starts with it
+        (field="scheduled", value="2026-W38", or just "2026-09" for that month). get_config lists the fields."""
+        return call("list_tasks", status=status, label=label, field=field, value=value)
 
     @mcp.tool()
     def get_task(task_id: str) -> str:
@@ -68,29 +73,34 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
     @mcp.tool()
     def create_task(title: str, problem: str, expected_outcome: str, acceptance_criteria: list[str],
                     verification: str, context: str = "", priority: str = "P2",
-                    tool: str = "", model: str = "", effort: str = "") -> str:
+                    tool: str = "", model: str = "", effort: str = "", fields: dict | None = None) -> str:
         """Add a task to the backlog. Rejected unless the problem is clearly described, expected_outcome is stated,
         acceptance_criteria are concrete and checkable, and verification says how to check (command or steps).
         If you lack any of these, ask the user before calling. priority: P0 (urgent) .. P3 (someday).
         tool/model/effort pick what the agent runs with; leave them empty for the project defaults (get_status
         shows them). tool: claude or codex. effort: claude low/medium/high/xhigh/max, codex minimal/low/medium/high/xhigh.
-        model must belong to the tool (e.g. opus for claude, gpt-6-astra for codex)."""
+        model must belong to the tool (e.g. opus for claude, gpt-6-astra for codex).
+        fields carries the project's own fields, e.g. {"labels": ["api", "perf"], "scheduled": "2026-W38"};
+        get_status / get_config name the ones this project defines. Ask the user for a label or a date only when
+        they bring it up — otherwise leave fields out."""
         return call("create_task", title=title, problem=problem, expected_outcome=expected_outcome,
                     acceptance_criteria=acceptance_criteria, verification=verification, context=context,
-                    priority=priority, tool=tool, model=model, effort=effort)
+                    priority=priority, tool=tool, model=model, effort=effort, fields=fields)
 
     @mcp.tool()
     def update_task(task_id: str, title: str | None = None, problem: str | None = None,
                     expected_outcome: str | None = None, acceptance_criteria: list[str] | None = None,
                     verification: str | None = None, context: str | None = None, priority: str | None = None,
-                    tool: str | None = None, model: str | None = None, effort: str | None = None) -> str:
-        """Edit fields of a task. Only the fields you pass are changed. tool/model/effort change what the agent
-        will run with next time it starts ("" = back to the project default)."""
-        fields = {k: v for k, v in dict(title=title, problem=problem, expected_outcome=expected_outcome,
-                                          acceptance_criteria=acceptance_criteria, verification=verification,
-                                          context=context, priority=priority, tool=tool, model=model,
-                                          effort=effort).items() if v is not None}
-        return call("update_task", task_id=task_id, fields=fields)
+                    tool: str | None = None, model: str | None = None, effort: str | None = None,
+                    fields: dict | None = None) -> str:
+        """Edit a task. Only what you pass is changed. tool/model/effort change what the agent will run with next
+        time it starts ("" = back to the project default). fields sets the project's own fields, e.g.
+        {"labels": ["api"], "scheduled": "2026-09-20"}; pass an empty value to clear one."""
+        changes = {k: v for k, v in dict(title=title, problem=problem, expected_outcome=expected_outcome,
+                                         acceptance_criteria=acceptance_criteria, verification=verification,
+                                         context=context, priority=priority, tool=tool, model=model,
+                                         effort=effort, fields=fields).items() if v is not None}
+        return call("update_task", task_id=task_id, fields=changes)
 
     @mcp.tool()
     def reorder_backlog(ordered_task_ids: list[str]) -> str:
@@ -129,6 +139,13 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
     def remove_worktree(task_id: str, force: bool = False) -> str:
         """Delete a finished task's worktree folder (the branch is kept). force=true discards uncommitted changes."""
         return call("remove_worktree", task_id=task_id, force=force)
+
+    @mcp.tool()
+    def clean_worktrees(force: bool = False) -> str:
+        """Free disk space: remove the worktrees of every done or cancelled task (their branches are kept) and
+        forget the ones already gone. Worktrees with uncommitted changes are kept unless force=true — ask the
+        user before using force. Returns what was removed and how much space came back."""
+        return call("clean_worktrees", force=force)
 
     @mcp.tool()
     def get_events(limit: int = 30) -> str:

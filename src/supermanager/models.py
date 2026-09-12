@@ -69,6 +69,7 @@ class Task:
     context: str = ""
     plan: str = ""             # how the agent intends to do it; the agent keeps it current (update_plan)
     priority: str = "P2"
+    fields: dict[str, Any] = field(default_factory=dict)   # labels, scheduled, and whatever config.toml defines
     tool: str = ""             # per-task agent settings; "" = the agents.* default from config
     model: str = ""
     effort: str = ""
@@ -95,6 +96,7 @@ class Task:
             "priority": self.priority,
             "status": self.status,
             "tool": self.tool, "model": self.model, "effort": self.effort,
+            **{k: v for k, v in self.fields.items() if v not in ("", None, [])},
             "sessions": len(self.sessions),
             "agent_phase": self.agent.phase if self.agent else None,
             "branch": self.agent.branch if self.agent else None,
@@ -130,6 +132,7 @@ class State:
             agent = td.get("agent")
             td = {**td, "agent": AgentInfo(**agent) if agent else None}
             td.setdefault("sessions", [])
+            td.setdefault("fields", {})
             tasks[tid] = Task(**td)
         manager = d.get("manager")
         return cls(

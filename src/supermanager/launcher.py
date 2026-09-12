@@ -31,11 +31,14 @@ def codex_bin() -> str:
     return shutil.which("codex") or "codex"
 
 
-def supermanager_argv() -> list[str]:
-    """Absolute way to invoke ourselves from hooks and MCP config, even in a fresh shell."""
+def supermanager_argv(portable: bool = False) -> list[str]:
+    """How a session calls us back (hooks, MCP bridge).
+
+    `portable` writes the bare command when it is on PATH, so the files we generate carry no path from this
+    machine — a teammate who clones the project and runs their own supermanager gets the same files."""
     exe = shutil.which("supermanager")
     if exe:
-        return [exe]
+        return ["supermanager"] if portable else [exe]
     return [sys.executable, "-m", "supermanager"]
 
 
@@ -44,12 +47,15 @@ def new_session_id() -> str:
 
 
 def _hook(cmd_args: list[str]) -> dict:
-    return {"type": "command", "command": shlex.join([*supermanager_argv(), *cmd_args])}
+    return {"type": "command", "command": shlex.join([*supermanager_argv(portable=True), *cmd_args])}
 
 
 def _hooks(role: str, task_id: str | None, tool: str, root: Path) -> dict[str, list]:
-    """The lifecycle hooks that let the daemon follow a session. Same JSON shape for Claude and Codex."""
-    base = ["hook", "--project", str(root)] + (["--task", task_id] if task_id else [])
+    """The lifecycle hooks that let the daemon follow a session. Same JSON shape for Claude and Codex.
+
+    The commands name no project and no task: every session runs with SUPERMANAGER_PROJECT and SUPERMANAGER_TASK
+    in its environment (see session_env), so these files hold nothing specific to this machine."""
+    base = ["hook"]
     hooks: dict[str, list] = {
         "SessionEnd": [{"hooks": [_hook([*base, "session-end"])]}],
         "Stop": [{"hooks": [_hook([*base, "idle"])]}],
@@ -71,11 +77,9 @@ def write_session_files(
     folder = paths.agent_dir(task_id) if task_id else paths.home / "manager"
     folder.mkdir(parents=True, exist_ok=True)
 
-    mcp_args = ["mcp", "--role", role, "--project", str(paths.root), "--tool", tool]
-    if task_id:
-        mcp_args += ["--task", task_id]
-    mcp = {"mcpServers": {"supermanager": {"command": supermanager_argv()[0],
-                                            "args": [*supermanager_argv()[1:], *mcp_args]}}}
+    argv = supermanager_argv(portable=True)
+    mcp = {"mcpServers": {"supermanager": {"command": argv[0],
+                                            "args": [*argv[1:], "mcp", "--role", role, "--tool", tool]}}}
     settings = {"hooks": _hooks(role, task_id, tool, paths.root)}
 
     mcp_path, settings_path, prompt_path = folder / "mcp.json", folder / "settings.json", folder / "prompt.md"
@@ -204,8 +208,8 @@ def _codex_argv(
     if system_prompt:
         argv += ["-c", f"developer_instructions={_toml(system_prompt)}"]
     if mcp:
-        exe, *rest = supermanager_argv()
-        mcp_args = [*rest, "mcp", "--role", "agent", "--project", str(paths.root), "--tool", "codex", "--task", agent_id]
+        exe, *rest = supermanager_argv(portable=True)
+        mcp_args = [*rest, "mcp", "--role", "agent", "--tool", "codex"]
         argv += ["-c", f"mcp_servers.supermanager.command={_toml(exe)}",
                  "-c", f"mcp_servers.supermanager.args={_toml(mcp_args)}",
                  "-c", 'mcp_servers.supermanager.default_tools_approval_mode="approve"']   # our tools: no prompts
@@ -252,6 +256,8 @@ def _git_exclude(cwd: Path, pattern: str) -> None:
 
 
 def session_env(paths: ProjectPaths, task_id: str | None) -> dict[str, str]:
+    """What a session's window carries: which project it belongs to and which task it is for. The hooks and the
+    MCP bridge read these instead of having the paths written into their config files."""
     env = {"SUPERMANAGER_PROJECT": str(paths.root), "SUPERMANAGER_SOCKET": str(paths.socket)}
     if task_id:
         env["SUPERMANAGER_TASK"] = task_id

@@ -57,6 +57,10 @@ right away, then tell the user it started. Do not begin working on the task in t
   project's CLAUDE.md; otherwise precise manual steps.
 - **context**: files, modules, links, constraints, and anything from CLAUDE.md that the agent must respect.
 
+The project may define extra fields for its tasks (labels, a scheduled date, whatever `get_status` lists under
+`task_fields`). Fill them when the user mentions one ("tag it api", "this is for next week"), leave them out
+otherwise, and use `list_tasks(label=...)` or `list_tasks(field=..., value=...)` when the user asks about them.
+
 Write acceptance criteria the user would recognise as what they asked for; do not add goals they did not mention.
 Split anything that needs more than one agent-session of focused work into separate tasks, each with its own agent.
 

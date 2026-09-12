@@ -13,7 +13,7 @@ from textual.binding import Binding
 from textual.widgets import DataTable, Footer, Input, Static
 
 from ..client import DaemonClient, DaemonError, DaemonUnavailable
-from ..config import SETTABLE_KEYS, SETTING_HELP, get_key, load_config, save_config, set_key
+from ..config import SETTABLE_KEYS, SETTING_HELP, get_key, load_config, local_keys, save_config, set_key
 from ..paths import ProjectPaths
 from ..tmux import CONFIG_WINDOW, Tmux, inside_tmux_session
 from .shared import FLEX, PageApp, PageTable, SearchBar, wrap
@@ -70,8 +70,12 @@ class ConfigApp(PageApp):
         keys = [k for k in SETTABLE_KEYS if self.matches(k, str(get_key(self.config, k)), SETTING_HELP.get(k, ""))]
         keys = self.sorted_rows(keys, lambda k, column: {"Setting": k, "Value": str(get_key(self.config, k)),
                                                           "What it does": SETTING_HELP.get(k, "")}.get(column))
+        overridden = local_keys(self.paths.config)
         for key in keys:
-            table.add_row(key, _shown(key, get_key(self.config, key)), wrap(SETTING_HELP.get(key, ""), width, "dim"),
+            help_text = SETTING_HELP.get(key, "")
+            if key in overridden:
+                help_text = f"[from config.local.toml] {help_text}"
+            table.add_row(key, _shown(key, get_key(self.config, key)), wrap(help_text, width, "dim"),
                           key=key, height=None)
         if self.selected in keys:
             table.move_cursor(row=keys.index(self.selected))

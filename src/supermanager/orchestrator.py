@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from . import launcher, prompts, taskfiles, worktree
-from .config import Config, save_config, set_key, settings_snapshot
+from .config import Config, get_key, local_keys, save_config, set_key, settings_snapshot
 from .launcher import AgentSettings
 from .models import ACTIVE_STATUSES, FINISHED_STATUSES, PRIORITIES, AgentInfo, Event, ManagerInfo, State, Task, TaskStatus
 from .paths import ProjectPaths
@@ -29,6 +29,7 @@ EDITABLE_FIELDS = {"title", "problem", "expected_outcome", "acceptance_criteria"
                    "priority", "tool", "model", "effort"}
 AGENT_SETTING_FIELDS = ("tool", "model", "effort")
 RESUME_GRACE_SECONDS = 25
+TASKS_IGNORE_HEADER = "# tasks.in_git is off: the backlog stays on this machine.\n"
 IDLE_RECHECK_SECONDS = 20   # how long to wait before looking again at a session that ended its turn while busy
 IDLE_RECHECKS = 3
 # What a session's status line says while it is still working: "1 shell, 1 monitor", "2 tasks", "esc to interrupt".
@@ -117,6 +118,7 @@ class Orchestrator:
             "task_counts": counts,
             "free_agents": sum(1 for a in self.state.free_agents.values() if a.session_open),
             "agent_defaults": {f: getattr(self.config.agents, f) for f in AGENT_SETTING_FIELDS},
+            "task_fields": [{"name": f.name, "type": f.type, "help": f.help} for f in self.config.task_fields()],
             "backlog_order": [tid for tid in self.state.order if self.state.tasks[tid].status == TaskStatus.BACKLOG],
             "pending_manager_events": len(self.state.pending_manager_events),
         }
@@ -130,9 +132,12 @@ class Orchestrator:
             save_config(self.paths.config, self.config)
             if key == "tasks.path":
                 self.store.relocate(self.state, self.paths.tasks_dir(self.config.tasks.path))
-            if key in ("tasks.path", "tasks.gitignore_transcripts"):
-                self._apply_transcripts_gitignore()
-        self._emit("config", f"Setting changed: {key} = {value}")
+            if key in ("tasks.path", "tasks.in_git"):
+                self.apply_tasks_gitignore()
+        message = f"Setting changed: {key} = {value}"
+        if key in local_keys(self.paths.config):
+            message += f" — but config.local.toml still overrides it ({get_key(self.config, key)} is what runs)."
+        self._emit("config", message)
         if key in ("agents.concurrency", "agents.auto_dispatch"):
             self._auto_dispatch()
         return {"key": key, "value": value}
@@ -185,9 +190,21 @@ class Orchestrator:
             errors.append(f"priority: use one of {', '.join(PRIORITIES)}.")
         return errors
 
+    def _task_fields(self, values: dict[str, Any] | None, onto: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Clean the extra fields (labels, scheduled, whatever config.toml defines) and merge them onto a task's."""
+        fields = dict(onto or {})
+        for name, raw in (values or {}).items():
+            spec = self.config.field(name)
+            if not spec:
+                known = ", ".join(f.name for f in self.config.task_fields()) or "none"
+                raise OrchestratorError(f"Unknown task field '{name}'. This project has: {known}. "
+                                        "Add one under [[tasks.fields]] in .supermanager/config.toml.")
+            fields[name] = spec.parse(raw)
+        return {k: v for k, v in fields.items() if v not in ("", None, [])}
+
     def create_task(self, title: str, problem: str, expected_outcome: str, acceptance_criteria: list[str],
                     verification: str, context: str = "", priority: str = "P2",
-                    tool: str = "", model: str = "", effort: str = "") -> Task:
+                    tool: str = "", model: str = "", effort: str = "", fields: dict[str, Any] | None = None) -> Task:
         priority = (priority or "P2").upper()
         errors = self.validate_task(title, problem, expected_outcome, acceptance_criteria, verification, priority)
         if errors:
@@ -200,7 +217,8 @@ class Orchestrator:
             task = Task(
                 id=task_id, title=title.strip(), problem=problem.strip(), expected_outcome=expected_outcome.strip(),
                 acceptance_criteria=[c.strip() for c in acceptance_criteria if c.strip()],
-                verification=verification.strip(), context=(context or "").strip(), priority=priority, **settings,
+                verification=verification.strip(), context=(context or "").strip(), priority=priority,
+                fields=self._task_fields(fields), **settings,
             )
             self.state.tasks[task_id] = task
             self.state.order.append(task_id)
@@ -233,10 +251,13 @@ class Orchestrator:
 
     def update_task(self, task_id: str, **fields: Any) -> Task:
         task = self._task(task_id)
+        extra = fields.pop("fields", None)
         unknown = set(fields) - EDITABLE_FIELDS
         if unknown:
-            raise OrchestratorError(f"Cannot edit {sorted(unknown)}. Editable: {sorted(EDITABLE_FIELDS)}")
+            raise OrchestratorError(f"Cannot edit {sorted(unknown)}. Editable: {sorted(EDITABLE_FIELDS)}, fields")
         with self._lock:
+            if extra is not None:
+                task.fields = self._task_fields(extra, task.fields)
             merged = {f: fields.get(f, getattr(task, f)) for f in EDITABLE_FIELDS}
             merged["priority"] = (merged["priority"] or "P2").upper()
             errors = self.validate_task(merged["title"], merged["problem"], merged["expected_outcome"],
@@ -278,6 +299,7 @@ class Orchestrator:
             task.status = TaskStatus.CANCELLED
             task.touch()
         self._emit("task", f"Cancelled {task.id}. {reason}".strip(), task.id)
+        self._clean_worktree(task, "cancelled")
         return task
 
     def close_task(self, task_id: str) -> Task:
@@ -291,6 +313,7 @@ class Orchestrator:
             task.result = {"summary": "Closed from the tasks page.", "verification_notes": "", "ts": time.time()}
             task.touch()
         self._emit("done", f"{task.id} '{task.title}' closed.", task.id)
+        self._clean_worktree(task, "closed")
         self._auto_dispatch()
         return task
 
@@ -298,6 +321,9 @@ class Orchestrator:
         task = self._task(task_id)
         if task.is_active:
             raise OrchestratorError(f"{task.id} has a running agent. Stop it first.")
+        if task.agent and task.agent.worktree:
+            task.status = TaskStatus.CANCELLED   # the task is going away; its worktree should go with it
+            self._clean_worktree(task, "task deleted")
         with self._lock:
             self.state.tasks.pop(task.id)
             self.state.order.remove(task.id)
@@ -324,10 +350,18 @@ class Orchestrator:
                 return self.state.tasks[tid]
         return None
 
-    def list_tasks(self, status: str | None = None) -> list[Task]:
+    def list_tasks(self, status: str | None = None, label: str | None = None,
+                   field: str | None = None, value: str | None = None) -> list[Task]:
+        """The backlog in order. Filters: by status, by label, or by any field (`field`/`value`, where a list
+        field matches when it contains the value and a text one when it starts with it — so scheduled=2026-W38
+        and scheduled=2026 both work)."""
         tasks = [self.state.tasks[tid] for tid in self.state.order]
         if status:
             tasks = [t for t in tasks if t.status == status]
+        if label:
+            tasks = [t for t in tasks if label in (t.fields.get("labels") or [])]
+        if field and value is not None:
+            tasks = [t for t in tasks if _field_matches(t.fields.get(field), value)]
         return tasks
 
     # --------------------------------------------------------------- dispatch
@@ -446,8 +480,8 @@ class Orchestrator:
             self._attend(agent_id, _attention_reason(payload, event))
 
     def _prepare_workdir(self, task: Task) -> tuple[Path, Path | None, str | None]:
-        if not self.config.agents.worktrees:
-            return self.paths.root, None, None
+        if not self.config.agents.worktrees or task.fields.get("conflict_for"):
+            return self.paths.root, None, None   # a conflict is resolved where the branches meet: the checkout
         if not self.paths.is_git_repo():
             raise OrchestratorError("Worktrees are on but this folder is not a git repo. Run `git init` or set agents.worktrees=false.")
         branch = f"sm/{task.id}"
@@ -489,6 +523,71 @@ class Orchestrator:
             self._keep_transcript(task)
             self._emit("agent", f"Closed the finished session of {task.id}.", task.id)
         return task
+
+    def _clean_worktree(self, task: Task, why: str) -> int:
+        """Delete a finished task's worktree (agents.clean_worktrees). The branch keeps the work, so nothing is
+        lost — unless something there was never committed, and then the worktree is kept. Returns bytes freed."""
+        agent = task.agent
+        if not self.config.agents.clean_worktrees or not agent or not agent.worktree:
+            return 0
+        path = Path(agent.worktree)
+        if not path.exists():
+            agent.worktree = None
+            worktree.prune(self.paths.root)
+            return 0
+        if agent.session_open or task.status not in FINISHED_STATUSES:
+            return 0
+        if worktree.is_dirty(path):
+            self._emit("agent", f"Kept the worktree of {task.id}: it has uncommitted changes ({path}).", task.id)
+            return 0
+        freed = worktree.folder_size(path)
+        try:
+            worktree.remove_worktree(self.paths.root, path)
+        except worktree.GitError as exc:
+            self._emit("agent", f"Could not remove the worktree of {task.id}: {exc}", task.id)
+            return 0
+        with self._lock:
+            agent.worktree = None
+            self.save()
+        self._emit("agent", f"Freed {worktree.human_size(freed)}: removed the worktree of {task.id} ({why}); "
+                            f"branch {agent.branch} is kept.", task.id)
+        return freed
+
+    def clean_worktrees(self, force: bool = False) -> dict[str, Any]:
+        """Sweep: drop the worktrees of every done or cancelled task, and forget the ones already gone.
+        force also removes worktrees with uncommitted changes."""
+        if not self.paths.is_git_repo():
+            return {"removed": [], "kept": [], "freed": 0, "freed_human": "0 B"}
+        worktree.prune(self.paths.root)
+        removed, kept, freed = [], [], 0
+        for task in list(self.state.tasks.values()):
+            agent = task.agent
+            if not agent or not agent.worktree or task.status not in FINISHED_STATUSES or agent.session_open:
+                continue
+            path = Path(agent.worktree)
+            if not path.exists():
+                agent.worktree = None
+                continue
+            if force and worktree.is_dirty(path):
+                size = worktree.folder_size(path)
+                try:
+                    worktree.remove_worktree(self.paths.root, path, force=True)
+                except worktree.GitError as exc:
+                    kept.append({"task": task.id, "why": str(exc)})
+                    continue
+                with self._lock:
+                    agent.worktree = None
+                self._emit("agent", f"Freed {worktree.human_size(size)}: removed the worktree of {task.id} "
+                                    f"with its uncommitted changes; branch {agent.branch} is kept.", task.id)
+            else:
+                size = self._clean_worktree(task, "cleanup")
+                if agent.worktree:
+                    kept.append({"task": task.id, "why": "uncommitted changes"})
+                    continue
+            removed.append({"task": task.id, "freed": size, "branch": agent.branch})
+            freed += size
+        self.save()
+        return {"removed": removed, "kept": kept, "freed": freed, "freed_human": worktree.human_size(freed)}
 
     def remove_worktree(self, task_id: str, force: bool = False) -> Task:
         task = self._task(task_id)
@@ -585,9 +684,53 @@ class Orchestrator:
             committed = worktree.commit_all(path, f"{task.id} {task.title}")
             head = worktree.merge_branch(self.paths.root, agent.branch, base, f"Merge {agent.branch}: {task.title}")
         except worktree.GitError as exc:
+            clash = worktree.conflicting_files(self.paths.root, agent.branch, base)
+            if clash:
+                fix = self.create_conflict_task(task, base, clash)
+                raise OrchestratorError(
+                    f"{agent.branch} conflicts with {base} in {', '.join(clash[:5])}. Nothing was merged and your "
+                    f"work is safe on {agent.branch}. {fix.id} was created to resolve it; tell the user that, and "
+                    "complete your own task with merge=false.") from exc
             raise OrchestratorError(f"Could not merge {agent.branch} into {base}: {exc}") from exc
         self._emit("agent", f"{task.id}: merged {agent.branch} into {base} ({head}).", task.id, notify_manager=True)
         return {"task_id": task.id, "branch": agent.branch, "into": base, "committed": committed, "head": head}
+
+    def create_conflict_task(self, task: Task, base: str, files: list[str]) -> Task:
+        """A merge clashed: make a task for it, top of the backlog, and start an agent when a slot is free.
+
+        The agent that resolves it works in the project checkout itself (not a worktree of its own): a merge has
+        to happen where both branches meet."""
+        branch = task.agent.branch if task.agent else "?"
+        existing = next((t for t in self.state.tasks.values()
+                         if t.fields.get("conflict_for") == task.id and t.status not in FINISHED_STATUSES), None)
+        if existing:
+            return existing
+        listed = "\n".join(f"- `{f}`" for f in files)
+        fix = self.create_task(
+            title=f"Resolve the merge conflict of {task.id} into {base}",
+            problem=(f"Merging `{branch}` ({task.id}: {task.title}) into `{base}` stops on conflicting changes in:\n"
+                     f"{listed}\nBoth sides changed the same lines, so git cannot decide. The merge was aborted; "
+                     f"`{base}` and `{branch}` are both untouched."),
+            expected_outcome=(f"`{branch}` is merged into `{base}` with every conflict resolved so that both the "
+                              f"earlier work on {base} and the work of {task.id} still do what they were meant to."),
+            acceptance_criteria=[
+                f"git merge --no-ff {branch} completes on {base} with no conflict markers left in the tree",
+                "The project builds and its test command passes after the merge",
+                f"Nothing that {base} already did is lost, and nothing {task.id} added is dropped",
+            ],
+            verification=("Run the project's test/build command from CLAUDE.md after the merge, and "
+                          f"`git diff --check` plus `grep -rn '<<<<<<<' .` to prove no markers are left."),
+            context=(f"Work in the project checkout `{self.paths.root}` on `{base}` — a conflict cannot be resolved "
+                     f"in a worktree of its own. Read both sides first (`git log {base}..{branch}` and "
+                     f"`git log {branch}..{base}`) and understand what each change was for before you pick or "
+                     f"combine. Files: {', '.join(files)}."),
+            priority="P0",
+            fields={"conflict_for": task.id} if self.config.field("conflict_for") else None,
+        )
+        self._emit("task", f"{fix.id} created: {task.id} cannot merge into {base} ({len(files)} conflicting file(s)).",
+                   fix.id, notify_manager=True)
+        self._auto_dispatch()
+        return fix
 
     def complete_task(self, task_id: str, summary: str, verification_notes: str, merge: bool = False) -> Task:
         task = self._task(task_id)
@@ -617,10 +760,12 @@ class Orchestrator:
         return task
 
     def _safe_close(self, task_id: str) -> None:
+        """The session of a finished agent, closed a few seconds after it reported done — and its worktree with it."""
         try:
             self.close_agent_session(task_id)
         except OrchestratorError:
-            pass
+            return
+        self._clean_worktree(self._task(task_id), "task done")
 
     # ------------------------------------------------------------------ hooks
     def hello(self, role: str, task_id: str | None, session_id: str | None) -> dict[str, Any]:
@@ -661,17 +806,18 @@ class Orchestrator:
         if path and isinstance(info, AgentInfo):
             info.transcript = str(path)
 
-    def _apply_transcripts_gitignore(self) -> None:
-        """tasks.gitignore_transcripts: a .gitignore in the sessions folder keeps the copies out of git."""
-        folder = self.store.tasks.path / "sessions"
+    def apply_tasks_gitignore(self) -> None:
+        """tasks.in_git: the task files are committed with the project. Off puts a .gitignore in their folder,
+        so the backlog stays on this machine."""
+        folder = self.store.tasks.path
         if not folder.is_dir():
             return
         ignore = folder / ".gitignore"
-        if self.config.tasks.gitignore_transcripts:
-            if not ignore.exists():
-                ignore.write_text("# transcripts of the agent sessions; tasks.gitignore_transcripts turns this off\n*\n")
-        elif ignore.exists():
-            ignore.unlink()
+        if self.config.tasks.in_git:
+            if ignore.is_file() and ignore.read_text().startswith(TASKS_IGNORE_HEADER):
+                ignore.unlink()
+        elif not ignore.exists():
+            ignore.write_text(TASKS_IGNORE_HEADER + "*\n")
 
     def _sync_session_record(self, task: Task, ended: bool = False) -> None:
         """Copy what we now know about the running agent into the task's session list (the task file keeps it)."""
@@ -683,16 +829,15 @@ class Orchestrator:
             record["ended_at"] = time.time()
 
     def _keep_transcript(self, task: Task) -> None:
-        """Copy the finished session's transcript next to the task files, so the record survives the tool's own
-        history (tasks.keep_transcripts; tasks.gitignore_transcripts decides whether it is committed)."""
-        if not self.config.tasks.keep_transcripts or not task.agent or not task.sessions:
+        """Copy the finished session's transcript into the task's agent folder, so the record survives the tool's
+        own history (agents.keep_transcripts). That folder is never in git."""
+        if not self.config.agents.keep_transcripts or not task.agent or not task.sessions:
             return
         source = Path(task.agent.transcript or "")
         if not source.is_file():
             return
-        folder = self.store.tasks.path / "sessions" / task.id
+        folder = self.paths.transcripts_dir(task.id)
         folder.mkdir(parents=True, exist_ok=True)
-        self._apply_transcripts_gitignore()
         target = folder / f"{task.agent.session_id or source.stem}{source.suffix or '.jsonl'}"
         try:
             shutil.copy2(source, target)
@@ -1071,6 +1216,9 @@ class Orchestrator:
             if changed:
                 self.save()
         self._sweep_dead_windows()
+        if startup:
+            self.apply_tasks_gitignore()
+            self.clean_worktrees()   # worktrees of tasks finished in an earlier run
         if changed:
             self._auto_dispatch()
 
@@ -1149,6 +1297,12 @@ ATTENTION_REASONS = {
     "agent_needs_input": "asks you a question",
     "idle_prompt": "waiting for your reply",
 }
+
+
+def _field_matches(stored: Any, wanted: str) -> bool:
+    if isinstance(stored, list):
+        return wanted in stored
+    return str(stored or "").startswith(wanted)
 
 
 def _session_record(agent: AgentInfo) -> dict[str, Any]:
