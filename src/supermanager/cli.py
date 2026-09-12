@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -562,6 +563,82 @@ def config_keys():
 
 
 # ---------------------------------------------------------------------------------- internal plumbing
+@app.command("self-restart", hidden=True)
+def self_restart(project: Path = typer.Option(..., help="Project root"),
+                 task: Optional[str] = typer.Option(None, help="The task whose change is being loaded")):
+    """Restart a workspace's daemon and pages so they run the current code (internal).
+
+    Runs detached, because it kills the processes that asked for it. The agents are left alone: the dashboard
+    gets SIGKILL, which skips its "stop everything" handler."""
+    paths = _paths(project)
+    config = load_config(paths.config)
+    from .daemon import is_daemon_running
+    from .launcher import supermanager_argv
+    from .tmux import MANAGER_WINDOW, Tmux
+
+    log = paths.logs_dir / "self-restart.log"
+    def note(text: str) -> None:
+        paths.logs_dir.mkdir(parents=True, exist_ok=True)
+        with log.open("a") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {text}\n")
+
+    from .upgrade import smoke_test
+    ok, output = smoke_test()
+    if not ok:
+        note(f"refused: supermanager does not start with this code. {output[-500:]}")
+        console.print(f"[red]Not restarting: supermanager does not start with the code as it is now.[/red]\n{output[-500:]}")
+        raise typer.Exit(1)
+
+    note(f"restarting for {task or 'a change'}")
+    _kill_matching(f"supermanager dashboard -C {paths.root}", signal.SIGKILL)
+    for page in ("agents-page", "config-page"):
+        _kill_matching(f"supermanager {page} -C {paths.root}", signal.SIGTERM)
+    for _ in range(20):
+        if not is_daemon_running(paths.socket):
+            break
+        time.sleep(0.5)
+    proc = subprocess.run([*supermanager_argv(), "up", "--no-attach", "-C", str(paths.root)],
+                          capture_output=True, text=True)
+    for _ in range(40):
+        if is_daemon_running(paths.socket):
+            break
+        time.sleep(0.5)
+    if is_daemon_running(paths.socket):
+        note("back up")
+        message = (f"supermanager restarted with the change from {task}: this daemon and the pages now run the new "
+                   "code. Tell the user, in one line." if task else "supermanager restarted with the new code.")
+        try:
+            _client(paths).call("tell_manager", message=message, timeout=5.0)
+        except (DaemonError, DaemonUnavailable):
+            pass
+        return
+    failure = (proc.stderr or proc.stdout).strip()[-1500:]
+    note(f"FAILED: {failure}")
+    line = (f"[supermanager] The change from {task} was applied, but supermanager could not restart with it. "
+            f"Nothing is running this workspace's daemon now. The error was: {' '.join(failure.split())[:600]} "
+            f"Read {log}, fix the code in the supermanager checkout, then run `supermanager up` here.")
+    tmux = Tmux(config.tmux_session)
+    window = tmux.find_window(MANAGER_WINDOW)
+    if window:
+        try:
+            tmux.send_text(window, line)
+        except Exception:
+            pass
+    console.print(line)
+    raise typer.Exit(1)
+
+
+def _kill_matching(pattern: str, sig: int) -> None:
+    """Signal the processes whose command line contains `pattern` (never this process)."""
+    found = subprocess.run(["pgrep", "-f", "--", pattern], capture_output=True, text=True).stdout.split()
+    for pid in found:
+        if int(pid) != os.getpid():
+            try:
+                os.kill(int(pid), sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+
 @app.command(hidden=True)
 def mcp(role: str = typer.Option(..., help="manager or agent"),
         project: Optional[Path] = typer.Option(None, help="Project root (default: $SUPERMANAGER_PROJECT)"),

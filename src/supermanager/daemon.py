@@ -49,6 +49,7 @@ class Daemon:
             "list_agents": self.orch.list_agents,
             "close_task": self.orch.close_task,
             "ask_manager_to_start": self.orch.ask_manager_to_start,
+            "tell_manager": self.orch.tell_manager,
             "stop_agent": self.orch.stop_agent,
             "close_agent_session": self.orch.close_agent_session,
             "remove_worktree": self.orch.remove_worktree,

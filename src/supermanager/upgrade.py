@@ -14,6 +14,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -214,3 +215,33 @@ def _write_stamp() -> None:
         STAMP.write_text(json.dumps({"ts": time.time()}))
     except OSError:
         pass
+
+
+# ---------------------------------------------------------------- reloading this machine's own workspaces
+SMOKE_TIMEOUT = 60
+
+
+def smoke_test() -> tuple[bool, str]:
+    """Does supermanager still start with the code as it is now? Runs the real command in a subprocess, so a
+    syntax error, a bad import or a broken CLI definition is caught before anything is restarted."""
+    exe = shutil.which("supermanager")
+    argv = [exe] if exe else [sys.executable, "-m", "supermanager"]
+    try:
+        proc = subprocess.run([*argv, "--version"], capture_output=True, text=True, timeout=SMOKE_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"supermanager --version did not finish: {exc}"
+    if proc.returncode != 0:
+        return False, (proc.stderr or proc.stdout).strip()
+    return True, proc.stdout.strip()
+
+
+def restart_workspace(project: Path, task_id: str | None = None) -> None:
+    """Restart a project's daemon and pages so they run the current code, without touching its agents.
+
+    Detached on purpose: the process doing the restart is one of the processes being restarted."""
+    exe = shutil.which("supermanager")
+    argv = ([exe] if exe else [sys.executable, "-m", "supermanager"]) + ["self-restart", "--project", str(project)]
+    if task_id:
+        argv += ["--task", task_id]
+    subprocess.Popen(argv, start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

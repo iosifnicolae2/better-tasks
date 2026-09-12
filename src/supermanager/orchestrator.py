@@ -779,8 +779,20 @@ class Orchestrator:
         self._auto_dispatch()
         return fix
 
+    def changes_supermanager(self, task: Task) -> bool:
+        """True when this task worked on supermanager's own checkout."""
+        source = upgrade.source_dir()
+        repo = str(task.fields.get("repo") or "").strip()
+        return bool(source and repo and Path(repo).expanduser().resolve() == source)
+
     def complete_task(self, task_id: str, summary: str, verification_notes: str, merge: bool = False) -> Task:
         task = self._task(task_id)
+        if self.changes_supermanager(task) and self.config.agents.reload_supermanager:
+            ok, output = upgrade.smoke_test()
+            if not ok:
+                raise OrchestratorError(
+                    "supermanager does not start with your change, so the task is not done and nothing was "
+                    f"restarted. Fix this, run your verification again, then call complete_task once more:\n{output[-1500:]}")
         merged = self.merge_task(task_id) if merge else None
         with self._lock:
             task.status = TaskStatus.DONE
@@ -803,8 +815,26 @@ class Orchestrator:
             # session record in the task file stay, so nothing is lost.
             self._keep_transcript(task)
             threading.Timer(self.config.agents.close_done_after, self._safe_close, args=(task.id,)).start()
+        if self.changes_supermanager(task) and self.config.agents.reload_supermanager:
+            # The code under this daemon changed and it starts: reload the workspace with it, once the finished
+            # session has been closed. The agents keep running; only the daemon and the pages come back new.
+            self._emit("agent", f"{task.id} changed supermanager itself; this workspace restarts with the new "
+                                "code in a moment (agents keep running).", task.id, notify_manager=True)
+            threading.Timer(self.config.agents.close_done_after + 5, self._reload_workspace, args=(task.id,)).start()
         self._auto_dispatch()
         return task
+
+    def _reload_workspace(self, task_id: str) -> None:
+        """Restart this workspace with the code as it is now. The check runs once more here: the agent may have
+        touched something after it reported done, and a workspace that stays up on the old code is far better
+        than one that cannot come back."""
+        ok, output = upgrade.smoke_test()
+        if not ok:
+            self._emit("error", f"Did not restart for {task_id}: supermanager does not start with the code as it "
+                                f"is now. This workspace keeps running the version it started with. {output[-400:]}",
+                       task_id, notify_manager=True)
+            return
+        upgrade.restart_workspace(self.paths.root, task_id)
 
     def _safe_close(self, task_id: str) -> None:
         """The session of a finished agent, closed a few seconds after it reported done — and its worktree with it."""
@@ -1183,6 +1213,11 @@ class Orchestrator:
             raise OrchestratorError(f"Could not reach the manager window: {exc}") from exc
         self._emit("manager", f"Asked the manager to dispatch {task.id}.", task.id)
         return task
+
+    def tell_manager(self, message: str) -> dict[str, Any]:
+        """Say something to the manager from outside (the restart helper uses this)."""
+        self._emit("manager", message, notify_manager=True)
+        return {"delivered": self.manager_alive()}
 
     def _deliver_to_manager(self, message: str) -> None:
         if not self.manager_alive():

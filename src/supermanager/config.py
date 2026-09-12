@@ -38,6 +38,7 @@ class AgentsConfig:
     merge_into: str = ""          # branch an agent merges into when you say yes ("" = the branch the project is on)
     clean_worktrees: bool = True  # delete a finished task's worktree; its branch keeps the work
     keep_transcripts: bool = True # copy each finished session's transcript into .supermanager/agents/<id>/
+    reload_supermanager: bool = True  # a task that changed supermanager itself restarts this workspace with it
     model: str = ""               # empty = the tool's own default; must be a model of that tool
     effort: str = ""              # claude: low..max, codex: minimal..xhigh; empty = the tool's default
     allow_skip_permissions: bool = True
@@ -224,6 +225,7 @@ SETTABLE_KEYS = {
     "agents.merge_into": str,
     "agents.clean_worktrees": bool,
     "agents.keep_transcripts": bool,
+    "agents.reload_supermanager": bool,
     "agents.model": str,
     "agents.effort": str,
     "agents.allow_skip_permissions": bool,
@@ -257,6 +259,7 @@ SETTING_HELP = {
     "agents.merge_into": "Branch an agent merges its work into when you approve at the end (empty = whatever branch the project is on).",
     "agents.clean_worktrees": "Delete a task's worktree once it is done or cancelled (the branch keeps the work). A worktree with uncommitted changes is kept.",
     "agents.keep_transcripts": "Copy a session's transcript into .supermanager/agents/<id>/transcripts/ when it ends (that folder is never in git).",
+    "agents.reload_supermanager": "When a task changes supermanager itself, restart this workspace with the new code once the agent is done (its agents keep running).",
     "agents.model": "Default model for agents (empty = the tool's default), e.g. opus, or gpt-6-astra for codex.",
     "agents.effort": "Default effort for agents (empty = the tool's default). claude: low/medium/high/xhigh/max, codex: minimal/low/medium/high/xhigh.",
     "agents.allow_skip_permissions": "Let you choose 'bypass permissions' when approving an agent's plan.",

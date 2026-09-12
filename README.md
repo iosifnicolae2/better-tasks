@@ -217,6 +217,7 @@ page marks what your local file overrides.
 | `agents.clean_worktrees` | true | delete a task's worktree once it is done; the branch keeps the work |
 | `agents.keep_transcripts` | true | copy a session's transcript into `.supermanager/agents/<id>/transcripts/` |
 | `agents.close_done_after` | 20 | seconds before a finished agent's session closes |
+| `agents.reload_supermanager` | true | a task that changed supermanager itself restarts this workspace with the new code |
 | `agents.auto_dispatch` | false | start the next backlog task by itself when a slot frees |
 | `agents.auto_trust` | true | answer "do you trust this folder?" for new worktrees |
 | `agents.allow_skip_permissions` | true | offer "bypass permissions" when approving a plan |
