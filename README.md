@@ -52,18 +52,19 @@ waits. You approve it here, in claude.ai, or on your phone — these are Remote 
 ### tasks — the roadmap, as a table or a board
 
 ```
- ID      Pri  Status     Title                         Labels          When         Agent
+ ID      Pri  Status     Title                         Labels        When         Agent               Created         Updated
                          backlog  (2)
- T-002   P2   backlog    Retry failed uploads           api                         ▶ start (s)
- T-003   P2   backlog    Ship the release notes         docs           2026-09-20   ▶ start (s)
+ T-002   P2   backlog    Retry failed uploads           api                        ▶ start (s)         09/13/26 01:55  09/13/26 01:55
+ T-003   P2   backlog    Ship the release notes         docs         2026-09-20    ▶ start (s)         09/12/26 18:02  09/13/26 01:41
                          working  (1)
- T-001   P2   working    Fix the BOM in the CSV import  import  bug    2026-W38     demo-T-001 · busy
+ T-001   P2   working    Fix the BOM in the CSV import  import  bug  2026-W38      demo-T-001 · busy   09/12/26 09:20  09/13/26 01:52
  ^w Search  n New task  s Start  p Pause  x Delete  d Done  i Edit file  h Show done  v Board/table  ? Help  q Leave
 ```
 
 Grouped by status, with running agents first. `enter` opens the agent (or the task file when there is none),
 `s` starts one, `n` writes a new task, `ctrl+w` searches every column, a click on a title sorts it (up, down,
-off), `g` changes what it groups by, `G` drops the headings.
+off — `Created` and `Updated` sort by time), `g` changes what it groups by, `G` drops the headings. Dates are
+written the way this machine writes them.
 
 `v` turns it into a board:
 

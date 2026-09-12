@@ -25,7 +25,7 @@ from ..models import FINISHED_STATUSES, PRIORITIES, Event, Task, TaskStatus
 from ..orchestrator import Orchestrator, OrchestratorError
 from ..tmux import CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, inside_tmux_session
 from .board import CARD_WIDTH, NO_VALUE, Board, Card, field_grouping, label_chips, status_grouping
-from .shared import FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, wrap
+from .shared import FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, local_time, wrap
 
 STATUS_STYLE = {
     TaskStatus.BACKLOG: "white", TaskStatus.PLANNING: "yellow", TaskStatus.WORKING: "bright_green",
@@ -36,7 +36,8 @@ STARTABLE = {TaskStatus.BACKLOG, TaskStatus.INTERRUPTED}
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
 # bell or a longer status appears — the Agent column, last in the row, is where those show up.
 BASE_COLUMNS = (("ID", 6), ("Pri", 3), ("Status", 11), ("Title", FLEX))
-AGENT_COLUMN_SPEC = ("Agent", 36)   # always last; a click on this cell starts / opens the agent
+AGENT_COLUMN_SPEC = ("Agent", 36)   # a click on this cell starts / opens the agent
+TIME_COLUMNS = (("Created", 16), ("Updated", 16))   # last, in this machine's own date format
 AGENT_WIDTH = 36
 
 HELP = """\
@@ -221,19 +222,21 @@ class SupermanagerApp(PageApp):
             return
         previous = self._selected_task
         fields = self._shown_fields()
-        columns = [*BASE_COLUMNS, *[(f.column, f.width) for f in fields], AGENT_COLUMN_SPEC]
-        table.action_columns = (len(columns) - 1,)   # the Agent column moves when fields are added
+        columns = [*BASE_COLUMNS, *[(f.column, f.width) for f in fields], AGENT_COLUMN_SPEC, *TIME_COLUMNS]
+        table.action_columns = (len(columns) - 1 - len(TIME_COLUMNS),)   # the Agent column: fields shift it
         table.clear(columns=True)
         self.add_columns(table, *columns)
         width = self.flex_width
         tasks, hidden = self._visible_tasks(fields)
-        filler = [""] * len(fields)
+        filler = [""] * (len(fields) + len(TIME_COLUMNS))
 
         def row(t: Task) -> None:
             table.add_row(t.id, t.priority, Text(t.status, style=STATUS_STYLE.get(t.status, "white")),
                           wrap(t.title, width),
                           *(_field_cell(f, t.fields.get(f.name)) for f in fields),
-                          _agent_cell(t, AGENT_WIDTH), key=t.id, height=None)
+                          _agent_cell(t, AGENT_WIDTH),
+                          Text(local_time(t.created_at), style="dim"), Text(local_time(t.updated_at), style="dim"),
+                          key=t.id, height=None)
 
         if self.group_rows and tasks:
             grouping = self._grouping(tasks)
@@ -684,5 +687,6 @@ def _sort_value(fields: list):
             if f.column == column:
                 return f.show(t.fields.get(f.name))
         return {"ID": t.id, "Pri": t.priority, "Status": str(t.status), "Title": t.title,
-                "Agent": _agent_cell(t).plain}.get(column)
+                "Agent": _agent_cell(t).plain,
+                "Created": t.created_at, "Updated": t.updated_at}.get(column)
     return value

@@ -4,6 +4,7 @@ yours is missing."""
 
 from __future__ import annotations
 
+import locale
 import shutil
 import subprocess
 import sys
@@ -193,6 +194,19 @@ def _sortable(value: object) -> tuple:
     if isinstance(value, (int, float)):
         return (0, value)
     return (1, str(value).lower())
+
+
+try:   # dates in the format this machine uses, not a hard-coded one
+    locale.setlocale(locale.LC_TIME, "")
+except locale.Error:
+    pass
+
+
+def local_time(ts: float | None) -> str:
+    """A timestamp as this machine writes dates and times (%x %X from the current locale)."""
+    if not ts:
+        return ""
+    return time.strftime("%x %H:%M", time.localtime(ts))
 
 
 def wrap(text: str, width: int, style: str = "") -> Text:
