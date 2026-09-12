@@ -161,7 +161,10 @@ class PageApp(QuitTwice, App):
         here and not per row, so nothing shifts while the page refreshes in place."""
         content = content or {}
         sized = [(name, self._width(name, width, content.get(name, []))) for name, width in columns]
-        self.flex_width = max(16, table.size.width - sum(w for _, w in sized if w) - 3 * len(sized) - 2)
+        # Every column costs its width plus the table's padding on each side; what is left over is the flex
+        # column's, so the row reaches the right edge instead of stopping short of it.
+        overhead = 2 * table.cell_padding * len(sized)
+        self.flex_width = max(16, table.size.width - sum(w for _, w in sized if w) - overhead - 1)
         keys = []
         for name, width in sized:
             mark = "" if not self.sort or self.sort.key != name else (" ▼" if self.sort.reverse else " ▲")

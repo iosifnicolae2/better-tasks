@@ -1372,6 +1372,7 @@ class Orchestrator:
             raise OrchestratorError("tmux is required to host Claude sessions. Install it: brew install tmux")
 
 
+QUOTED_NOTIFICATIONS = {"agent_needs_input", "elicitation_dialog", "elicitation_url_dialog"}
 ATTENTION_REASONS = {
     "permission_prompt": "needs your permission",
     "elicitation_dialog": "asks you a question",
@@ -1399,11 +1400,14 @@ def _attention_reason(payload: dict[str, Any], event: str = "notification") -> s
     text ('' = it does not)."""
     if event == "permission":
         return ATTENTION_REASONS["permission_prompt"]
-    reason = ATTENTION_REASONS.get(str(payload.get("notification_type", "")))
+    kind = str(payload.get("notification_type", ""))
+    reason = ATTENTION_REASONS.get(kind)
     if not reason:
         return ""
+    # A question is worth quoting; "Claude Code needs your approval to run a command" only repeats the reason,
+    # and a row on a page has no room for that.
     message = " ".join(str(payload.get("message", "")).split())
-    return f"{reason}: {message[:80]}" if message else reason
+    return f"{reason}: {message[:60]}" if message and kind in QUOTED_NOTIFICATIONS else reason
 
 
 def _pkill_claude(pattern: str) -> bool:
