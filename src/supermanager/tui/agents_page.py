@@ -149,7 +149,8 @@ class AgentsApp(PageApp):
             for s in sessions:
                 table.add_row(*self._cells(s, self.flex_width), key=s["id"], height=None)
             if not sessions:
-                hint = "No agent matches the search." if self.query else "No agent is running: n starts one, s on the tasks page starts one on a task."
+                hint = ("No agent matches the search." if self.search_text
+                        else "No agent is running: n starts one, s on the tasks page starts one on a task.")
                 cells = [""] * len(COLUMNS)
                 cells[FLEX_COLUMN] = wrap(hint, self.flex_width, "dim")
                 table.add_row(*cells, height=None)

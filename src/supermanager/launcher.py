@@ -77,9 +77,12 @@ def write_session_files(
     folder = paths.agent_dir(task_id) if task_id else paths.home / "manager"
     folder.mkdir(parents=True, exist_ok=True)
 
+    # The task id belongs on the command line: it is not a path, and a tool that scrubs the environment for its
+    # MCP servers (Codex does) would otherwise leave the bridge without one. The project is not named here;
+    # the bridge finds it from the session's environment, or from git when it only has a worktree.
     argv = supermanager_argv(portable=True)
-    mcp = {"mcpServers": {"supermanager": {"command": argv[0],
-                                            "args": [*argv[1:], "mcp", "--role", role, "--tool", tool]}}}
+    mcp_args = [*argv[1:], "mcp", "--role", role, "--tool", tool] + (["--task", task_id] if task_id else [])
+    mcp = {"mcpServers": {"supermanager": {"command": argv[0], "args": mcp_args}}}
     settings = {"hooks": _hooks(role, task_id, tool, paths.root)}
 
     mcp_path, settings_path, prompt_path = folder / "mcp.json", folder / "settings.json", folder / "prompt.md"
@@ -209,7 +212,7 @@ def _codex_argv(
         argv += ["-c", f"developer_instructions={_toml(system_prompt)}"]
     if mcp:
         exe, *rest = supermanager_argv(portable=True)
-        mcp_args = [*rest, "mcp", "--role", "agent", "--tool", "codex"]
+        mcp_args = [*rest, "mcp", "--role", "agent", "--tool", "codex", "--task", agent_id]
         argv += ["-c", f"mcp_servers.supermanager.command={_toml(exe)}",
                  "-c", f"mcp_servers.supermanager.args={_toml(mcp_args)}",
                  "-c", 'mcp_servers.supermanager.default_tools_approval_mode="approve"']   # our tools: no prompts

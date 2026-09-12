@@ -1,0 +1,114 @@
+<svg class="rich-terminal" viewBox="0 0 2763 342.79999999999995" xmlns="http://www.w3.org/2000/svg">
+    <!-- Generated with Rich https://www.textualize.io -->
+    <style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-3780860993-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-3780860993-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-3780860993-r1 { fill: #c5c8c6 }
+.terminal-3780860993-r2 { fill: #949494 }
+.terminal-3780860993-r3 { fill: #949494;font-weight: bold }
+.terminal-3780860993-r4 { fill: #ffffff }
+.terminal-3780860993-r5 { fill: #c5c8c6;font-weight: bold }
+.terminal-3780860993-r6 { fill: #4e4e4e }
+.terminal-3780860993-r7 { fill: #afd7ff }
+.terminal-3780860993-r8 { fill: #808080 }
+.terminal-3780860993-r9 { fill: #98a84b }
+.terminal-3780860993-r10 { fill: #68a0b3 }
+.terminal-3780860993-r11 { fill: #98729f }
+.terminal-3780860993-r12 { fill: #d0b344 }
+.terminal-3780860993-r13 { fill: #ff87af }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-3780860993-clip-terminal">
+      <rect x="0" y="0" width="2744.0" height="291.79999999999995" />
+    </clipPath>
+    <clipPath id="terminal-3780860993-line-0">
+    <rect x="0" y="1.5" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-1">
+    <rect x="0" y="25.9" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-2">
+    <rect x="0" y="50.3" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-3">
+    <rect x="0" y="74.7" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-4">
+    <rect x="0" y="99.1" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-5">
+    <rect x="0" y="123.5" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-6">
+    <rect x="0" y="147.9" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-7">
+    <rect x="0" y="172.3" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-8">
+    <rect x="0" y="196.7" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-9">
+    <rect x="0" y="221.1" width="2745" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3780860993-line-10">
+    <rect x="0" y="245.5" width="2745" height="24.65"/>
+            </clipPath>
+    </defs>
+
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="2761" height="340.8" rx="8"/><text class="terminal-3780860993-title" fill="#c5c8c6" text-anchor="middle" x="1380" y="27">sm-acme-api&#160;·&#160;manager</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
+            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
+            <circle cx="44" cy="0" r="7" fill="#28c840"/>
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-3780860993-clip-terminal)">
+    <rect fill="#3a3a3a" x="0" y="74.7" width="24.4" height="24.65" shape-rendering="crispEdges"/><rect fill="#3a3a3a" x="24.4" y="74.7" width="988.2" height="24.65" shape-rendering="crispEdges"/>
+    <g class="terminal-3780860993-matrix">
+    <text class="terminal-3780860993-r2" x="24.4" y="20" textLength="244" clip-path="url(#terminal-3780860993-line-0)">Called&#160;supermanager&#160;</text><text class="terminal-3780860993-r3" x="268.4" y="20" textLength="12.2" clip-path="url(#terminal-3780860993-line-0)">2</text><text class="terminal-3780860993-r2" x="280.6" y="20" textLength="85.4" clip-path="url(#terminal-3780860993-line-0)">&#160;times&#160;</text><text class="terminal-3780860993-r1" x="2745" y="20" textLength="12.2" clip-path="url(#terminal-3780860993-line-0)">
+</text><text class="terminal-3780860993-r4" x="0" y="44.4" textLength="12.2" clip-path="url(#terminal-3780860993-line-1)">⏺</text><text class="terminal-3780860993-r1" x="12.2" y="44.4" textLength="207.4" clip-path="url(#terminal-3780860993-line-1)">&#160;The&#160;backlog&#160;for&#160;</text><text class="terminal-3780860993-r5" x="219.6" y="44.4" textLength="97.6" clip-path="url(#terminal-3780860993-line-1)">acme-api</text><text class="terminal-3780860993-r1" x="317.2" y="44.4" textLength="939.4" clip-path="url(#terminal-3780860993-line-1)">&#160;is&#160;empty&#160;—&#160;no&#160;tasks&#160;yet,&#160;3&#160;free&#160;agent&#160;slots.&#160;What&#160;would&#160;you&#160;like&#160;to&#160;work&#160;on?</text><text class="terminal-3780860993-r1" x="2745" y="44.4" textLength="12.2" clip-path="url(#terminal-3780860993-line-1)">
+</text><text class="terminal-3780860993-r2" x="0" y="68.8" textLength="12.2" clip-path="url(#terminal-3780860993-line-2)">✻</text><text class="terminal-3780860993-r2" x="24.4" y="68.8" textLength="341.6" clip-path="url(#terminal-3780860993-line-2)">Brewed&#160;for&#160;8s&#160;·&#160;done&#160;2:07&#160;AM</text><text class="terminal-3780860993-r1" x="2745" y="68.8" textLength="12.2" clip-path="url(#terminal-3780860993-line-2)">
+</text><text class="terminal-3780860993-r6" x="0" y="93.2" textLength="24.4" clip-path="url(#terminal-3780860993-line-3)">❯&#160;</text><text class="terminal-3780860993-r4" x="24.4" y="93.2" textLength="988.2" clip-path="url(#terminal-3780860993-line-3)">The&#160;CSV&#160;import&#160;drops&#160;rows&#160;when&#160;the&#160;file&#160;starts&#160;with&#160;a&#160;BOM.&#160;Fix&#160;it&#160;and&#160;add&#160;a&#160;test.</text><text class="terminal-3780860993-r1" x="2745" y="93.2" textLength="12.2" clip-path="url(#terminal-3780860993-line-3)">
+</text><text class="terminal-3780860993-r2" x="24.4" y="117.6" textLength="244" clip-path="url(#terminal-3780860993-line-4)">Called&#160;supermanager&#160;</text><text class="terminal-3780860993-r3" x="268.4" y="117.6" textLength="12.2" clip-path="url(#terminal-3780860993-line-4)">2</text><text class="terminal-3780860993-r2" x="280.6" y="117.6" textLength="85.4" clip-path="url(#terminal-3780860993-line-4)">&#160;times&#160;</text><text class="terminal-3780860993-r1" x="2745" y="117.6" textLength="12.2" clip-path="url(#terminal-3780860993-line-4)">
+</text><text class="terminal-3780860993-r4" x="0" y="142" textLength="12.2" clip-path="url(#terminal-3780860993-line-5)">⏺</text><text class="terminal-3780860993-r1" x="12.2" y="142" textLength="73.2" clip-path="url(#terminal-3780860993-line-5)">&#160;Task&#160;</text><text class="terminal-3780860993-r5" x="85.4" y="142" textLength="61" clip-path="url(#terminal-3780860993-line-5)">T-001</text><text class="terminal-3780860993-r1" x="146.4" y="142" textLength="585.6" clip-path="url(#terminal-3780860993-line-5)">&#160;created&#160;and&#160;an&#160;agent&#160;has&#160;started&#160;on&#160;it&#160;(branch&#160;</text><text class="terminal-3780860993-r7" x="732" y="142" textLength="97.6" clip-path="url(#terminal-3780860993-line-5)">sm/T-001</text><text class="terminal-3780860993-r1" x="829.6" y="142" textLength="1390.8" clip-path="url(#terminal-3780860993-line-5)">).&#160;It&#160;will&#160;fix&#160;the&#160;BOM&#160;handling&#160;in&#160;the&#160;CSV&#160;reader&#160;and&#160;add&#160;a&#160;regression&#160;test;&#160;you&#x27;ll&#160;get&#160;its&#160;plan&#160;to&#160;approve&#160;first.</text><text class="terminal-3780860993-r1" x="2745" y="142" textLength="12.2" clip-path="url(#terminal-3780860993-line-5)">
+</text><text class="terminal-3780860993-r2" x="0" y="166.4" textLength="12.2" clip-path="url(#terminal-3780860993-line-6)">✻</text><text class="terminal-3780860993-r2" x="24.4" y="166.4" textLength="390.4" clip-path="url(#terminal-3780860993-line-6)">Cogitated&#160;for&#160;10s&#160;·&#160;done&#160;2:07&#160;AM</text><text class="terminal-3780860993-r1" x="2745" y="166.4" textLength="12.2" clip-path="url(#terminal-3780860993-line-6)">
+</text><text class="terminal-3780860993-r8" x="0" y="190.8" textLength="2720.6" clip-path="url(#terminal-3780860993-line-7)">────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────&#160;acme-api-manager&#160;─</text><text class="terminal-3780860993-r1" x="2745" y="190.8" textLength="12.2" clip-path="url(#terminal-3780860993-line-7)">
+</text><text class="terminal-3780860993-r1" x="0" y="215.2" textLength="24.4" clip-path="url(#terminal-3780860993-line-8)">❯ </text><text class="terminal-3780860993-r1" x="2745" y="215.2" textLength="12.2" clip-path="url(#terminal-3780860993-line-8)">
+</text><text class="terminal-3780860993-r8" x="0" y="239.6" textLength="2720.6" clip-path="url(#terminal-3780860993-line-9)">───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text><text class="terminal-3780860993-r1" x="2745" y="239.6" textLength="12.2" clip-path="url(#terminal-3780860993-line-9)">
+</text><text class="terminal-3780860993-r9" x="24.4" y="264" textLength="1549.4" clip-path="url(#terminal-3780860993-line-10)">/private/tmp/claude-501/-Users-iosif-Documents-Projects-claude-manager/a969617e-fc2e-4117-bf25-f7f4d5e677bf/scratchpad/acme-api</text><text class="terminal-3780860993-r10" x="1586" y="264" textLength="73.2" clip-path="url(#terminal-3780860993-line-10)">(main)</text><text class="terminal-3780860993-r11" x="1671.4" y="264" textLength="122" clip-path="url(#terminal-3780860993-line-10)">[Sonnet&#160;5]</text><text class="terminal-3780860993-r12" x="1805.6" y="264" textLength="109.8" clip-path="url(#terminal-3780860993-line-10)">65k/1000k</text><text class="terminal-3780860993-r1" x="2745" y="264" textLength="12.2" clip-path="url(#terminal-3780860993-line-10)">
+</text><text class="terminal-3780860993-r13" x="24.4" y="288.4" textLength="292.8" clip-path="url(#terminal-3780860993-line-11)">⏵⏵&#160;bypass&#160;permissions&#160;on</text><text class="terminal-3780860993-r2" x="317.2" y="288.4" textLength="414.8" clip-path="url(#terminal-3780860993-line-11)">&#160;(shift+tab&#160;to&#160;cycle)&#160;·&#160;←&#160;3&#160;agents</text><text class="terminal-3780860993-r1" x="2745" y="288.4" textLength="12.2" clip-path="url(#terminal-3780860993-line-11)">
+</text>
+    </g>
+    </g>
+</svg>

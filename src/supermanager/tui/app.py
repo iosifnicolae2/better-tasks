@@ -17,6 +17,7 @@ from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Static
 
@@ -36,12 +37,15 @@ STATUS_STYLE = {
 STARTABLE = WAITING_STATUSES   # backlog, queued, interrupted: s starts one, or queues it when no slot is free
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
 # bell or a longer status appears — the Agent column, last in the row, is where those show up.
-# AUTO columns are as wide as what is in them; Agent keeps a fixed width because its text changes with every
-# bell, and a column that resizes under your eyes is worse than a little empty space.
+# AUTO columns are as wide as what is in them. Agent and Needs you keep a fixed width: their text changes with
+# every bell, and a column that resizes under your eyes is worse than a little empty space.
 BASE_COLUMNS = (("ID", AUTO), ("Pri", AUTO), ("Status", AUTO), ("Title", FLEX))
-AGENT_COLUMN_SPEC = ("Agent", 36)   # a click on this cell starts / opens the agent
+AGENT_COLUMN_SPEC = ("Agent", 22)       # who is on it; a click here starts or opens the agent
+STATE_COLUMN_SPEC = ("Needs you", 34)   # what that agent is doing, or what it wants from you
 TIME_COLUMNS = (("Created", AUTO), ("Updated", AUTO))   # last, in this machine's own date format
-AGENT_WIDTH = 36
+AGENT_WIDTH = 22
+STATE_WIDTH = 34
+PHASE_STYLE = {"starting": "dim", "busy": "yellow", "idle": "green", "ended": "dim"}
 
 HELP = """\
 [b]tasks[/b]   enter / click  open the task's agent; without one, edit the task file in your editor
@@ -61,6 +65,28 @@ HELP = """\
 {KEY} cycles manager → tasks → agents → config. In the bar at the bottom, `agents` lights up while you are in an
 agent's window; click a name there to jump to it. Inside a Claude window every other key goes to Claude.
 """
+
+class FinishedStrip(Static):
+    """The line above the keys: how many finished tasks there are, and whether they are shown. Click it or
+    press h. It stays out of the table, so the list itself is only tasks."""
+
+    DEFAULT_CSS = """
+    FinishedStrip { height: 1; padding: 0 1; color: $text-muted; background: $panel; }
+    FinishedStrip:hover { color: $text; }
+    """
+
+    class Clicked(Message):
+        pass
+
+    def show(self, count: int, expanded: bool) -> None:
+        self.display = bool(count)
+        if count:
+            arrow, what = ("▾", "hide") if expanded else ("▸", "show")
+            self.update(f"{arrow} {count} finished — h or click to {what} them")
+
+    def on_click(self) -> None:
+        self.post_message(self.Clicked())
+
 
 # ------------------------------------------------------------------------------------------- modals
 class ConfirmScreen(ModalScreen[bool]):
@@ -141,6 +167,7 @@ class SupermanagerApp(PageApp):
         yield PageTable(id="tasks-table")   # its action column is set on every render (fields shift it)
         yield Board(id="tasks-board")
         yield SearchBar()
+        yield FinishedStrip()
         yield Footer()
 
     async def on_mount(self) -> None:
@@ -225,8 +252,9 @@ class SupermanagerApp(PageApp):
             return
         previous = self._selected_task
         fields = self._shown_fields()
-        columns = [*BASE_COLUMNS, *[(f.column, AUTO) for f in fields], AGENT_COLUMN_SPEC, *TIME_COLUMNS]
-        table.action_columns = (len(columns) - 1 - len(TIME_COLUMNS),)   # the Agent column: fields shift it
+        columns = [*BASE_COLUMNS, *[(f.column, AUTO) for f in fields], AGENT_COLUMN_SPEC, STATE_COLUMN_SPEC,
+                   *TIME_COLUMNS]
+        table.action_columns = (len(columns) - 2 - len(TIME_COLUMNS),)   # the Agent column: fields shift it
         table.clear(columns=True)
         tasks, hidden = self._visible_tasks(fields)
         self.add_columns(table, *columns, content={
@@ -237,35 +265,44 @@ class SupermanagerApp(PageApp):
             "Updated": [local_time(t.updated_at) for t in tasks],
         })
         width = self.flex_width
-        filler = [""] * (len(fields) + len(TIME_COLUMNS))
+        filler = [""] * (len(fields) + len(TIME_COLUMNS) + 1)   # +1: the Needs you column
 
         def row(t: Task) -> None:
             table.add_row(t.id, t.priority, Text(t.status, style=STATUS_STYLE.get(t.status, "white")),
                           wrap(t.title, width),
                           *(_field_cell(f, t.fields.get(f.name)) for f in fields),
-                          _agent_cell(t, AGENT_WIDTH),
+                          _agent_cell(t, AGENT_WIDTH), _state_cell(t, STATE_WIDTH),
                           Text(local_time(t.created_at), style="dim"), Text(local_time(t.updated_at), style="dim"),
                           key=t.id, height=None)
 
-        if self.group_rows and tasks:
-            grouping = self._grouping(tasks)
+        def heading(label: str, count: int) -> None:
+            table.add_row("", "", "", Text(f"{label}  ({count})", style="bold reverse"), *filler, "",
+                          key=GROUP_PREFIX + label)
+
+        # Finished tasks are their own group at the very bottom, whatever the rest is grouped by.
+        live = [t for t in tasks if t.status not in FINISHED_STATUSES]
+        finished = [t for t in tasks if t.status in FINISHED_STATUSES]
+        if self.group_rows and live:
+            grouping = self._grouping(live)
             # A task can carry several labels; in a list it belongs under one heading, the first of them.
             for value in grouping.values:
-                in_group = [t for t in tasks if grouping.of(t)[0] == value]
-                if not in_group:
-                    continue
-                table.add_row("", "", "", Text(f"{value}  ({len(in_group)})", style="bold reverse"), *filler, "",
-                              key=GROUP_PREFIX + value)
-                for t in in_group:
-                    row(t)
+                in_group = [t for t in live if grouping.of(t)[0] == value]
+                if in_group:
+                    heading(value, len(in_group))
+                    for t in in_group:
+                        row(t)
         else:
-            for t in tasks:
+            for t in live:
                 row(t)
-        if not tasks and not hidden:
-            hint = "No task matches the search." if self.query else "No tasks yet: n creates one, or tell the manager what you want."
+        if finished:
+            heading("finished", len(finished))
+            for t in finished:
+                row(t)
+        if not tasks:
+            hint = ("No task matches the search." if self.search_text
+                    else "No tasks yet: n creates one, or tell the manager what you want.")
             table.add_row("", "", "", Text(hint, style="dim"), *filler, "")
-        if hidden:
-            table.add_row("", "", "", Text(f"{hidden} finished task(s) hidden — h shows them", style="dim"), *filler, "")
+        self.query_one(FinishedStrip).show(hidden or len(finished), self.show_done)
         ids = [str(r.key.value) for r in table.ordered_rows]
         if previous not in ids:
             previous = next((i for i in ids if not i.startswith(GROUP_PREFIX)), None)
@@ -399,10 +436,14 @@ class SupermanagerApp(PageApp):
         self.refresh_all()
 
     def action_toggle_done(self) -> None:
-        """h: show or hide the finished tasks. The starting state comes from tasks.hide_done."""
+        """h, or a click on the strip above the keys: show or hide the finished tasks. They sit in one group at
+        the bottom of the list. The starting state comes from tasks.hide_done."""
         self.show_done = not self.show_done
         self._refresh_tasks()
-        self.notify("Showing finished tasks." if self.show_done else "Finished tasks hidden.")
+
+    @on(FinishedStrip.Clicked)
+    def _strip_clicked(self) -> None:
+        self.action_toggle_done()
 
     def action_help(self) -> None:
         self.push_screen(HelpScreen())
@@ -665,27 +706,37 @@ def _card(t: Task, fields: list) -> Text:
         body.append(label_chips(value) if f.type == "list" else Text(f"{f.show(value)}\n", style="cyan"))
         if f.type == "list":
             body.append("\n")
-    agent = _agent_cell(t, CARD_WIDTH)
-    if agent.plain.strip():
-        body.append(agent)
+    for cell in (_agent_cell(t, CARD_WIDTH), _state_cell(t, CARD_WIDTH)):
+        if cell.plain.strip():
+            body.append(cell)
+            body.append("\n")
     return body
 
 
 def _agent_cell(t: Task, width: int = 200) -> Text:
-    """The Agent column: what to do (start), what it is waiting for, or who works on it and how it is doing."""
+    """The Agent column: who is on it, or what you can do about it."""
     a = t.agent
     if t.status == TaskStatus.QUEUED:
-        return Text("⏳ queued · starts when a slot frees", style="cyan")
+        return Text("⏳ queued", style="cyan")
     if t.status in STARTABLE:
         return Text("▶ start (s)", style="cyan")
     if a and a.session_open:
-        name = a.rc_name or f"{a.tool} {t.id}"
+        return wrap(a.rc_name or f"{a.tool} {t.id}", width, "yellow")
+    return wrap(a.branch, width, "dim") if a and a.branch else Text("")
+
+
+def _state_cell(t: Task, width: int = 200) -> Text:
+    """The Needs you column: what that agent is doing, and what it wants from you when it wants something."""
+    a = t.agent
+    if t.status == TaskStatus.QUEUED:
+        return Text("starts when a slot frees", style="cyan")
+    if a and a.session_open:
         if a.attention:
-            return wrap(f"🔔 {name} · {a.attention}", width, "bold yellow")
-        return wrap(f"{name} · {a.phase}", width, "yellow")
-    if t.status == TaskStatus.DONE:
-        return Text(f"done · {a.branch}" if a and a.branch else "done", style="green")
-    return Text(str(t.status), style="dim")
+            return wrap(f"🔔 {a.attention}", width, "bold yellow")
+        return Text(a.phase, style=PHASE_STYLE.get(a.phase, "dim"))
+    if t.status in STARTABLE:
+        return Text("")
+    return Text(str(t.status), style=STATUS_STYLE.get(t.status, "dim"))
 
 
 def _default_order(t: Task) -> tuple:
@@ -701,6 +752,6 @@ def _sort_value(fields: list):
             if f.column == column:
                 return f.show(t.fields.get(f.name))
         return {"ID": t.id, "Pri": t.priority, "Status": str(t.status), "Title": t.title,
-                "Agent": _agent_cell(t).plain,
+                "Agent": _agent_cell(t).plain, "Needs you": _state_cell(t).plain,
                 "Created": t.created_at, "Updated": t.updated_at}.get(column)
     return value

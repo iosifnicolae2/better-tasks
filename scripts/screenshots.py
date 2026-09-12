@@ -13,6 +13,7 @@ from supermanager.paths import ProjectPaths
 from supermanager.tui.agents_page import AgentsApp
 from supermanager.tui.app import SupermanagerApp
 from supermanager.tui.config_page import ConfigApp
+from textual.widgets import Static
 
 OUT = _P(__file__).resolve().parents[1] / "docs" / "screenshots"
 NOW = time.time()
@@ -69,6 +70,29 @@ def sessions(orch):
                            "tool": "claude", "model": "", "effort": "", "session_open": True}})
     return rows
 
+class Bar(Static):
+    """The strip tmux draws under every page: the workspace's windows, and the key that cycles them."""
+    DEFAULT_CSS = "Bar { dock: bottom; height: 1; background: #303030; color: #bcbcbc; padding: 0 1; }"
+
+
+def bar(active: str, tasks: int, agents: int) -> Static:
+    def tab(name: str, count: int = 0) -> str:
+        label = f"{name} ({count})" if count else name
+        return f"[black on #5fd7ff] {label} [/]" if name == active else f" {label} "
+    left = f"[b #5fd7ff] acme-api [/][#585858]│[/]"
+    tabs = "".join(tab(n, c) for n, c in (("manager", 0), ("tasks", tasks), ("agents", agents), ("config", 0)))
+    return Bar(f"{left}{tabs}[#585858]{'':>6}[/][#8a8a8a]ctrl+a / ← → pages[/]")
+
+
+async def with_bar(app, active, tasks, agents):
+    """Screenshots show the bar too: on screen it is part of what you are looking at. The page's own footer is
+    nudged up by one row to make room for it, the way the terminal does."""
+    from textual.widgets import Footer
+    for footer in app.query(Footer):
+        footer.styles.offset = (0, -1)
+    await app.mount(bar(active, tasks, agents))
+
+
 async def main():
     orch, paths = build()
     app = SupermanagerApp(orch)
@@ -83,13 +107,21 @@ async def main():
     rows = sessions(orch)
     agents._poll = lambda: (setattr(agents, "sessions", rows), agents._render())[1]
     agents._poll_events = lambda: None
-    async with agents.run_test(size=(150, 12)) as pilot:
-        await pilot.pause(); await pilot.pause()
+    async with agents.run_test(size=(150, 14)) as pilot:
+        for _ in range(3):
+            await pilot.pause()
+        await with_bar(agents, "agents", 5, 2)
+        for _ in range(3):
+            await pilot.pause()
         agents.save_screenshot(str(OUT / "agents.svg"))
 
     config = ConfigApp(paths)
     async with config.run_test(size=(150, 20)) as pilot:
-        await pilot.pause(); await pilot.pause()
+        for _ in range(3):
+            await pilot.pause()
+        await with_bar(config, "config", 5, 2)
+        for _ in range(3):
+            await pilot.pause()
         config.save_screenshot(str(OUT / "config.svg"))
     print("\n".join(f"{p.name}: {p.stat().st_size // 1024} KB" for p in sorted(OUT.glob('*.svg'))))
 

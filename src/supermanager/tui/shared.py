@@ -100,7 +100,8 @@ class PageApp(QuitTwice, App):
 
     # -- search
     @property
-    def query(self) -> str:
+    def search_text(self) -> str:
+        """What is typed in the search bar. (Never call this `query`: App.query is Textual's own.)"""
         try:
             return self.query_one(SearchBar).value.strip().lower()   # type: ignore[attr-defined]
         except Exception:
@@ -121,7 +122,7 @@ class PageApp(QuitTwice, App):
         self.rerender()
 
     def matches(self, *cells: object) -> bool:
-        q = self.query
+        q = self.search_text
         return not q or any(q in _plain(c).lower() for c in cells)
 
     @on(Input.Changed, "SearchBar")
