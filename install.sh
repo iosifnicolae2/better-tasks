@@ -2,12 +2,12 @@
 # Installs the `supermanager` / `sm` commands and links them to a source checkout (editable install).
 #
 # One command, no clone needed (clones into ~/.local/share/supermanager/src, or updates it):
-#   curl -fsSL https://raw.githubusercontent.com/iosifnicolae2/claude-manager/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/bringes/supermanager/main/install.sh | sh
 # Or from inside your own checkout, to link that folder instead:
 #   ./install.sh
 set -eu
 
-REPO_URL="${SUPERMANAGER_REPO:-https://github.com/iosifnicolae2/claude-manager}"
+REPO_URL="${SUPERMANAGER_REPO:-https://github.com/bringes/supermanager}"
 SRC_DIR="${SUPERMANAGER_SRC:-$HOME/.local/share/supermanager/src}"
 
 script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || pwd)"

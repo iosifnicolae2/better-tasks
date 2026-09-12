@@ -30,7 +30,7 @@ Open this when you want to know how to run it or how the pieces talk to each oth
 One command, nothing to clone first:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/iosifnicolae2/claude-manager/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bringes/supermanager/main/install.sh | sh
 ```
 
 It installs `uv` and `tmux` if they are missing, clones this repo into `~/.local/share/supermanager/src`
@@ -40,8 +40,8 @@ Run the same command again to update.
 Working on the code? Clone it yourself and link your checkout instead:
 
 ```sh
-git clone https://github.com/iosifnicolae2/claude-manager
-cd claude-manager
+git clone https://github.com/bringes/supermanager
+cd supermanager
 ./install.sh
 ```
 
