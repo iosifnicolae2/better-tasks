@@ -20,7 +20,8 @@ from typing import Any
 from . import launcher, prompts, taskfiles, worktree
 from .config import Config, get_key, local_keys, save_config, set_key, settings_snapshot
 from .launcher import AgentSettings
-from .models import ACTIVE_STATUSES, FINISHED_STATUSES, PRIORITIES, AgentInfo, Event, ManagerInfo, State, Task, TaskStatus
+from .models import (ACTIVE_STATUSES, FINISHED_STATUSES, PRIORITIES, WAITING_STATUSES, AgentInfo, Event,
+                     ManagerInfo, State, Task, TaskStatus)
 from .paths import ProjectPaths
 from .store import StateStore
 from .tmux import AGENTS_WINDOW, DASHBOARD_WINDOW, MANAGER_WINDOW, Tmux, TmuxError
@@ -353,6 +354,13 @@ class Orchestrator:
                 return self.state.tasks[tid]
         return None
 
+    def next_queued_task(self) -> Task | None:
+        """The first task you asked to start that is still waiting for a slot."""
+        for tid in self.state.order:
+            if self.state.tasks[tid].status == TaskStatus.QUEUED:
+                return self.state.tasks[tid]
+        return None
+
     def list_tasks(self, status: str | None = None, label: str | None = None,
                    field: str | None = None, value: str | None = None) -> list[Task]:
         """The backlog in order. Filters: by status, by label, or by any field (`field`/`value`, where a list
@@ -369,20 +377,29 @@ class Orchestrator:
 
     # --------------------------------------------------------------- dispatch
     def spawn_agent(self, task_id: str | None = None, resume: bool | None = None,
-                    tool: str | None = None, model: str | None = None, effort: str | None = None) -> Task:
-        """Start an agent on a task. tool/model/effort given here are saved on the task, then used."""
+                    tool: str | None = None, model: str | None = None, effort: str | None = None,
+                    queue: bool = True) -> Task:
+        """Start an agent on a task, or queue the task when every slot is busy (it then starts by itself as soon
+        as one frees). tool/model/effort given here are saved on the task, then used."""
         self._require_tmux()
         with self._lock:
-            task = self._task(task_id) if task_id else self.next_backlog_task()
+            task = self._task(task_id) if task_id else (self.next_queued_task() or self.next_backlog_task())
             if not task:
                 raise OrchestratorError("The backlog is empty; nothing to dispatch.")
             if task.is_active:
                 raise OrchestratorError(f"{task.id} already has a running agent.")
-            if task.status not in (TaskStatus.BACKLOG, TaskStatus.INTERRUPTED):
+            if task.status not in WAITING_STATUSES:
                 raise OrchestratorError(f"{task.id} is {task.status}; requeue it first if you want it redone.")
             if self.free_slots() <= 0:
-                raise OrchestratorError(
-                    f"All {self.config.agents.concurrency} slots are busy. Wait for a task to finish or raise agents.concurrency.")
+                if not queue:
+                    raise OrchestratorError(f"All {self.config.agents.concurrency} slots are busy.")
+                if task.status != TaskStatus.QUEUED:
+                    task.status = TaskStatus.QUEUED
+                    task.touch()
+                    self.save()
+                    self._emit("task", f"{task.id} is queued: it starts as soon as one of the "
+                                       f"{self.config.agents.concurrency} slots frees.", task.id)
+                return task
             settings = self._agent_settings(task, tool=tool, model=model, effort=effort)
             for field, value in zip(AGENT_SETTING_FIELDS, (tool, model, effort)):
                 if value:
@@ -609,13 +626,21 @@ class Orchestrator:
         return task
 
     def _auto_dispatch(self) -> None:
-        if not self.config.agents.auto_dispatch:
-            return
-        while self.free_slots() > 0 and self.next_backlog_task():
+        """Fill the free slots: first with the tasks you asked to start (queued), then — when
+        agents.auto_dispatch is on — with the top of the backlog."""
+        while self.free_slots() > 0:
+            task = self.next_queued_task() or (self.next_backlog_task() if self.config.agents.auto_dispatch else None)
+            if not task:
+                return
             try:
-                self.spawn_agent()
+                self.spawn_agent(task.id, queue=False)
             except OrchestratorError as exc:
-                self._emit("error", f"Auto-dispatch stopped: {exc}")
+                with self._lock:
+                    if task.status == TaskStatus.QUEUED:
+                        task.status = TaskStatus.BACKLOG   # it cannot start; do not spin on it
+                        task.touch()
+                        self.save()
+                self._emit("error", f"Could not start {task.id}: {exc}", task.id)
                 return
 
     # ---------------------------------------------------------- agent reports

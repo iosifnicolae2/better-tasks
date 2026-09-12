@@ -59,7 +59,7 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
     @mcp.tool()
     def list_tasks(status: str | None = None, label: str | None = None,
                    field: str | None = None, value: str | None = None) -> str:
-        """List tasks in backlog order. Filters, all optional: status (backlog, planning, working, blocked, done,
+        """List tasks in backlog order. Filters, all optional: status (backlog, queued, planning, working, blocked, done,
         interrupted, cancelled), label (one of a task's labels), or field+value for any other field the project
         defines — a list field matches when it contains the value, a text or date one when it starts with it
         (field="scheduled", value="2026-W38", or just "2026-09" for that month). get_config lists the fields."""
@@ -129,7 +129,9 @@ def _register_manager_tools(mcp: FastMCP, call) -> None:
     @mcp.tool()
     def spawn_agent(task_id: str | None = None, resume: bool | None = None,
                     tool: str | None = None, model: str | None = None, effort: str | None = None) -> str:
-        """Start an isolated agent for a task (top backlog task if no id). Fails when no slot is free.
+        """Start an isolated agent for a task (the first queued or backlog task if no id). When every slot is
+        busy the task is queued instead and starts by itself as soon as one frees — the returned status says
+        which happened ("planning" = it started, "queued" = it is waiting), so tell the user either way.
         resume=true continues an interrupted task's previous conversation and worktree.
         tool (claude|codex), model and effort override the task's / project's settings and are saved on the task."""
         return call("spawn_agent", task_id=task_id, resume=resume, tool=tool, model=model, effort=effort)

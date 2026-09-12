@@ -25,9 +25,9 @@ CARD_WIDTH = 26   # the text inside a card's border
 LABEL_STYLES = ("cyan", "magenta", "green", "yellow", "blue", "bright_magenta", "bright_cyan")
 # The flow, left to right. The first four are always shown (an empty column is where you drop work);
 # the rest only when they hold something.
-STATUS_ORDER = (TaskStatus.BACKLOG, TaskStatus.PLANNING, TaskStatus.WORKING, TaskStatus.BLOCKED,
-                TaskStatus.INTERRUPTED, TaskStatus.DONE, TaskStatus.CANCELLED)
-ALWAYS_SHOWN = 4
+STATUS_ORDER = (TaskStatus.BACKLOG, TaskStatus.QUEUED, TaskStatus.PLANNING, TaskStatus.WORKING,
+                TaskStatus.BLOCKED, TaskStatus.INTERRUPTED, TaskStatus.DONE, TaskStatus.CANCELLED)
+ALWAYS_SHOWN = 5
 NO_VALUE = "—"   # the column for tasks that have nothing in the field the board groups by
 
 

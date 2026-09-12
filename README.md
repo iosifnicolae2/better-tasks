@@ -124,6 +124,7 @@ up — click it for the list. A session that needs you rings 🔔 there and in y
 | --- | --- |
 | **Talk, don't file tickets** | every request becomes a task with a problem, acceptance criteria and a way to verify it; the manager asks only when it truly cannot write one |
 | **Run agents in parallel** | `agents.concurrency` slots, one git worktree and branch `sm/<task-id>` each, so they never step on each other |
+| **Queue the rest** | `s` on a task starts it, or queues it when every slot is busy — queued tasks start by themselves, in order, and say so on the page |
 | **Mix tools** | `claude` or `codex` per project or per task, with the model and effort you want (`opus` + `max`, `gpt-6-astra` + `xhigh`) |
 | **Approve from anywhere** | the plan waiting in your terminal is the same one on your phone |
 | **Land the work** | the agent asks "commit and merge `sm/T-005` into `main`?" — say yes and it commits, merges, closes the task and its session |
@@ -260,7 +261,8 @@ page marks what your local file overrides.
   supermanager reads its status line, stays quiet, and looks again a few seconds later.
 - The daemon talks to the manager by typing a `[supermanager] …` line into its window.
 
-**Task status flow:** `backlog → planning → working → done`, with side exits `blocked` (needs you),
+**Task status flow:** `backlog → queued → planning → working → done`, where `queued` means you asked for it and
+it starts as soon as a slot frees. Side exits: `blocked` (needs you),
 `interrupted` (the session ended early; `spawn_agent` resumes it with its worktree and conversation) and
 `cancelled`.
 

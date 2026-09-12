@@ -21,18 +21,19 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Static
 
 from ..daemon import Daemon
-from ..models import FINISHED_STATUSES, PRIORITIES, Event, Task, TaskStatus
+from ..models import FINISHED_STATUSES, PRIORITIES, WAITING_STATUSES, Event, Task, TaskStatus
 from ..orchestrator import Orchestrator, OrchestratorError
 from ..tmux import CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, inside_tmux_session
 from .board import CARD_WIDTH, NO_VALUE, Board, Card, field_grouping, label_chips, status_grouping
 from .shared import AUTO, FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, local_time, wrap
 
 STATUS_STYLE = {
-    TaskStatus.BACKLOG: "white", TaskStatus.PLANNING: "yellow", TaskStatus.WORKING: "bright_green",
+    TaskStatus.BACKLOG: "white", TaskStatus.QUEUED: "cyan", TaskStatus.PLANNING: "yellow",
+    TaskStatus.WORKING: "bright_green",
     TaskStatus.BLOCKED: "bright_red", TaskStatus.DONE: "green", TaskStatus.INTERRUPTED: "magenta",
     TaskStatus.CANCELLED: "dim",
 }
-STARTABLE = {TaskStatus.BACKLOG, TaskStatus.INTERRUPTED}
+STARTABLE = WAITING_STATUSES   # backlog, queued, interrupted: s starts one, or queues it when no slot is free
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
 # bell or a longer status appears — the Agent column, last in the row, is where those show up.
 # AUTO columns are as wide as what is in them; Agent keeps a fixed width because its text changes with every
@@ -92,7 +93,7 @@ class SupermanagerApp(PageApp):
     BINDINGS = [
         Binding("n,N", "new_task", "New task"),
         Binding("enter", "open_selected", "Open"),
-        Binding("s", "spawn_selected", "Start"),
+        Binding("s", "spawn_selected", "Start/queue"),
         Binding("p", "pause_selected", "Pause"),
         Binding("x", "delete_selected", "Delete"),
         Binding("d", "close_selected", "Done"),
@@ -355,7 +356,7 @@ class SupermanagerApp(PageApp):
             return
         if value == TaskStatus.BACKLOG:
             self._try(self.orch.requeue_task, task.id, ok=f"{task.id} is back in the backlog.")
-        elif value == TaskStatus.PLANNING:
+        elif value in (TaskStatus.QUEUED, TaskStatus.PLANNING):
             self._spawn(task.id)
         elif value == TaskStatus.DONE:
             self._try(self.orch.close_task, task.id, ok=f"{task.id} is done.")
@@ -489,7 +490,8 @@ class SupermanagerApp(PageApp):
 
     @work(thread=True, exclusive=True, group="spawn")
     def _spawn(self, task_id: str) -> None:
-        """Start an agent on the task and go straight into its window."""
+        """s: start an agent on the task and go into its window — or, when every slot is busy, put the task in
+        the queue; it starts by itself as soon as one frees."""
         try:
             task = self.orch.spawn_agent(task_id)
         except OrchestratorError as exc:
@@ -498,7 +500,9 @@ class SupermanagerApp(PageApp):
             return
         self.call_from_thread(self.refresh_all)
         self.call_from_thread(self._select_task, task.id)
-        if task.agent:
+        if task.status == TaskStatus.QUEUED:
+            self.call_from_thread(self.notify, f"{task.id} is queued — it starts when a slot frees.")
+        elif task.agent:
             self.call_from_thread(self._attach_window, task.agent.tmux_window)
 
     def action_spawn_selected(self) -> None:
@@ -668,8 +672,10 @@ def _card(t: Task, fields: list) -> Text:
 
 
 def _agent_cell(t: Task, width: int = 200) -> Text:
-    """The Agent column: what to do (start), or who works on it and how it is doing."""
+    """The Agent column: what to do (start), what it is waiting for, or who works on it and how it is doing."""
     a = t.agent
+    if t.status == TaskStatus.QUEUED:
+        return Text("⏳ queued · starts when a slot frees", style="cyan")
     if t.status in STARTABLE:
         return Text("▶ start (s)", style="cyan")
     if a and a.session_open:
@@ -683,9 +689,9 @@ def _agent_cell(t: Task, width: int = 200) -> Text:
 
 
 def _default_order(t: Task) -> tuple:
-    """Tasks with a live agent first, then by priority. Same priority keeps the backlog order (stable sort)."""
-    running = 0 if t.agent and t.agent.session_open else 1
-    return (running, PRIORITIES.index(t.priority) if t.priority in PRIORITIES else len(PRIORITIES))
+    """Live agents first, then what you asked to start, then by priority. Same rank keeps the backlog order."""
+    rank = 0 if t.agent and t.agent.session_open else (1 if t.status == TaskStatus.QUEUED else 2)
+    return (rank, PRIORITIES.index(t.priority) if t.priority in PRIORITIES else len(PRIORITIES))
 
 
 def _sort_value(fields: list):

@@ -17,8 +17,8 @@ Any message from the user that asks for something to be done (a fix, a feature, 
 "make Y") means exactly this, in one go:
 1. `create_task` with the fields below, filled from the message, the project's CLAUDE.md and the code you can
    read. State your assumptions inside the task's `context` instead of asking.
-2. `spawn_agent(task_id=...)` immediately if `get_status` shows a free slot. If no slot is free, the task waits at
-   its place in the backlog and you say so.
+2. `spawn_agent(task_id=...)` right away. If no slot is free the task is queued instead and starts by itself
+   when one frees; the status it returns tells you which happened, and you say so in one line.
 3. Reply in two or three lines: the task id, what the agent will do, and that the user will approve its plan.
 
 Ask a question first only when you genuinely cannot write a checkable task from what you have (for example the
@@ -66,7 +66,9 @@ Write acceptance criteria the user would recognise as what they asked for; do no
 Split anything that needs more than one agent-session of focused work into separate tasks, each with its own agent.
 
 ## Dispatch rules
-- `get_status` tells you the concurrency limit and free slots. `spawn_agent` without an id takes the top backlog task.
+- `get_status` tells you the concurrency limit and free slots. `spawn_agent` without an id takes the first queued
+  task, or the top of the backlog when none is queued. A queued task needs nothing more from you: it starts on
+  its own. Tasks the user asked for are queued; the rest wait in the backlog until someone asks.
 - Agents start in plan mode. The user reviews and approves each agent's plan through Remote Control.
 - Each agent is isolated (own git worktree and branch `sm/<task-id>` when worktrees are on). They cannot see
   each other's work, so avoid dispatching two tasks that must edit the same files at the same time.

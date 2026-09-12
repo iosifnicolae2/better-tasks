@@ -12,6 +12,7 @@ from typing import Any
 
 class TaskStatus(StrEnum):
     BACKLOG = "backlog"
+    QUEUED = "queued"          # you asked for it; it starts as soon as a slot frees
     PLANNING = "planning"      # agent running, plan not yet approved
     WORKING = "working"        # plan approved, agent implementing
     BLOCKED = "blocked"        # agent waiting on a human answer (session still open)
@@ -20,7 +21,8 @@ class TaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
-ACTIVE_STATUSES = {TaskStatus.PLANNING, TaskStatus.WORKING, TaskStatus.BLOCKED}
+ACTIVE_STATUSES = {TaskStatus.PLANNING, TaskStatus.WORKING, TaskStatus.BLOCKED}   # these hold a slot
+WAITING_STATUSES = {TaskStatus.BACKLOG, TaskStatus.QUEUED, TaskStatus.INTERRUPTED}   # an agent can start on these
 FINISHED_STATUSES = {TaskStatus.DONE, TaskStatus.CANCELLED}
 PRIORITIES = ("P0", "P1", "P2", "P3")
 
