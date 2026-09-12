@@ -24,11 +24,9 @@ from ..client import DaemonClient, DaemonError, DaemonUnavailable
 from ..config import load_config
 from ..paths import ProjectPaths
 from ..tmux import AGENTS_WINDOW, Tmux, inside_tmux_session
+from .app import MUTED, PHASE_STYLE, STATUS_STYLE   # one palette for both pages
 from .shared import AUTO, FLEX, PageApp, PageTable, SearchBar, edit_task, wrap
 
-PHASE_STYLE = {"starting": "dim", "busy": "yellow", "idle": "green", "ended": "dim"}
-STATUS_STYLE = {"planning": "yellow", "working": "bright_green", "blocked": "bright_red", "done": "green",
-                "interrupted": "magenta", "cancelled": "dim"}
 # (name, width): AUTO fits the column to what is in it, FLEX takes whatever is left of the row. Widths are
 # settled when the list of agents changes, not on every refresh, so nothing shifts while you read.
 COLUMNS = (("Agent", AUTO), ("Phase", AUTO), ("Task", FLEX), ("Status", AUTO),

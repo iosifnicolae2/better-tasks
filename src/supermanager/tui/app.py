@@ -28,11 +28,12 @@ from ..tmux import CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, inside_tmux_session
 from .board import CARD_WIDTH, NO_VALUE, Board, Card, field_grouping, label_chips, status_grouping
 from .shared import AUTO, FLEX, GROUP_PREFIX, PageApp, PageTable, SearchBar, TitleScreen, edit_task, local_time, wrap
 
+# Light enough to read on the row's background and on the cursor's tint, so a selected row keeps its colours.
+MUTED = "#9aa0a6"
 STATUS_STYLE = {
     TaskStatus.BACKLOG: "white", TaskStatus.QUEUED: "cyan", TaskStatus.PLANNING: "yellow",
-    TaskStatus.WORKING: "bright_green",
-    TaskStatus.BLOCKED: "bright_red", TaskStatus.DONE: "green", TaskStatus.INTERRUPTED: "magenta",
-    TaskStatus.CANCELLED: "dim",
+    TaskStatus.WORKING: "bright_green", TaskStatus.BLOCKED: "#ff6b81", TaskStatus.DONE: "#7fc08a",
+    TaskStatus.INTERRUPTED: "#d78fd7", TaskStatus.CANCELLED: MUTED,
 }
 STARTABLE = WAITING_STATUSES   # backlog, queued, interrupted: s starts one, or queues it when no slot is free
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
@@ -45,7 +46,7 @@ STATE_COLUMN_SPEC = ("Needs you", 34)   # what that agent is doing, or what it w
 TIME_COLUMNS = (("Created", AUTO), ("Updated", AUTO))   # last, in this machine's own date format
 AGENT_WIDTH = 22
 STATE_WIDTH = 34
-PHASE_STYLE = {"starting": "dim", "busy": "yellow", "idle": "green", "ended": "dim"}
+PHASE_STYLE = {"starting": MUTED, "busy": "yellow", "idle": "green", "ended": MUTED}
 
 HELP = """\
 [b]tasks[/b]   enter / click  open the task's agent; without one, edit the task file in your editor
@@ -272,7 +273,7 @@ class SupermanagerApp(PageApp):
                           wrap(t.title, width),
                           *(_field_cell(f, t.fields.get(f.name)) for f in fields),
                           _agent_cell(t, AGENT_WIDTH), _state_cell(t, STATE_WIDTH),
-                          Text(local_time(t.created_at), style="dim"), Text(local_time(t.updated_at), style="dim"),
+                          Text(local_time(t.created_at), style=MUTED), Text(local_time(t.updated_at), style=MUTED),
                           key=t.id, height=None)
 
         def heading(label: str, count: int) -> None:
@@ -722,7 +723,7 @@ def _agent_cell(t: Task, width: int = 200) -> Text:
         return Text("▶ start (s)", style="cyan")
     if a and a.session_open:
         return wrap(a.rc_name or f"{a.tool} {t.id}", width, "yellow")
-    return wrap(a.branch, width, "dim") if a and a.branch else Text("")
+    return wrap(a.branch, width, MUTED) if a and a.branch else Text("")
 
 
 def _state_cell(t: Task, width: int = 200) -> Text:

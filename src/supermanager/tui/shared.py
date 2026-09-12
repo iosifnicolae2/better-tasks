@@ -267,8 +267,16 @@ class PageTable(DataTable):
             self.row_key = row_key
             self.column = column
 
+    # The selected row keeps its own colours — a status stays green, a bell stays amber — so only the background
+    # tells you where the cursor is. The tint is soft enough that every colour we use still reads on it.
+    DEFAULT_CSS = """
+    PageTable > .datatable--cursor { background: $primary 18%; }
+    PageTable:focus > .datatable--cursor { background: $primary 30%; }
+    """
+
     def __init__(self, *args, action_columns: tuple[int, ...] = (), **kwargs):
-        super().__init__(*args, cursor_type="row", zebra_stripes=True, **kwargs)
+        super().__init__(*args, cursor_type="row", zebra_stripes=True,
+                         cursor_foreground_priority="renderable", **kwargs)
         self.action_columns = action_columns
 
     def on_resize(self) -> None:
