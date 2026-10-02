@@ -20,6 +20,7 @@ type Host = {
   pluginPrompts: string[]
   notices: string[]
   registered: string[]
+  spawned: string[]
 }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
 
@@ -31,7 +32,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [] }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [] }
   mock.env(on, teams.env)
   on('settings.read', () => ({ value: { env: teams.settingsEnv } }))
   on('ui.log', ($, e) => {
@@ -76,7 +77,10 @@ function fakeHost(
   })
   on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'Now' } } }))
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
-  on('tool.call', { tool: 'Agent' }, ($, e) => ({ result: { isolation: e.isolation ?? 'none' } }))
+  on('tool.call', { tool: 'Agent' }, ($, e) => {
+    host.spawned.push(e.prompt)
+    return { result: { isolation: e.isolation ?? 'none' } }
+  })
   on('prompt.submit', ($, e) => {
     if (e.origin.kind === 'plugin') host.pluginPrompts.push(e.text)
     return { text: e.text, context: e.context }
@@ -343,4 +347,50 @@ test("a teammate's tool call shows as its activity until its turn ends", async (
 
   await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', agentId: 'a1', reason: 'answer' })
   expect(await status()).toBe('auth · running · context ?')
+})
+
+test('a project customizes numbering, files, the task template and teammate instructions', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const seed = {
+    [`${ROOT}/.claude/manager/config.json`]: JSON.stringify({ taskPrefix: 'BUG-', taskPadding: 2, taskFileName: '{id}.md', tasksFolder: 'work' }),
+    [`${ROOT}/.claude/manager/task-template.md`]: '# {id} {title}\n{goal}\n',
+    [`${ROOT}/.claude/manager/teammate.md`]: '<!-- extend -->\nRun `make check` before you report.',
+  }
+  const host = fakeHost(on, [], seed)
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('a backlog task'))
+  await $.tool.call({ ...create, when: 'backlog' })
+  expect(host.files.get(`${ROOT}/work/BUG-01.md`)).toContain('---\n# BUG-01 Fix login\nNo loop\n')
+
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'Fix BUG-01.', name: 'auth' })
+  expect(host.spawned.at(-1)).toContain('Fix BUG-01.\n\n# Working as a supermanager teammate')
+  expect(host.spawned.at(-1)).toMatch(/Run `make check` before you report\.$/)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find X.' })
+  expect(host.spawned.at(-1)).toBe('Find X.')
+})
+
+test('a broken config.json is logged once and the defaults apply', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/manager/config.json`]: '{ taskPrefix: ' })
+  await $.session.start(SESSION)
+  await clock.advance(120_000)
+  expect(host.notices.filter(line => line.includes('config.json'))).toHaveLength(1)
+  await $.prompt.submit(prompt('a backlog task'))
+  await $.tool.call({ ...create, when: 'backlog' })
+  expect(host.files.has(`${TASKS}/T-001-fix-login.md`)).toBe(true)
+})
+
+test('project_init writes the starter files once and keeps edits', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/manager/tips.md`]: 'my tips' })
+  await $.session.start(SESSION)
+  const first = await $.tool.call({ tool: 'mcp__supermanager__project_init', tool_use_id: 'i1' })
+  expect(String(first.result)).toContain('Wrote .claude/manager/config.json, .claude/manager/coordinator.md')
+  expect(String(first.result)).not.toContain('tips.md')
+  expect(host.files.get(`${ROOT}/.claude/manager/tips.md`)).toBe('my tips')
+  const again = await $.tool.call({ tool: 'mcp__supermanager__project_init', tool_use_id: 'i2' })
+  expect(String(again.result)).toContain('All override files exist already.')
 })

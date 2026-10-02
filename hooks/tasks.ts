@@ -2,8 +2,11 @@ import type { Task, TaskStatus, When } from '../types'
 import type { Files } from './io'
 import { dayOf, nextSprint, sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
+import { settingsFrom, settingsOf } from './settings'
+import type { TaskNaming } from './settings'
+import { fill, projectText, SHIPPED } from './texts'
 
-export const TASKS_DIR = '.claude/manager/tasks'
+const DEFAULT_NAMING = settingsOf({}).tasks
 
 const FIELDS = ['id', 'title', 'sprint', 'urgent', 'status', 'owner', 'rolled', 'created'] as const
 const STATUSES: readonly TaskStatus[] = ['todo', 'doing', 'done', 'cancelled']
@@ -42,9 +45,13 @@ export function slugOf(title: string): string {
     .replace(/-+$/, '')
 }
 
-export function nextId(tasks: readonly Task[]): string {
-  const numbers = tasks.map(task => Number(task.id.replace(/^T-/, '')) || 0)
-  return `T-${String(Math.max(0, ...numbers) + 1).padStart(3, '0')}`
+/** The id after the highest one with this prefix: T-001, T-002, … (prefix, padding and start are settings). */
+export function nextId(tasks: readonly Task[], naming: TaskNaming = DEFAULT_NAMING): string {
+  const numbers = tasks
+    .filter(task => task.id.startsWith(naming.prefix))
+    .map(task => Number(task.id.slice(naming.prefix.length)) || 0)
+  const next = Math.max(naming.start - 1, ...numbers) + 1
+  return `${naming.prefix}${String(next).padStart(naming.padding, '0')}`
 }
 
 export function isOpen(task: Task): boolean {
@@ -67,8 +74,14 @@ export function whenOf(task: Task, today: string, config: SprintConfig): When {
   return task.urgent ? 'now' : 'this-sprint'
 }
 
-export function bodyOf(goal: string): string {
-  return `## Goal\n${goal.trim()}\n\n## Notes\n`
+/** A new task's body: the task template with {goal}, {title}, {id} and {created} filled in. */
+export function bodyOf(goal: string, template = SHIPPED['task-template'], values: Record<string, string> = {}): string {
+  const body = fill(template, { ...values, goal: goal.trim() })
+  return body.endsWith('\n') ? body : `${body}\n`
+}
+
+export function fileNameOf(naming: TaskNaming, id: string, title: string): string {
+  return fill(naming.fileName, { id, slug: slugOf(title), title: title.trim() })
 }
 
 /** Adds a dated line at the end of the Notes section. */
@@ -92,7 +105,7 @@ export function taskLine(task: Task, today: string, config: SprintConfig): strin
 // ---- With files: the task files of the session's project ----
 
 export async function tasksDir(files: Files): Promise<string> {
-  return `${await files.root()}/${TASKS_DIR}`
+  return `${await files.root()}/${(await settingsFrom(files)).tasks.folder}`
 }
 
 export async function today(files: Files): Promise<string> {
@@ -105,11 +118,11 @@ const byId = (a: Task, b: Task) => a.id.localeCompare(b.id, undefined, { numeric
 export async function listTasks(files: Files): Promise<Task[]> {
   const dir = await tasksDir(files)
   const entries = await files.list(dir).catch(() => [])
-  const names = entries.filter(entry => entry.kind === 'file' && /^T-\d+.*\.md$/.test(entry.name))
-  const tasks = await Promise.all(
+  const names = entries.filter(entry => entry.kind === 'file' && entry.name.endsWith('.md'))
+  const parsed = await Promise.all(
     names.map(async entry => parseTask(await files.read(`${dir}/${entry.name}`), `${dir}/${entry.name}`)),
   )
-  tasks.sort(byId)
+  const tasks = parsed.filter(task => task.id !== '').sort(byId)
   await files.publishTasks(tasks)
   return tasks
 }
@@ -126,19 +139,22 @@ export async function saveTask(files: Files, task: Task): Promise<void> {
 
 export type NewTask = { title: string; goal: string; when: When }
 
-export async function createTask(files: Files, input: NewTask, config: SprintConfig): Promise<Task> {
+export async function createTask(files: Files, input: NewTask): Promise<Task> {
+  const settings = await settingsFrom(files)
   const day = await today(files)
-  const id = nextId(await listTasks(files))
+  const id = nextId(await listTasks(files), settings.tasks)
+  const title = input.title.trim()
+  const template = await projectText(files, 'task-template')
   const task: Task = {
     id,
-    title: input.title.trim(),
-    ...placeOf(input.when, day, config),
+    title,
+    ...placeOf(input.when, day, settings.sprint),
     status: 'todo',
     owner: '',
     rolled: 0,
     created: day,
-    file: `${await tasksDir(files)}/${id}-${slugOf(input.title)}.md`,
-    body: bodyOf(input.goal),
+    file: `${await tasksDir(files)}/${fileNameOf(settings.tasks, id, title)}`,
+    body: bodyOf(input.goal, template, { id, title, created: day }),
   }
   await saveTask(files, task)
   return task

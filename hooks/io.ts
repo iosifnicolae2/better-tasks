@@ -1,6 +1,7 @@
 import type { AgentInfo, FsEntry } from 'claude-code'
 
 import type { Activity, Task, Teammate } from '../types'
+import type { Settings } from './settings'
 
 // `$` never crosses an import (the validator refuses it), so the parts take these
 // instead; each hooks file builds them from `$` in a top-level function of its own.
@@ -13,6 +14,8 @@ export type Files = {
   write: (path: string, text: string) => Promise<void>
   list: (path: string) => Promise<FsEntry[]>
   publishTasks: (tasks: Task[]) => Promise<unknown>
+  /** The project's settings (settings.ts `projectSettings`); without it the parts use the shipped defaults. */
+  config?: () => Promise<Settings>
 }
 
 export type Io = Files & {

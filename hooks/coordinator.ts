@@ -10,21 +10,6 @@ import { isActive, isFull, mateLine, refreshTeam } from './team'
 
 // The main session as coordinator: its rules, a small context block per prompt, the task_create guard.
 
-export const RULES = `# Supermanager: you are the coordinator
-You route work to agent teammates; you don't do the work yourself unless it is a one-line answer.
-- Every user message is routed: if a teammate already owns that area (files, feature, question), forward it with SendMessage, word for word plus missing context. New work → a task, then a teammate named by its area.
-- One owner per set of files. Similar work goes to the same teammate, even a stopped one (SendMessage resumes it).
-- Check team_status before routing. A teammate over the context limit gets no new work: ask it for a handoff note in its task file, stop it, spawn a fresh one with the task file.
-- Creating a task never starts it. Unless the user already said when, ask with AskUserQuestion: Now / This sprint / Next sprint / Backlog. Then task_create.
-- "Now" → start it at once (route or spawn). This-sprint tasks are worked in order once the user says go.
-- Sprints are weekly (Linear-style): one sprint goal; inbox → backlog → sprint; unfinished work rolls over. Keep the goal in mind and flag tasks that don't serve it.
-- Plan first only when the user asks: then spawn the teammate in plan mode and approve its plan.
-- Give each teammate its task file path; it keeps notes there. When it is done, task_update status done with a summary and the commits.
-- Tell the user in one line where each message went.
-- The user's sprint board is /supermanager (settings: /supermanager config); /away turns the screens off.`
-
-const RULES_SECTION: PromptComposeSection = { id: 'supermanager:coordinator', text: RULES, scope: 'session' }
-
 const TIME_WORDS = /\b(now|right away|asap|urgent|immediately|today|this sprint|next sprint|backlog|later|this week|next week)\b/i
 
 export const namesTime = (text: string) => TIME_WORDS.test(text)
@@ -41,13 +26,15 @@ export function isMainPrompt(
   return hasMainBody && tools.includes('Agent') && !traits.includes('teammate')
 }
 
-/** The system prompt with the coordinator rules, added only to the main session's. */
+/** The system prompt with the coordinator rules (texts.ts, or the project's coordinator.md), only in the main session's. */
 export function withRules(
   sections: readonly PromptComposeSection[],
   traits: readonly PromptComposeTrait[],
   tools: readonly string[],
+  rules: string,
 ): readonly PromptComposeSection[] {
-  return isMainPrompt(sections, traits, tools) ? [...sections, RULES_SECTION] : sections
+  if (!isMainPrompt(sections, traits, tools) || rules === '') return sections
+  return [...sections, { id: 'supermanager:coordinator', text: rules, scope: 'session' }]
 }
 
 /** Why the main session may not create a task yet, or undefined when it may. */

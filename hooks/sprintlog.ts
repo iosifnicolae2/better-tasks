@@ -1,8 +1,10 @@
 import type { Task } from '../types'
 import type { Files } from './io'
+import { settingsFrom } from './settings'
 
 // sprints.md: one "## <start> · <label>" section per sprint, its goal and review.
 
+/** The default path; a project may set another (settings.paths.sprints). */
 export const SPRINTS_FILE = '.claude/manager/sprints.md'
 
 const HEADER = '# Sprints\nOne section per sprint: its goal, then the review written when it ends.\n'
@@ -47,7 +49,7 @@ export function withReview(text: string, start: string, label: string, review: R
 }
 
 async function sprintsPath(files: Files): Promise<string> {
-  return `${await files.root()}/${SPRINTS_FILE}`
+  return `${await files.root()}/${(await settingsFrom(files)).paths.sprints}`
 }
 
 export async function readSprints(files: Files): Promise<string> {

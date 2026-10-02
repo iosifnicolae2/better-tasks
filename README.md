@@ -16,6 +16,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 - **Planning:** only when you ask ("plan T-003 first") → the teammate plans, you approve.
 - **Away:** `/away` → screens black, Mac keeps working; move the mouse to come back.
 - **Settings:** `/config` → `supermanager.*`, or `/supermanager config` (`c` on the board).
+- **Per project:** "set up supermanager for this project" → `.claude/manager/` (task numbering, rules, teammate instructions, template). See [Customize per project](#customize-per-project).
 - **Footer:** `Sprint 41 · 1/4 done · 1 due` (teammates: Claude Code's own list). Each session starts with short tips.
 
 ## What it does
@@ -64,7 +65,7 @@ coordinator asks you for the new goal and which backlog tasks to pull in.
 
 ## Settings
 
-In `/config` (rows `supermanager.*`) or the pane's config row.
+In `/config` (rows `supermanager.*`), `/supermanager config`, or per project in `.claude/manager/config.json` (below).
 
 | setting | default | what |
 | --- | --- | --- |
@@ -75,7 +76,35 @@ In `/config` (rows `supermanager.*`) or the pane's config row.
 | `sprintWeeks` | 1 | sprint length in weeks (1 or 2) |
 | `sprintStart` | monday | weekday a sprint starts |
 
+## Customize per project
+
+Everything lives in `<project>/.claude/manager/`. Ask Claude to "set up supermanager for this project"
+(the `project_init` tool) to get starter files; existing files are never overwritten.
+
+- **`config.json`**: any setting above, plus the ones below. Wins over `/config` for this project.
+  Keys starting with `//` are off (the starter file lists every key that way).
+
+  | key | default | what |
+  | --- | --- | --- |
+  | `taskPrefix` | `T-` | id prefix: `T-001` |
+  | `taskPadding` | 3 | digits: `001` |
+  | `taskStart` | 1 | first number |
+  | `taskFileName` | `{id}-{slug}.md` | task file name; `{id}`, `{slug}`, `{title}` |
+  | `tasksFolder` | `.claude/manager/tasks` | where task files go |
+  | `logFile` | `docs/tasks.md` | finished-task log |
+  | `sprintsFile` | `.claude/manager/sprints.md` | sprint goals and reviews |
+
+- **Texts**, each optional:
+  `coordinator.md` (the manager's rules), `teammate.md` (added to every teammate's spawn prompt),
+  `task-template.md` (a new task's body; `{goal}`, `{title}`, `{id}`, `{created}`), `tips.md` (startup tips).
+  A file **replaces** the built-in text; first line `<!-- extend -->` **adds** to it instead.
+  `<!-- comments -->` are for people and never reach the model.
+- Bad JSON or an unknown key: one dim line at startup, that key skipped, everything else applies.
+- Files you don't override follow the mod's updates.
+
 ## Files it keeps (per project)
+
+Paths are the defaults; `config.json` can move them.
 
 - `.claude/manager/tasks/T-001-short-slug.md`: one task: frontmatter (`sprint`, `status`, `owner`, `rolled`, …) + Goal, Notes, Plan.
 - `.claude/manager/sprints.md`: each sprint's goal and review.
@@ -83,7 +112,7 @@ In `/config` (rows `supermanager.*`) or the pane's config row.
 
 ## The model's tools
 
-`task_create`, `task_update`, `task_list`, `sprint_goal`, `team_status`, `screen_off`
+`task_create`, `task_update`, `task_list`, `sprint_goal`, `team_status`, `project_init`, `screen_off`
 (listed as `mcp__supermanager__*`).
 
 ## Develop

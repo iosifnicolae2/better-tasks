@@ -1,16 +1,16 @@
 import type { Task, TaskStatus, When } from '../types'
 import type { Files } from './io'
+import { settingsFrom } from './settings'
 import { sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
 import { placeOf, saveTask, today, withNote } from './tasks'
 
 // What happens to a task: changed, started, finished (finished ones are logged in docs/tasks.md).
 
-export const LOG_FILE = 'docs/tasks.md'
 
-const LOG_HEADER =
+const logHeader = (path: string) =>
   '# Finished tasks\n' +
-  'One row per finished task; grep it, don\'t read it: `grep -i <word> docs/tasks.md`.\n\n' +
+  `One row per finished task; grep it, don't read it: \`grep -i <word> ${path}\`.\n\n` +
   'date | teammate | task | summary | commits | session\n' +
   '--- | --- | --- | --- | --- | ---\n'
 
@@ -57,8 +57,9 @@ export async function changeTask(
 }
 
 async function logDone(files: Files, task: Task, day: string, change: TaskChange): Promise<void> {
-  const path = `${await files.root()}/${LOG_FILE}`
-  const text = await files.read(path).catch(() => LOG_HEADER)
+  const log = (await settingsFrom(files)).paths.log
+  const path = `${await files.root()}/${log}`
+  const text = await files.read(path).catch(() => logHeader(log))
   const row = logRow(task, day, await files.sessionId(), change)
   await files.write(path, `${text.endsWith('\n') ? text : `${text}\n`}${row}`)
 }

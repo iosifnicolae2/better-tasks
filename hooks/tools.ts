@@ -9,6 +9,7 @@ import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
 import { createTask, findTask, isOpen, listTasks, taskLine, today } from './tasks'
 import { mateLine, refreshTeam } from './team'
+import { initProject } from './texts'
 
 // The tools the model gets, listed as mcp__supermanager__<name>.
 
@@ -58,6 +59,12 @@ export const TOOLS: readonly ToolSpec[] = [
     inputSchema: { type: 'object', properties: { goal: { type: 'string' } }, required: ['goal'] },
   },
   {
+    name: 'project_init',
+    description:
+      'Write starter override files for this project in .claude/manager/ (config.json, coordinator.md, teammate.md, ' +
+      'task-template.md, tips.md). Existing files are kept. Use when the user wants to customize supermanager here.',
+  },
+  {
     name: 'team_status',
     description: 'Teammates: name, status, context fill and the tasks they own. Check it before routing work.',
   },
@@ -87,7 +94,7 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     const denial = createDenial(run.facts, run.agentId)
     if (denial) return { deny: denial }
     const when = input.when ?? 'backlog'
-    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when }, config)
+    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when })
     return { result: `Created ${task.id} (${when}): ${task.file}. Not started.` }
   }
   if (run.name === 'task_update') {
@@ -99,6 +106,7 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
   if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
   if (run.name === 'sprint_goal') return { result: await setGoal(io, input.goal ?? '', settings) }
   if (run.name === 'team_status') return { result: await teamStatus(io) }
+  if (run.name === 'project_init') return { result: await projectInit(io) }
   return { deny: `Unknown tool ${run.name}.` }
 }
 
@@ -131,4 +139,10 @@ async function teamStatus(io: Io): Promise<string> {
     return `${mateLine(mate)}${owned.length ? ` · ${owned.join(', ')}` : ''}`
   })
   return lines.length ? lines.join('\n') : 'No teammates.'
+}
+
+async function projectInit(io: Io): Promise<string> {
+  const written = await initProject(io)
+  const list = written.length ? `Wrote ${written.join(', ')}.` : 'All override files exist already.'
+  return `${list} Edit them in .claude/manager/; config.json keys starting with // are off.`
 }
