@@ -24,13 +24,13 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 Needs Claude Code with agent teams on (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) and in-process
 teammates (`teammateMode: in-process`; in tmux mode the context fill of teammates is not seen).
 
-One session:
+Try it in one session (loads it for that session only):
 
 ```sh
 claude --plugin-dir ~/Documents/Projects/claude-manager
 ```
 
-Every session: add the folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of `~/.claude/settings.json`.
+All its hooks live inside the plugin; nothing is written to your settings files.
 
 ## Use
 
@@ -75,6 +75,6 @@ claude plugin validate .   # what the engine will load
 claude plugin test .       # tests/*.test.ts
 ```
 
-Code map: `hooks/register.tsx` wires every core hook (`$` and state refs never cross an import);
+Code map: `hooks/register.tsx` wires every core hook and the one `session.start` (`$` and state refs never cross an import);
 `tasks.ts`, `taskflow.ts`, `sprints.ts`, `sprintlog.ts`, `boundary.ts`, `team.ts`, `coordinator.ts`,
 `tools.ts` hold the logic; `pane.tsx` the Tasks pane; `screen.ts` + `bin/blackout.js` the screen-off.

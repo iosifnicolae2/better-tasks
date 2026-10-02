@@ -46,6 +46,9 @@ function fakeHost(on: On, agents: AgentInfo[] = [], seed: Record<string, string>
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
   on('tool.call', { tool: 'Agent' }, ($, e) => ({ result: { isolation: e.isolation ?? 'none' } }))
   on('prompt.submit', ($, e) => ({ text: e.text, context: e.context }))
+  on('process.spawn', async function* () {
+    return { value: { code: 0, signal: null } }
+  })
   return host
 }
 

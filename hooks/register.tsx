@@ -10,7 +10,7 @@ import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
 import { settingsOf } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
-import { listTasks, TASKS_DIR, today } from './tasks'
+import { listTasks, today } from './tasks'
 import { contextTokens, refreshTeam, sendDenial } from './team'
 import { runTool, TOOLS } from './tools'
 
@@ -49,12 +49,6 @@ export const register: Register = (on, options) => {
     await update($, noticeState, () => '')
     await showStatus($)
     return next({ ...e, context: [...(e.context ?? []), block] })
-  })
-
-  on('fs.write', async ($, e, next) => {
-    const written = await next(e)
-    if (e.path.includes(`/${TASKS_DIR}/`)) await listTasks(ioOf($))
-    return written
   })
 
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {

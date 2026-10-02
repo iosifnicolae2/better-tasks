@@ -118,9 +118,10 @@ export async function findTask(files: Files, id: string): Promise<Task | undefin
   return (await listTasks(files)).find(task => task.id.toLowerCase() === id.trim().toLowerCase())
 }
 
-/** Writes the task file; the fs.write hook publishes the fresh list. */
+/** Writes the task file, then publishes the fresh list. */
 export async function saveTask(files: Files, task: Task): Promise<void> {
   await files.write(task.file, formatTask(task))
+  await listTasks(files)
 }
 
 export type NewTask = { title: string; goal: string; when: When }
