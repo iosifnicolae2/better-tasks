@@ -7,6 +7,7 @@ user's tmux config, bindings or sessions. The only key tmux keeps for itself is 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -16,9 +17,13 @@ DASHBOARD_WINDOW = "tasks"     # supermanager's own pages come last in the bar: 
 AGENTS_WINDOW = "agents"
 CONFIG_WINDOW = "config"
 MANAGER_WINDOW = "manager"
+REMOTE_WINDOW = "remote"       # `claude remote-control`: sessions you start from the Claude app
 PAGE_WINDOWS = (DASHBOARD_WINDOW, AGENTS_WINDOW, CONFIG_WINDOW)
 PAGE_CYCLE = (MANAGER_WINDOW, DASHBOARD_WINDOW, AGENTS_WINDOW, CONFIG_WINDOW)   # ctrl+a / ← → order
 KEY = "ctrl+a"                 # manager ⇄ tasks page. Every other key goes straight to Claude.
+
+BOX_LINES = 8                          # how far up from the bottom of a pane the input box can be
+EMPTY_BOX = re.compile(r"^[\s│|]*[>❯][\s│|]*$")   # "❯", "> ", "│ > │": the box with nothing typed in it
 
 # Server-wide settings developers expect from a well-configured tmux.
 SERVER_OPTIONS = (
@@ -234,6 +239,17 @@ class Tmux:
         self._run("send-keys", "-t", window_id, "-l", text)
         self._run("send-keys", "-t", window_id, "Enter")
 
+    def chat_box_free(self, window_id: str) -> bool:
+        """Is this Claude session's input box on screen and empty?
+
+        False means typing into it now would go somewhere it should not: onto the end of a line the user is
+        still writing (Enter would then send their unfinished sentence with ours stuck to it), or into a
+        dialog that has taken the box's place, where a line of text is an answer to a question.
+
+        Only the bottom of the pane is read: that is where the box is, under the transcript."""
+        lines = self.capture(window_id, 4).splitlines()[-BOX_LINES:]
+        return any(EMPTY_BOX.match(line) for line in lines)
+
     def send_keys(self, window_id: str, *keys: str) -> None:
         for key in keys:
             self._run("send-keys", "-t", window_id, key, check=False)
@@ -261,7 +277,7 @@ class Tmux:
         self._run("select-window", "-t", window_id, check=False)
 
     def select_page(self, here: str, step: int) -> None:
-        """← / → on a page: go to the previous / next page in PAGE_CYCLE that is open (agents are skipped)."""
+        """← / → on a page: go to the previous / next page in PAGE_CYCLE that is open."""
         open_pages = [name for name in PAGE_CYCLE if self.find_window(name)]
         if here not in open_pages:
             return

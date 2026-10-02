@@ -9,6 +9,10 @@ from pathlib import Path
 
 DIR_NAME = ".supermanager"
 RUNTIME_DIR = Path.home() / ".local" / "state" / "supermanager" / "run"
+# Exists only while supermanager is the one holding a shut lid awake, and names the project that asked.
+# It is how the setting gets put back after a crash, and why a lid the *user* shut off is never touched.
+# One file for the machine, not per project: `pmset disablesleep` is one machine-wide switch.
+LID_MARKER = RUNTIME_DIR / "lid-sleep-disabled"
 
 
 def find_project_root(start: Path | None = None) -> Path:
@@ -72,7 +76,7 @@ that uses it, or when you wonder why something in this folder is (or is not) in 
 
 | file | what it is |
 | --- | --- |
-| `config.toml` | the project's settings: concurrency, worktrees, the agent tool, models, effort |
+| `config.toml` | the project's settings: concurrency, where agents work, groups, the agent tool, models, effort |
 | `tasks/T-001.md` | one file per task: problem, criteria, plan, progress, result, and every session that worked on it |
 | `tasks/_index.json` | the dispatch order of the backlog |
 | `SKILL.md` | this file |
@@ -102,7 +106,7 @@ The manager fills them when you mention one, `supermanager tasks --label api` an
 `--field scheduled --value 2026-W38` filter by them, and `ctrl+w` on the tasks page searches every column.
 
 The tasks page groups by `tasks.group_by` (status by default) and can show the same tasks as a board — one
-column per group, cards you move with shift+arrows. `tasks.view` picks which one it opens with, `v` switches,
+column per group, cards you move with shift+arrows. `tasks.view` picks which one it shows, `v` switches,
 `g` regroups, `G` turns the table's headings off.
 
 ## Making it yours: `config.local.toml`

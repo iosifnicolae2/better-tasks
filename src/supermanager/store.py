@@ -32,9 +32,22 @@ class StateStore:
                 raise RuntimeError(f"state.json was unreadable ({exc}); moved it to {backup}") from exc
         tasks, order = self.tasks.load()
         if tasks or not state.tasks:  # task files win; legacy tasks inside state.json are migrated on first save
-            state.tasks, state.order = tasks, order
-        state.next_task_number = max([state.next_task_number] + [int(t[2:]) + 1 for t in state.tasks if t[2:].isdigit()])
+            self._take(state, tasks, order)
         return state
+
+    def follow(self, state: State) -> bool:
+        """A task file changed on disk — your editor, the agent, a git pull: take what the files say now.
+        False when nothing changed. A file that does not parse raises; the folder still counts as seen, so a
+        half-written file is reported once and picked up again when it is saved next."""
+        if not self.tasks.stale():
+            return False
+        self._take(state, *self.tasks.load())
+        return True
+
+    @staticmethod
+    def _take(state: State, tasks: dict, order: list[str]) -> None:
+        state.tasks, state.order = tasks, order
+        state.next_task_number = max([state.next_task_number] + [int(t[2:]) + 1 for t in state.tasks if t[2:].isdigit()])
 
     def save(self, state: State) -> None:
         state.events = state.events[-MAX_EVENTS:]

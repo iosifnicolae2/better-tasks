@@ -1,6 +1,7 @@
 """The agents page: the running agent sessions, live — one row per agent, and every notice about them (a plan
 waiting for approval, a question, a finished or interrupted task). Task agents (T-…) show the task they work on
-and how far it is (planning → working); free agents (A-…) have none. The Tool column says what runs there.
+and how far it is (planning → working); free agents (A-…) have none. Sessions you started yourself (R-…)
+are here too, with an icon for where they live: 📱 the Claude app, 💻 a terminal.
 
 enter or a click opens the agent's window, i edits its task file, n starts a new free agent, x stops it.
 
@@ -24,21 +25,25 @@ from ..client import DaemonClient, DaemonError, DaemonUnavailable
 from ..config import load_config
 from ..paths import ProjectPaths
 from ..tmux import AGENTS_WINDOW, Tmux, inside_tmux_session
+from .. import usage
 from .app import MUTED, PHASE_STYLE, STATUS_STYLE   # one palette for both pages
 from .shared import AUTO, FLEX, HelpScreen, PageApp, PageTable, SearchBar, edit_task, wrap
 
 # (name, width): AUTO fits the column to what is in it, FLEX takes whatever is left of the row. Widths are
 # settled when the list of agents changes, not on every refresh, so nothing shifts while you read.
 COLUMNS = (("Agent", AUTO), ("Phase", AUTO), ("Task", FLEX), ("Status", AUTO),
-           ("Branch", AUTO), ("Started", AUTO), ("Active", AUTO), ("Needs you", AUTO))
+           ("Branch", AUTO), ("Started", AUTO), ("Active", AUTO), ("Cost", AUTO), ("Needs you", AUTO))
 PHASE_COLUMN = 1   # a click on the phase cell opens the agent
 FLEX_COLUMN = next(i for i, (_, width) in enumerate(COLUMNS) if width is FLEX)   # where a hint line goes
+# A session you started yourself, outside supermanager: it has no window here, the icon says where it lives.
+OUTSIDE_ICON = {"app": "📱", "terminal": "💻"}
 NOTICE_KINDS = {"done": "information", "blocked": "warning", "interrupted": "warning", "error": "error",
-                "attention": "warning"}   # events that pop up here; the tasks page stays quiet
+                "attention": "warning", "budget": "warning"}   # events that pop up here; the tasks page stays quiet
 HELP_SECTIONS = [
     ("The session you are on", [
         ("enter / click", "open its window: you are in the session, talking to it"),
         ("i", "edit the task it works on (a free agent has no task file)"),
+        ("", "📱 / 💻 a session you started yourself (Claude app / terminal): no window here, answer it there"),
         ("x", "stop it — a task agent's task goes back to the backlog"),
     ]),
     ("This page", [
@@ -54,6 +59,10 @@ HELP_SECTIONS = [
 ]
 HELP_NOTE = ("Everything that needs you appears here — a plan to approve, a question, a task that finished or "
              "was interrupted. The tasks page stays quiet on purpose.")
+
+
+def _where(a: dict) -> str:
+    return f"yours, in a terminal ({a['tty']})" if a.get("origin") == "terminal" else "yours, from the Claude app"
 
 
 def _age(ts: float) -> str:
@@ -102,6 +111,7 @@ class AgentsApp(PageApp):
         self.tmux = Tmux(self.config.tmux_session)
         self.sessions: list[dict] = []
         self.windows: dict[str, str] = {}   # session id (T-… or A-…) -> its tmux window
+        self.outside: dict[str, dict] = {}  # sessions you started yourself (R-…): no window, an origin instead
         self.with_task: set[str] = set()     # sessions that belong to a task (i edits the task file)
         self.selected: str | None = None
         self.shown: list[str] | None = None   # session ids currently in the table, in order
@@ -157,6 +167,7 @@ class AgentsApp(PageApp):
         else:
             sessions.sort(key=lambda s: -s["agent"]["started_at"])   # newest agent on top
         self.windows = {s["id"]: s["agent"]["tmux_window"] for s in sessions}
+        self.outside = {s["id"]: s["agent"] for s in sessions if s["agent"].get("role") == "remote"}
         self.with_task = {s["id"] for s in sessions if s["task"]}
         ids = [s["id"] for s in sessions]
         if ids != self.shown:
@@ -185,13 +196,19 @@ class AgentsApp(PageApp):
         and in the events; this page is about what each session is doing."""
         a = s["agent"]
         phase = a["phase"]
-        task = wrap(f"{s['id']}  {s['title']}", width) if s["task"] else Text("no task · project root", style="dim")
+        if s["task"]:
+            task = wrap(f"{s['id']}  {s['title']}", width)
+        elif a.get("role") == "remote":
+            icon = OUTSIDE_ICON.get(a.get("origin") or "app", OUTSIDE_ICON["app"])   # "" = a row from an older run
+            task = Text(f"{icon} {s['id']}  {_where(a)}", style="dim")
+        else:
+            task = Text("no task · project root", style="dim")
         status = s.get("status", "")
         return (Text(a["rc_name"] or s["id"], style="bold"),
                 Text(phase, style=PHASE_STYLE.get(phase, "dim")), task,
                 Text(status, style=STATUS_STYLE.get(status, "dim")),
                 Text(a["branch"] or ""), Text(_age(a["started_at"])), Text(_age(a["last_activity"])),
-                Text(f"🔔 {a['attention']}" if a["attention"] else "", style="bold yellow"))
+                _cost(a), Text(f"🔔 {a['attention']}" if a["attention"] else "", style="bold yellow"))
 
     @on(DataTable.RowHighlighted, "#agents-table")
     def _row_highlighted(self, event: DataTable.RowHighlighted) -> None:
@@ -222,7 +239,11 @@ class AgentsApp(PageApp):
         """enter / click: jump to the agent's window."""
         window = self.windows.get(self.selected or "")
         if not window:
-            self.notify("This agent has no open window.", severity="warning")
+            outside = self.outside.get(self.selected or "", {})
+            where = (f"your terminal ({outside['tty']})" if outside.get("origin") == "terminal"
+                     else "the Claude app")
+            self.notify(f"This session runs in {where}, not here: it has no window to open. "
+                        "Go there to talk to it.", severity="warning")
             return
         try:
             self.client.call("acknowledge", target=self.selected, timeout=3.0)
@@ -295,8 +316,19 @@ class AgentsApp(PageApp):
             self.exit()
 
 
+def _cost(a: dict) -> Text:
+    """What this one session has spent so far — its share of the task's total, not the task's."""
+    spent = a.get("usage") or {}
+    count = usage.tokens(spent)
+    if not count:
+        return Text("")
+    return Text(usage.money(float(spent.get("cost", 0.0)), bool(spent.get("priced", True))) or usage.short(count),
+                style="dim")
+
+
 def _sort_value(s: dict, column: str) -> object:
     a = s["agent"]
     return {"Agent": a["rc_name"] or s["id"], "Phase": a["phase"],
             "Task": s["id"] if s["task"] else "", "Status": s.get("status", ""), "Branch": a["branch"] or "",
-            "Started": -a["started_at"], "Active": -a["last_activity"], "Needs you": a["attention"]}.get(column)
+            "Started": -a["started_at"], "Active": -a["last_activity"], "Needs you": a["attention"],
+            "Cost": -float((a.get("usage") or {}).get("cost", 0.0))}.get(column)

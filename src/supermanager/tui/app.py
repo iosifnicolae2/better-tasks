@@ -25,7 +25,9 @@ from ..daemon import Daemon
 from ..models import FINISHED_STATUSES, PRIORITIES, WAITING_STATUSES, Event, Task, TaskStatus
 from ..orchestrator import Orchestrator, OrchestratorError
 from ..tmux import CONFIG_WINDOW, DASHBOARD_WINDOW, KEY, inside_tmux_session
-from .board import CARD_WIDTH, NO_VALUE, Board, Card, field_grouping, label_chips, status_grouping
+from .. import usage
+from .board import (CARD_WIDTH, NO_VALUE, STATUS_ORDER, TABLE_STATUS_ORDER, Board, Card, field_grouping,
+                    label_chips, status_grouping)
 from .shared import (AUTO, FLEX, GROUP_PREFIX, HelpScreen, PageApp, PageTable, SearchBar, TitleScreen, edit_task,
                      local_time, wrap)
 
@@ -37,22 +39,25 @@ STATUS_STYLE = {
     TaskStatus.INTERRUPTED: "#d78fd7", TaskStatus.CANCELLED: MUTED,
 }
 STARTABLE = WAITING_STATUSES   # backlog, queued, interrupted: s starts one, or queues it when no slot is free
+# Columns on a status board you cannot drop a card into: an agent reports these, you do not set them.
+AGENT_STATUSES = {str(TaskStatus.WORKING), str(TaskStatus.BLOCKED), str(TaskStatus.INTERRUPTED)}
 # (name, width); the Title column takes whatever is left. Fixed widths keep the rows from shifting when a
 # bell or a longer status appears — the Agent column, last in the row, is where those show up.
 # AUTO columns are as wide as what is in them. Agent and Needs you keep a fixed width: their text changes with
 # every bell, and a column that resizes under your eyes is worse than a little empty space.
 BASE_COLUMNS = (("ID", AUTO), ("Pri", AUTO), ("Status", AUTO), ("Title", FLEX))
-AGENT_COLUMN_SPEC = ("Agent", 22)       # who is on it; a click here starts or opens the agent
-STATE_COLUMN_SPEC = ("Needs you", 34)   # what that agent is doing, or what it wants from you
+AGENT_COLUMN_SPEC = ("Agent", 18)       # who is on it; a click here starts or opens the agent
+STATE_COLUMN_SPEC = ("Needs you", 30)   # what that agent wants from you; a click here opens the agent too
+COST_COLUMN_SPEC = ("Cost", AUTO)       # what the task has spent, over every session that worked on it
 TIME_COLUMNS = (("Created", AUTO), ("Updated", AUTO))   # last, in this machine's own date format
-AGENT_WIDTH = 22
-STATE_WIDTH = 34
+AGENT_WIDTH = 18
+STATE_WIDTH = 30
 PHASE_STYLE = {"starting": MUTED, "busy": "yellow", "idle": "green", "ended": MUTED}
 
 HELP_SECTIONS = [
     ("The task you are on", [
-        ("enter / click", "open its agent — or its file in your editor, when nothing runs on it"),
-        ("i", "edit the task file"),
+        ("enter / click / i", "open its file in your editor"),
+        ("click on Agent / Needs you", "open its agent instead — or start one, when none runs yet"),
         ("s", "start an agent on it, or queue it when every slot is busy"),
         ("t", "ask the manager to start it instead, so it knows"),
         ("p", "pause its agent: Esc goes to the session, it stops and waits for you"),
@@ -80,7 +85,10 @@ HELP_SECTIONS = [
     ("On the board", [
         ("arrows", "move the selection between cards and columns"),
         ("shift+← →", "move the task itself: to another status, or to another label"),
-        ("shift+↑ ↓", "move it up or down the backlog"),
+        ("shift+↑ ↓", "move it up or down its column"),
+        ("drag a card", "the same two moves with the mouse: hold it, and the column you are over"),
+        ("", "lights up with a line where it will land — let go to drop it there"),
+        ("", "cards keep the order you put them in; the table sorts its own way"),
     ]),
     ("The workspace", [
         ("ctrl+a  ← →", "the next page: manager → tasks → agents → config"),
@@ -171,10 +179,11 @@ class SupermanagerApp(PageApp):
         self.daemon = Daemon(orch)
         self._events: queue.Queue[Event] = queue.Queue()
         self._selected_task: str | None = None
-        self.show_done = not orch.config.tasks.hide_done   # h flips it for this session only
-        self.board_view = orch.config.tasks.view == "board"
-        self.group_by = orch.config.tasks.group_by     # "status", or one of the project's own fields
-        self.group_rows = orch.config.tasks.group_rows  # headings in the table, on by default
+        self._page_settings = self._settings_from_config()   # what config.toml said last time we looked
+        self.show_done = self._page_settings["show_done"]     # h flips it for this session only
+        self.board_view = self._page_settings["board_view"]   # v
+        self.group_by = self._page_settings["group_by"]       # g: "status", or one of the project's own fields
+        self.group_rows = self._page_settings["group_rows"]   # G: headings in the table, on by default
         self.sub_title = orch.config.project_name
 
     @property
@@ -197,6 +206,7 @@ class SupermanagerApp(PageApp):
         self.run_worker(self._boot, thread=True)
         self.refresh_all()
         self.set_interval(0.5, self._drain_events)
+        self.set_interval(1.0, self._follow_files)
         self.set_interval(5.0, self._periodic_reconcile)
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGHUP):
@@ -238,9 +248,34 @@ class SupermanagerApp(PageApp):
         self.orch.reconcile()
         self.call_from_thread(self.refresh_all)
 
+    @work(thread=True, exclusive=True, group="follow")
+    def _follow_files(self) -> None:
+        """A task file or config.toml edited by hand — in your editor, by the manager, by git — shows up here
+        within a second. (A change made through the daemon arrives as an event and needs no polling.)"""
+        if self.orch.follow_files():
+            self.call_from_thread(self.refresh_all)
+
     def refresh_all(self) -> None:
+        self._follow_settings()
         self.orch.update_bar_counts()
         self._refresh_tasks()
+
+    def _settings_from_config(self) -> dict:
+        t = self.orch.config.tasks
+        return {"show_done": not t.hide_done, "board_view": t.view == "board", "group_by": t.group_by,
+                "group_rows": t.group_rows}
+
+    def _follow_settings(self) -> None:
+        """tasks.view, group_by, group_rows, hide_done changed on the config page or in the file: the page
+        takes the new value. Only the ones that changed — v, g, G and h set the rest for this session, and a
+        change to some other setting must not undo them."""
+        now = self._settings_from_config()
+        for name, value in now.items():
+            if value != self._page_settings[name]:
+                setattr(self, name, value)
+        if now["board_view"] != self._page_settings["board_view"] and not self.board_view:   # as v does
+            self.call_after_refresh(self.query_one("#tasks-table", DataTable).focus)
+        self._page_settings = now
 
     def rerender(self) -> None:
         self._refresh_tasks()
@@ -267,55 +302,53 @@ class SupermanagerApp(PageApp):
         table.display = not self.board_view
         board.display = self.board_view
         if self.board_view:
-            self._refresh_board(board)
+            if not board.dragging:   # a redraw mid-drag would take the card out of your hand
+                self._refresh_board(board)
             return
         previous = self._selected_task
         fields = self._shown_fields()
         columns = [*BASE_COLUMNS, *[(f.column, AUTO) for f in fields], AGENT_COLUMN_SPEC, STATE_COLUMN_SPEC,
-                   *TIME_COLUMNS]
-        table.action_columns = (len(columns) - 2 - len(TIME_COLUMNS),)   # the Agent column: fields shift it
+                   COST_COLUMN_SPEC, *TIME_COLUMNS]
+        agent_column = columns.index(AGENT_COLUMN_SPEC)   # the project's own fields shift it along
+        table.action_columns = (agent_column, agent_column + 1)   # Needs you sits right after
         table.clear(columns=True)
         tasks, hidden = self._visible_tasks(fields)
+        # The groups are settled before the columns are: a heading sits in the first column, so that column has
+        # to be wide enough for the longest one.
+        live = [t for t in tasks if t.status not in FINISHED_STATUSES]
+        finished = [t for t in tasks if t.status in FINISHED_STATUSES]
+        sections = self._sections(live)
+        if finished:   # finished tasks are their own group at the very bottom, whatever the rest is grouped by
+            sections.append(("finished", finished))
         self.add_columns(table, *columns, content={
-            "ID": [t.id for t in tasks], "Pri": [t.priority for t in tasks],
+            "ID": [t.id for t in tasks] + [_heading(label, len(rows)) for label, rows in sections if label],
+            "Pri": [t.priority for t in tasks],
             "Status": [str(t.status) for t in tasks],
             **{f.column: [_field_cell(f, t.fields.get(f.name)) for t in tasks] for f in fields},
+            "Cost": [_cost_cell(t, self.orch).plain for t in tasks],
             "Created": [local_time(t.created_at) for t in tasks],
             "Updated": [local_time(t.updated_at) for t in tasks],
         })
         width = self.flex_width
-        filler = [""] * (len(fields) + len(TIME_COLUMNS) + 1)   # +1: the Needs you column
+        filler = [""] * (len(fields) + len(TIME_COLUMNS) + 2)   # +2: the Needs you and Cost columns
 
         def row(t: Task) -> None:
             table.add_row(t.id, t.priority, Text(t.status, style=STATUS_STYLE.get(t.status, "white")),
                           wrap(t.title, width),
                           *(_field_cell(f, t.fields.get(f.name)) for f in fields),
-                          _agent_cell(t, AGENT_WIDTH), _state_cell(t, STATE_WIDTH),
+                          _agent_cell(t, AGENT_WIDTH), _state_cell(t, STATE_WIDTH), _cost_cell(t, self.orch),
                           Text(local_time(t.created_at), style=MUTED), Text(local_time(t.updated_at), style=MUTED),
                           key=t.id, height=None)
 
         def heading(label: str, count: int) -> None:
-            table.add_row("", "", "", Text(f"{label}  ({count})", style="bold reverse"), *filler, "",
+            """A heading row reads from the left edge, in the first column, with the rest of the row empty."""
+            table.add_row(Text(_heading(label, count), style="bold reverse"), *[""] * (len(columns) - 1),
                           key=GROUP_PREFIX + label)
 
-        # Finished tasks are their own group at the very bottom, whatever the rest is grouped by.
-        live = [t for t in tasks if t.status not in FINISHED_STATUSES]
-        finished = [t for t in tasks if t.status in FINISHED_STATUSES]
-        if self.group_rows and live:
-            grouping = self._grouping(live)
-            # A task can carry several labels; in a list it belongs under one heading, the first of them.
-            for value in grouping.values:
-                in_group = [t for t in live if grouping.of(t)[0] == value]
-                if in_group:
-                    heading(value, len(in_group))
-                    for t in in_group:
-                        row(t)
-        else:
-            for t in live:
-                row(t)
-        if finished:
-            heading("finished", len(finished))
-            for t in finished:
+        for label, in_group in sections:
+            if label:
+                heading(label, len(in_group))
+            for t in in_group:
                 row(t)
         if not tasks:
             hint = ("No task matches the search." if self.search_text
@@ -329,21 +362,37 @@ class SupermanagerApp(PageApp):
         if self._selected_task:
             table.move_to_task(ids.index(self._selected_task))
 
+    def _sections(self, live: list[Task]) -> list[tuple[str, list[Task]]]:
+        """The table's groups, in order, each with the tasks under it. One nameless group when G is off.
+
+        A task can carry several labels; in a list it belongs under one heading, the first of them."""
+        if not (self.group_rows and live):
+            return [("", live)]
+        grouping = self._grouping(live, TABLE_STATUS_ORDER)
+        groups = [(value, [t for t in live if grouping.of(t)[0] == value]) for value in grouping.values]
+        return [(value, in_group) for value, in_group in groups if in_group]
+
     # ------------------------------------------------------------------ board
-    def _grouping(self, tasks: list[Task]):
-        """What the board's columns are: the statuses, or the values of one of the project's fields."""
+    def _grouping(self, tasks: list[Task], order: tuple = STATUS_ORDER):
+        """What the groups are: the statuses, or the values of one of the project's fields."""
         field = next((f for f in self.orch.config.task_fields() if f.name == self.group_by), None)
-        return field_grouping(field, tasks) if field else status_grouping(tasks)
+        return field_grouping(field, tasks) if field else status_grouping(tasks, order)
 
     def _refresh_board(self, board: Board) -> None:
+        """The board keeps the backlog's own order, unless a column is sorted: a card you drag somewhere has
+        to stay there. (The table is the one that floats running agents to the top.)"""
         fields = self._shown_fields()
         tasks, hidden = self._visible_tasks(fields)
+        if not self.sort:
+            place = {task_id: i for i, task_id in enumerate(self.orch.state.order)}
+            tasks.sort(key=lambda t: place.get(t.id, len(place)))
         grouping = self._grouping(tasks)
+        board.locked = AGENT_STATUSES if self.group_by == "status" else set()
         board.plan(grouping, tasks)
         ids = [t.id for t in tasks]
         if self._selected_task not in ids:
             self._selected_task = ids[0] if ids else None
-        board.show(grouping, {t.id: _card(t, fields) for t in tasks}, self._selected_task)
+        board.show(grouping, {t.id: _card(t, fields, self.orch) for t in tasks}, self._selected_task)
         self.sub_title = (f"{grouping.title} board · {len(ids)} task(s)"
                           + (f" · {hidden} finished hidden" if hidden else ""))
         if not board.has_focus:
@@ -379,24 +428,36 @@ class SupermanagerApp(PageApp):
         self._selected_task = event.task_id
         self.action_open_selected()
 
-    @on(Board.Reorder)
-    def _board_reorder(self, event: Board.Reorder) -> None:
-        self._try(self.orch.move_task, event.task_id, event.delta)
-
-    @on(Board.Move)
-    def _board_move(self, event: Board.Move) -> None:
-        """shift+← / shift+→: move the task into another column. On a status board that means the status
-        change the column stands for; on a field board it sets that field."""
+    @on(Board.Drop)
+    def _board_drop(self, event: Board.Drop) -> None:
+        """A card let go somewhere, by the mouse or by shift+↑↓: it takes that spot in the backlog, and — when
+        it came from another column — whatever that column stands for."""
         task = self.orch.state.tasks.get(event.task_id)
         if not task:
             return
+        self._selected_task = task.id
+        if event.value != event.was and not self._enter_column(task, event.value, event.was):
+            return   # the column would not take it: leave its place in the backlog alone too
+        if task.id not in (event.before, event.after):
+            self._try(self.orch.place_task, task.id, event.before, event.after)
+
+    @on(Board.Move)
+    def _board_move(self, event: Board.Move) -> None:
+        """shift+← / shift+→: move the task into another column, keeping its place inside it."""
+        task = self.orch.state.tasks.get(event.task_id)
+        if task:
+            self._selected_task = task.id
+            self._enter_column(task, event.value, event.was)
+
+    def _enter_column(self, task: Task, value: str, was: str) -> bool:
+        """What landing in a column means. On a status board it is the status change the column stands for;
+        on a field board it sets that field. False when the column will not take the task."""
         if self.group_by != "status":
             spec = self.orch.config.field(self.group_by)
-            value = self._field_after_move(task, spec, event.value, event.was)
-            self._try(self.orch.update_task, task.id, fields={self.group_by: value},
-                      ok=f"{task.id}: {spec.column or self.group_by} = {spec.show(value) or 'none'}")
-            return
-        self._move_status(task, event.value)
+            new = self._field_after_move(task, spec, value, was)
+            return self._try(self.orch.update_task, task.id, fields={self.group_by: new},
+                             ok=f"{task.id}: {spec.column or self.group_by} = {spec.show(new) or 'none'}")
+        return self._move_status(task, value)
 
     def _field_after_move(self, task: Task, spec, to: str, was: str):
         """Dragging a card to another column. A list field (labels) swaps the one value the column stands for
@@ -407,19 +468,22 @@ class SupermanagerApp(PageApp):
         kept = [v for v in (task.fields.get(spec.name) or []) if v != was]
         return kept + ([to] if to and to not in kept else [])
 
-    def _move_status(self, task: Task, value: str) -> None:
+    def _move_status(self, task: Task, value: str) -> bool:
+        """The status a column stands for. False when that is not yours to set: blocked, working and
+        interrupted are what an agent reports, not somewhere you can put a card."""
         if value == task.status:
-            return
+            return True
         if value == TaskStatus.BACKLOG:
-            self._try(self.orch.requeue_task, task.id, ok=f"{task.id} is back in the backlog.")
-        elif value in (TaskStatus.QUEUED, TaskStatus.PLANNING):
+            return self._try(self.orch.requeue_task, task.id, ok=f"{task.id} is back in the backlog.")
+        if value in (TaskStatus.QUEUED, TaskStatus.PLANNING):
             self._spawn(task.id)
-        elif value == TaskStatus.DONE:
-            self._try(self.orch.close_task, task.id, ok=f"{task.id} is done.")
-        elif value == TaskStatus.CANCELLED:
-            self._try(self.orch.cancel_task, task.id, ok=f"{task.id} is cancelled.")
-        else:
-            self.notify(f"An agent moves a task to {value}, you cannot. Start one with s.", severity="warning")
+            return True
+        if value == TaskStatus.DONE:
+            return self._try(self.orch.close_task, task.id, ok=f"{task.id} is done.")
+        if value == TaskStatus.CANCELLED:
+            return self._try(self.orch.cancel_task, task.id, ok=f"{task.id} is cancelled.")
+        self.notify(f"An agent moves a task to {value}, you cannot. Start one with s.", severity="warning")
+        return False
 
     @on(DataTable.RowHighlighted, "#tasks-table")
     def _task_row(self, event: DataTable.RowHighlighted) -> None:
@@ -433,7 +497,8 @@ class SupermanagerApp(PageApp):
 
     @on(PageTable.CellClicked)
     def _agent_cell_clicked(self, event: PageTable.CellClicked) -> None:
-        """A click on the Agent cell: starts an agent on a waiting task, opens the agent of a running one."""
+        """A click on the Agent or Needs you cell: starts an agent on a waiting task, opens the agent of a
+        running one. Every other cell opens the task file instead."""
         self._selected_task = event.row_key.value
         task = self._current_task()
         if task and task.status in STARTABLE:
@@ -445,14 +510,18 @@ class SupermanagerApp(PageApp):
         return self.orch.state.tasks.get(self._selected_task) if self._selected_task else None
 
     # ---------------------------------------------------------------- actions
-    def _try(self, fn, *args, ok: str | None = None, **kwargs) -> None:
+    def _try(self, fn, *args, ok: str | None = None, **kwargs) -> bool:
+        """Run something on the orchestrator and say so when it refuses. True when it went through."""
+        done = True
         try:
             fn(*args, **kwargs)
             if ok:
                 self.notify(ok)
         except OrchestratorError as exc:
             self.notify(str(exc), severity="error", timeout=8)
+            done = False
         self.refresh_all()
+        return done
 
     def action_toggle_done(self) -> None:
         """h, or a click on the strip above the keys: show or hide the finished tasks. They sit in one group at
@@ -504,13 +573,10 @@ class SupermanagerApp(PageApp):
         return self.orch.state.manager.tmux_window if self.orch.manager_alive() else None
 
     def action_open_selected(self) -> None:
-        """enter / click on a row: the running agent opens; a task without one opens its file in your editor."""
+        """enter / click on a row: the task file opens in your editor. The agent is one column over — click
+        Agent or Needs you, or press o."""
         task = self._current_task()
-        if not task:
-            return
-        if task.agent and task.agent.session_open:
-            self.action_open_agent()
-        else:
+        if task:
             self._open_in_editor(task.id)
 
     def action_open_agent(self) -> None:
@@ -658,12 +724,20 @@ class SupermanagerApp(PageApp):
             table.move_cursor(row=ids.index(task_id))
 
     def action_move_down(self) -> None:
-        if self._current_task():
-            self._try(self.orch.move_task, self._current_task().id, 1)
+        self._move_in_backlog(1)
 
     def action_move_up(self) -> None:
-        if self._current_task():
-            self._try(self.orch.move_task, self._current_task().id, -1)
+        self._move_in_backlog(-1)
+
+    def _move_in_backlog(self, delta: int) -> None:
+        """J / K: one step down or up. On the board that means one card inside the column, which is what you
+        see; in the table it is one row of the backlog."""
+        if not self._current_task():
+            return
+        if self.board_view:
+            self.query_one(Board).action_reorder(delta)
+            return
+        self._try(self.orch.move_task, self._current_task().id, delta)
 
     def action_more(self) -> None:
         self._try(self.orch.set_config, "agents.concurrency", str(self.orch.config.agents.concurrency + 1))
@@ -711,8 +785,8 @@ def _field_cell(field, value) -> Text:
     return wrap(field.show(value), field.width, "cyan")
 
 
-def _card(t: Task, fields: list) -> Text:
-    """One task as it reads on the board: what it is, then its labels, its date and its agent."""
+def _card(t: Task, fields: list, orch) -> Text:
+    """One task as it reads on the board: what it is, then its labels, its date, its agent and what it spent."""
     body = Text()
     body.append(f"{t.id}  ", style="bold")
     body.append(t.priority, style=STATUS_STYLE.get(t.status, "white"))
@@ -725,7 +799,7 @@ def _card(t: Task, fields: list) -> Text:
         body.append(label_chips(value) if f.type == "list" else Text(f"{f.show(value)}\n", style="cyan"))
         if f.type == "list":
             body.append("\n")
-    for cell in (_agent_cell(t, CARD_WIDTH), _state_cell(t, CARD_WIDTH)):
+    for cell in (_agent_cell(t, CARD_WIDTH), _state_cell(t, CARD_WIDTH), _cost_cell(t, orch)):
         if cell.plain.strip():
             body.append(cell)
             body.append("\n")
@@ -740,7 +814,8 @@ def _agent_cell(t: Task, width: int = 200) -> Text:
     if t.status in STARTABLE:
         return Text("▶ start (s)", style="cyan")
     if a and a.session_open:
-        return wrap(a.rc_name or f"{a.tool} {t.id}", width, "yellow")
+        with_lead = f" · with {a.lead}" if a.lead else ""   # riding on another task's session (same group)
+        return wrap((a.rc_name or f"{a.tool} {t.id}") + with_lead, width, "yellow")
     return wrap(a.branch, width, MUTED) if a and a.branch else Text("")
 
 
@@ -758,6 +833,24 @@ def _state_cell(t: Task, width: int = 200) -> Text:
     return Text(str(t.status), style=STATUS_STYLE.get(t.status, "dim"))
 
 
+def _cost_cell(t: Task, orch) -> Text:
+    """The Cost column: what this task has spent so far. It turns amber past four fifths of its budget and red
+    once it is over, so a task about to run out is visible before it does."""
+    spent = t.usage or {}
+    cost, count = float(spent.get("cost", 0.0)), usage.tokens(spent)
+    if not count:
+        return Text("")
+    shown = usage.money(cost, bool(spent.get("priced", True))) or usage.short(count)
+    limit_tokens, limit_usd = orch.budget_of(t)
+    share = max((count / limit_tokens) if limit_tokens else 0.0, (cost / limit_usd) if limit_usd else 0.0)
+    style = "bold red" if t.budget_hit or share >= 1 else "yellow" if share >= 0.8 else MUTED
+    return Text(shown, style=style)
+
+
+def _heading(label: str, count: int) -> str:
+    return f"{label} ({count})"
+
+
 def _default_order(t: Task) -> tuple:
     """Live agents first, then what you asked to start, then by priority. Same rank keeps the backlog order."""
     rank = 0 if t.agent and t.agent.session_open else (1 if t.status == TaskStatus.QUEUED else 2)
@@ -772,5 +865,6 @@ def _sort_value(fields: list):
                 return f.show(t.fields.get(f.name))
         return {"ID": t.id, "Pri": t.priority, "Status": str(t.status), "Title": t.title,
                 "Agent": _agent_cell(t).plain, "Needs you": _state_cell(t).plain,
+                "Cost": -float((t.usage or {}).get("cost", 0.0)),
                 "Created": t.created_at, "Updated": t.updated_at}.get(column)
     return value

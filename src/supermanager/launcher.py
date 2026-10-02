@@ -15,12 +15,17 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import EFFORT_LEVELS, Config
+from .config import EFFORT_LEVELS, Config, skips_permissions
 from .paths import ProjectPaths
 
 DISALLOWED_TOOLS = ["SendMessage", "ListAgents"]
 MANAGER_EDIT_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"]
+# A planner reads and asks; it has no worktree, so it must not be able to change anything, and its plan goes
+# onto the task with update_plan instead of through the plan-mode dialog.
+PLANNER_DISALLOWED = [*DISALLOWED_TOOLS, *MANAGER_EDIT_TOOLS, "ExitPlanMode"]
 CODEX_HOOKS_FILE = Path(".codex") / "hooks.json"
+OUR_TOOLS = "mcp__supermanager"   # supermanager's own MCP tools: always allowed, whatever else is asked about
+PROJECT_SETTINGS_FILE = Path(".claude") / "settings.local.json"   # per-user project settings: never committed
 
 
 def claude_bin() -> str:
@@ -75,6 +80,8 @@ def write_session_files(
 ) -> tuple[Path, Path, Path]:
     """Write mcp.json, settings.json and prompt.md for a session; returns their paths."""
     folder = paths.agent_dir(task_id) if task_id else paths.home / "manager"
+    if role == "plan":
+        folder = folder / "plan"
     folder.mkdir(parents=True, exist_ok=True)
 
     # The task id belongs on the command line: it is not a path, and a tool that scrubs the environment for its
@@ -83,13 +90,63 @@ def write_session_files(
     argv = supermanager_argv(portable=True)
     mcp_args = [*argv[1:], "mcp", "--role", role, "--tool", tool] + (["--task", task_id] if task_id else [])
     mcp = {"mcpServers": {"supermanager": {"command": argv[0], "args": mcp_args}}}
-    settings = {"hooks": _hooks(role, task_id, tool, paths.root)}
+    settings = {"hooks": _hooks(role, task_id, tool, paths.root),
+                "permissions": {"allow": [OUR_TOOLS]}}   # talking to supermanager never needs a yes
 
     mcp_path, settings_path, prompt_path = folder / "mcp.json", folder / "settings.json", folder / "prompt.md"
     mcp_path.write_text(json.dumps(mcp, indent=2))
     settings_path.write_text(json.dumps(settings, indent=2))
     prompt_path.write_text(system_prompt)
     return mcp_path, settings_path, prompt_path
+
+
+def remote_argv(config: Config, spawn: str = "") -> list[str]:
+    """`claude remote-control`: a server that lets you start sessions in this project from claude.ai/code or the
+    Claude app. The sessions it spawns are its own — supermanager sees them through the project hooks."""
+    argv = [claude_bin(), "remote-control",
+            "--name", config.remote_name(),
+            "--spawn", spawn or config.remote.spawn,
+            "--capacity", str(max(1, config.remote.capacity))]
+    if skips_permissions(config):   # the sessions it spawns run like our own agents: nothing stops to ask
+        argv += ["--permission-mode", "bypassPermissions"]
+    return argv
+
+
+def write_project_hooks(paths: ProjectPaths) -> Path:
+    """Put our lifecycle hooks into `<project>/.claude/settings.local.json`, so a Claude session someone starts
+    in this project — from the phone through Remote Control, or by hand in a terminal — reports to supermanager
+    and shows up on the agents page. Whatever else is in that file is kept, and git never sees it."""
+    path = paths.root / PROJECT_SETTINGS_FILE
+    settings = _read_json(path)
+    hooks = {k: [e for e in v if not _is_ours(e)] for k, v in (settings.get("hooks") or {}).items()}
+    for event, entries in _hooks("session", None, "claude", paths.root).items():
+        hooks[event] = [*hooks.get(event, []), *entries]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({**settings, "hooks": {k: v for k, v in hooks.items() if v}}, indent=2))
+    _git_exclude(paths.root, str(PROJECT_SETTINGS_FILE))
+    return path
+
+
+def remove_project_hooks(paths: ProjectPaths) -> None:
+    """Take our hooks back out of the project's settings (remote.adopt off), leaving anything else in place."""
+    path = paths.root / PROJECT_SETTINGS_FILE
+    settings = _read_json(path)
+    if not settings.get("hooks"):
+        return
+    hooks = {k: [e for e in v if not _is_ours(e)] for k, v in settings["hooks"].items()}
+    rest = {**settings, "hooks": {k: v for k, v in hooks.items() if v}}
+    if not rest["hooks"]:
+        rest.pop("hooks")
+    path.write_text(json.dumps(rest, indent=2)) if rest else path.unlink()
+
+
+def _read_json(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return {}
 
 
 def manager_argv(
@@ -147,12 +204,56 @@ def _toml(value: str | list[str]) -> str:
     return json.dumps(value)
 
 
-def agent_argv(
+def _permission_args(skip: bool, plan_mode: bool) -> list[str]:
+    """How much a Claude agent may do on its own: everything, asked about nothing (agents.skip_permissions, the
+    default); plan mode, where it plans and you approve before anything changes; or acceptEdits, which is what
+    is left — an approved plan, auto.plan, or a project with no planning step at all."""
+    if skip:
+        return ["--dangerously-skip-permissions"]
+    if plan_mode:
+        return ["--permission-mode", "plan"]
+    return ["--permission-mode", "acceptEdits"]
+
+
+def planner_argv(
     config: Config, paths: ProjectPaths, task_id: str, cwd: Path, settings: AgentSettings,
     session_id: str, kickoff: str, resume: bool, system_prompt: str,
 ) -> list[str]:
+    """The planning session: it reads the project, asks the user what is unclear, and writes the plan onto the
+    task. It runs in the project itself with no worktree, so nothing it could do may change a file."""
     if settings.tool == "codex":
-        return _codex_argv(config, paths, task_id, cwd, settings, session_id, kickoff, resume, system_prompt, mcp=True)
+        return _codex_argv(config, paths, task_id, cwd, settings, session_id, kickoff, resume, system_prompt,
+                           mcp=True, read_only=True, role="plan")
+    mcp_path, settings_path, _ = write_session_files(paths, "plan", task_id, system_prompt)
+    argv = [claude_bin()]
+    if not resume:
+        argv.append(kickoff)
+    argv += [
+        "--name", f"{config.project_name}/{task_id} plan",
+        "--remote-control", config.agent_rc_name(task_id) + "-plan",
+        "--dangerously-skip-permissions",   # it cannot edit: every editing tool is disallowed below
+        "--mcp-config", str(mcp_path),
+        "--settings", str(settings_path),
+        "--append-system-prompt", system_prompt,
+        "--allowedTools", OUR_TOOLS,
+        "--disallowedTools", *PLANNER_DISALLOWED,
+    ]
+    argv += ["--resume", session_id] if resume else ["--session-id", session_id]
+    argv += _model_args("claude", settings.model, settings.effort)
+    argv += config.agents.extra_args
+    return argv
+
+
+def agent_argv(
+    config: Config, paths: ProjectPaths, task_id: str, cwd: Path, settings: AgentSettings,
+    session_id: str, kickoff: str, resume: bool, system_prompt: str,
+    plan_mode: bool = False, skip: bool = True,
+) -> list[str]:
+    """The session that does the work. `plan_mode` says it really starts in plan mode and waits for an
+    approval, `skip` that it runs with every permission granted (config.skips_permissions)."""
+    if settings.tool == "codex":
+        return _codex_argv(config, paths, task_id, cwd, settings, session_id, kickoff, resume, system_prompt,
+                           mcp=True, auto_permissions=skip)
     mcp_path, settings_path, _ = write_session_files(paths, "agent", task_id, system_prompt)
     argv = [claude_bin()]
     if not resume:
@@ -160,25 +261,28 @@ def agent_argv(
     argv += [
         "--name", f"{config.project_name}/{task_id}",
         "--remote-control", config.agent_rc_name(task_id),
-        "--permission-mode", "plan",
+        *_permission_args(skip, plan_mode),
         "--mcp-config", str(mcp_path),
         "--settings", str(settings_path),
         "--append-system-prompt", system_prompt,
+        "--allowedTools", OUR_TOOLS,
         "--disallowedTools", *DISALLOWED_TOOLS,
     ]
     argv += ["--resume", session_id] if resume else ["--session-id", session_id]
-    if config.agents.allow_skip_permissions:
-        argv.append("--allow-dangerously-skip-permissions")
+    if config.agents.allow_skip_permissions and not skip:
+        argv.append("--allow-dangerously-skip-permissions")   # already skipped: the flag would only clash
     argv += _model_args("claude", settings.model, settings.effort)
     argv += config.agents.extra_args
     return argv
 
 
-def free_agent_argv(config: Config, paths: ProjectPaths, agent_id: str, settings: AgentSettings, session_id: str) -> list[str]:
+def free_agent_argv(config: Config, paths: ProjectPaths, agent_id: str, settings: AgentSettings, session_id: str,
+                    skip: bool = True) -> list[str]:
     """A plain session in the project root: no task, no plan mode, no supermanager tools; only the hooks
     that let the daemon follow it (busy / idle / bell / ended)."""
     if settings.tool == "codex":
-        return _codex_argv(config, paths, agent_id, paths.root, settings, session_id, "", False, "", mcp=False)
+        return _codex_argv(config, paths, agent_id, paths.root, settings, session_id, "", False, "", mcp=False,
+                           auto_permissions=skip)
     _, settings_path, _ = write_session_files(paths, "agent", agent_id, "")
     argv = [
         claude_bin(),
@@ -188,7 +292,9 @@ def free_agent_argv(config: Config, paths: ProjectPaths, agent_id: str, settings
         "--disallowedTools", *DISALLOWED_TOOLS,
         "--session-id", session_id,
     ]
-    if config.agents.allow_skip_permissions:
+    if skip:
+        argv.append("--dangerously-skip-permissions")
+    elif config.agents.allow_skip_permissions:
         argv.append("--allow-dangerously-skip-permissions")
     argv += _model_args("claude", settings.model, settings.effort)
     argv += config.agents.extra_args
@@ -198,6 +304,7 @@ def free_agent_argv(config: Config, paths: ProjectPaths, agent_id: str, settings
 def _codex_argv(
     config: Config, paths: ProjectPaths, agent_id: str, cwd: Path, settings: AgentSettings,
     session_id: str, kickoff: str, resume: bool, system_prompt: str, mcp: bool,
+    auto_permissions: bool = False, read_only: bool = False, role: str = "agent",
 ) -> list[str]:
     """`codex` in the agent's folder. Its session id is only known once its first hook reports it, so a fresh
     session starts without one and `resume` uses the id the hooks gave us."""
@@ -208,11 +315,15 @@ def _codex_argv(
     elif kickoff:
         argv.append(kickoff)
     argv += ["--dangerously-bypass-hook-trust", "-C", str(cwd)]   # our hooks.json is ours; no review prompt
+    if read_only:          # a planner: it may look at anything and change nothing
+        argv += ["-a", "never", "-s", "read-only"]
+    elif auto_permissions:  # the same as Claude's --dangerously-skip-permissions: no approvals, no sandbox
+        argv.append("--dangerously-bypass-approvals-and-sandbox")
     if system_prompt:
         argv += ["-c", f"developer_instructions={_toml(system_prompt)}"]
     if mcp:
         exe, *rest = supermanager_argv(portable=True)
-        mcp_args = [*rest, "mcp", "--role", "agent", "--tool", "codex", "--task", agent_id]
+        mcp_args = [*rest, "mcp", "--role", role, "--tool", "codex", "--task", agent_id]
         argv += ["-c", f"mcp_servers.supermanager.command={_toml(exe)}",
                  "-c", f"mcp_servers.supermanager.args={_toml(mcp_args)}",
                  "-c", 'mcp_servers.supermanager.default_tools_approval_mode="approve"']   # our tools: no prompts
@@ -226,12 +337,7 @@ def write_codex_hooks(paths: ProjectPaths, agent_id: str, cwd: Path) -> Path:
     and hide the file from git so an agent does not commit it."""
     path = cwd / CODEX_HOOKS_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
-    existing: dict = {}
-    if path.is_file():
-        try:
-            existing = json.loads(path.read_text())
-        except json.JSONDecodeError:
-            existing = {}
+    existing = _read_json(path)
     hooks = {k: [e for e in v if not _is_ours(e)] for k, v in (existing.get("hooks") or {}).items()}
     for event, entries in _hooks("agent", agent_id, "codex", paths.root).items():
         hooks[event] = [*hooks.get(event, []), *entries]
@@ -258,10 +364,15 @@ def _git_exclude(cwd: Path, pattern: str) -> None:
         exclude.write_text("\n".join([*lines, pattern]) + "\n")
 
 
-def session_env(paths: ProjectPaths, task_id: str | None) -> dict[str, str]:
-    """What a session's window carries: which project it belongs to and which task it is for. The hooks and the
-    MCP bridge read these instead of having the paths written into their config files."""
+def session_env(paths: ProjectPaths, task_id: str | None, role: str = "") -> dict[str, str]:
+    """What a session's window carries: which project it belongs to, which task it is for, and what it is. The
+    hooks and the MCP bridge read these instead of having the paths written into their config files.
+
+    A window's environment is inherited by what it starts, which is the point for the Remote Control server:
+    every session it spawns carries SUPERMANAGER_ROLE=session, so its hooks land here as a session of ours."""
     env = {"SUPERMANAGER_PROJECT": str(paths.root), "SUPERMANAGER_SOCKET": str(paths.socket)}
     if task_id:
         env["SUPERMANAGER_TASK"] = task_id
+    if role:
+        env["SUPERMANAGER_ROLE"] = role
     return env

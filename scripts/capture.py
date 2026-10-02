@@ -1,7 +1,7 @@
 """Turn a live tmux pane into an SVG for the README: `python scripts/capture.py <window> <name> [lines]`.
 
-It renders through Textual, at the same width as the page screenshots, so a picture of a session and a picture
-of a page look like the same terminal.
+It renders through Textual, at the same width as the page screenshots and under the same bar, so a picture of a
+session and a picture of a page are the same workspace.
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Static
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bar import with_bar
 from svg_tools import strip_chrome
 
 OUT = Path(__file__).resolve().parents[1] / "docs" / "screenshots"
@@ -29,6 +30,10 @@ def pane(window: str, lines: int) -> str:
     return "\n".join(kept[-lines:])
 
 
+PROJECT = "acme-api"
+COUNTS = {"tasks": 5, "agents": 3}
+
+
 class Screen(App):
     """One widget: the captured text, on the terminal's own background."""
     CSS = "Screen { background: $surface; } Static { padding: 0 1; }"
@@ -41,11 +46,14 @@ class Screen(App):
         yield Static(self.body)
 
 
-async def render(body: Text, path: Path) -> None:
+async def render(body: Text, path: Path, active: str = "manager", ringing: str = "") -> None:
+    """The pane with the workspace bar under it — what you actually see on screen."""
     app = Screen(body)
     async with app.run_test(size=(WIDTH, len(body.plain.splitlines()) + 1)) as pilot:
         await pilot.pause()
-        await pilot.pause()
+        await with_bar(app, PROJECT, active, COUNTS, ringing)
+        for _ in range(3):
+            await pilot.pause()
         path.write_text(strip_chrome(app.export_screenshot()))
 
 

@@ -18,8 +18,9 @@ from .models import AgentInfo, Task
 SECTIONS = ("Problem", "Expected outcome", "Acceptance criteria", "Verification", "Context", "Asked for",
             "Plan", "Progress", "Result")
 STAMP = "%Y-%m-%d %H:%M"
-FRONT_KEYS = ("id", "title", "priority", "fields", "tool", "model", "effort", "status", "created_at",
-              "updated_at", "blocked_reason", "result_ts", "agent", "sessions")
+FRONT_KEYS = ("id", "title", "priority", "fields", "group", "workdir", "tool", "model", "effort", "autonomy", "planning", "plan_approved",
+              "status", "usage", "budget_tokens", "budget_usd", "budget_hit",
+              "created_at", "updated_at", "blocked_reason", "result_ts", "agent", "sessions")
 TEMPLATE_NAME = "task-template.md"   # put one in .supermanager/ to override DEFAULT_TEMPLATE for a project
 
 DEFAULT_TEMPLATE = """\
@@ -44,7 +45,11 @@ Files, modules, links, constraints, and anything from CLAUDE.md the agent must r
 def render_task(t: Task) -> str:
     front = {
         "id": t.id, "title": t.title, "priority": t.priority, "fields": t.fields,
-        "tool": t.tool, "model": t.model, "effort": t.effort, "status": str(t.status),
+        "group": t.group, "workdir": t.workdir,
+        "tool": t.tool, "model": t.model, "effort": t.effort, "autonomy": t.autonomy,
+        "planning": t.planning, "plan_approved": t.plan_approved, "status": str(t.status),
+        "usage": t.usage, "budget_tokens": t.budget_tokens, "budget_usd": t.budget_usd,
+        "budget_hit": t.budget_hit,
         "created_at": t.created_at, "updated_at": t.updated_at, "blocked_reason": t.blocked_reason,
         "result_ts": t.result.get("ts") if t.result else None,
         "agent": t.agent.__dict__ if t.agent else None,
@@ -96,8 +101,13 @@ def parse_task(text: str, source: str = "?") -> Task:
         result = {"summary": summary.strip(), "verification_notes": notes.strip(), "ts": front.get("result_ts") or 0}
     return Task(
         id=front["id"], title=front["title"], priority=front.get("priority", "P2"), status=front.get("status", "backlog"),
+        group=front.get("group") or "", workdir=front.get("workdir") or "",
         tool=front.get("tool") or "", model=front.get("model") or "", effort=front.get("effort") or "",
-        fields=front.get("fields") or {},
+        autonomy=front.get("autonomy") or "", planning=front.get("planning") or "",
+        plan_approved=bool(front.get("plan_approved")),
+        fields=front.get("fields") or {}, usage=front.get("usage") or {},
+        budget_tokens=front.get("budget_tokens") or 0, budget_usd=front.get("budget_usd") or 0.0,
+        budget_hit=front.get("budget_hit") or "",
         problem=body["Problem"], expected_outcome=body["Expected outcome"],
         acceptance_criteria=[l[2:].strip() for l in body["Acceptance criteria"].splitlines() if l.startswith("- ")],
         verification=body["Verification"], context=body["Context"], plan=body["Plan"],
@@ -139,14 +149,50 @@ def _logged_line(line: str) -> dict:
 
 
 class TaskDir:
+    """The folder of task files. It remembers what the files looked like when it last read or wrote them, so
+    an edit made by hand — your editor, the agent, git — is told apart from its own writes (`stale`)."""
+
     def __init__(self, path: Path):
         self.path = path
+        self.seen = self._stamps()
+        self.unreadable: dict[str, int] = {}   # the folder as it was when a file in it would not parse
 
     @property
     def index(self) -> Path:
         return self.path / "_index.json"
 
+    def _stamps(self) -> dict[str, int]:
+        if not self.path.is_dir():
+            return {}
+        files = [*self.path.glob("T-*.md"), *([self.index] if self.index.exists() else [])]
+        return {f.name: f.stat().st_mtime_ns for f in files}
+
+    def changed_outside(self) -> set[str]:
+        """The files that changed on disk since we last read or wrote them — edited, added, or deleted."""
+        now = self._stamps()
+        return {name for name in now.keys() | self.seen.keys() if now.get(name) != self.seen.get(name)}
+
+    def stale(self) -> bool:
+        """Something changed on disk that we have not taken in — unless it is the file that would not parse
+        last time, still as it was: that was reported once, and waits until it is saved again."""
+        return bool(self.changed_outside()) and self._stamps() != self.unreadable
+
+    def mark_seen(self) -> None:
+        self.seen = self._stamps()
+
     def load(self) -> tuple[dict[str, Task], list[str]]:
+        """Every task file and the order. A file that will not parse raises, and nothing counts as read: it
+        stays theirs, so a save does not write over it."""
+        stamps = self._stamps()
+        try:
+            tasks, order = self._read()
+        except Exception:
+            self.unreadable = stamps
+            raise
+        self.seen, self.unreadable = stamps, {}
+        return tasks, order
+
+    def _read(self) -> tuple[dict[str, Task], list[str]]:
         tasks: dict[str, Task] = {}
         if not self.path.is_dir():
             return tasks, []
@@ -160,20 +206,32 @@ class TaskDir:
         return tasks, order
 
     def save(self, tasks: dict[str, Task], order: list[str]) -> None:
+        """Write what memory holds — except a file someone changed on disk meanwhile: that edit is newer than
+        what we have, so it is left as it is (and stays `stale`, for the next load to take in)."""
         self.path.mkdir(parents=True, exist_ok=True)
+        theirs = self.changed_outside()
         wanted = set()
         for task in tasks.values():
             file = self.path / f"{task.id}.md"
             wanted.add(file.name)
+            if file.name in theirs:
+                continue
             text = render_task(task)
             if not file.exists() or file.read_text() != text:
                 _atomic_write(file, text)
         for stale in self.path.glob("T-*.md"):
-            if stale.name not in wanted:
+            if stale.name not in wanted and stale.name not in theirs:
                 stale.unlink()
         index_text = json.dumps({"order": order, "note": "dispatch order of the task files in this folder"}, indent=2) + "\n"
-        if not self.index.exists() or self.index.read_text() != index_text:
+        if self.index.name not in theirs and (not self.index.exists() or self.index.read_text() != index_text):
             _atomic_write(self.index, index_text)
+        seen = self._stamps()
+        for name in theirs:   # still theirs: keep the old stamp so the change is picked up
+            if name in self.seen:
+                seen[name] = self.seen[name]
+            else:
+                seen.pop(name, None)
+        self.seen = seen
 
     def remove_all(self) -> None:
         for file in self.path.glob("T-*.md"):
@@ -184,6 +242,7 @@ class TaskDir:
             self.path.rmdir()
         except OSError:
             pass
+        self.mark_seen()
 
 
 def _atomic_write(path: Path, text: str) -> None:

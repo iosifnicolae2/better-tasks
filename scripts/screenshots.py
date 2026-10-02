@@ -14,16 +14,19 @@ from supermanager.paths import ProjectPaths
 from supermanager.tui.agents_page import AgentsApp
 from supermanager.tui.app import SupermanagerApp
 from supermanager.tui.config_page import ConfigApp
+from bar import with_bar   # the tmux bar the pages sit under
 from svg_tools import strip_chrome
-from textual.containers import Horizontal
-from textual.widgets import Static
 
 OUT = _P(__file__).resolve().parents[1] / "docs" / "screenshots"
+PROJECT = "acme-api"
+COUNTS = {"tasks": 5, "agents": 3}
+RINGING = "T-001"   # the task waiting for you in this made-up run
 NOW = time.time()
+# The same run the walkthrough pictures come from: T-001 is the task the manager wrote, and the one that rings.
 DEMO = [
     # title, labels, when, status, tool/model, phase, attention, age
-    ("Fix the BOM in the CSV import", ["import", "bug"], "2026-W38", TaskStatus.WORKING, ("claude", "opus"), "busy", "", 2400),
-    ("Cache the avatar thumbnails", ["perf", "api"], "", TaskStatus.PLANNING, ("codex", "gpt-6-astra"), "idle", "plan ready — approve it", 300),
+    ("Fix the BOM in the CSV import", ["import", "bug"], "2026-W38", TaskStatus.PLANNING, ("claude", "opus"), "idle", "the planner needs you", 300),
+    ("Cache the avatar thumbnails", ["perf", "api"], "", TaskStatus.WORKING, ("claude", "sonnet"), "busy", "", 2400),
     ("Retry failed uploads with a backoff", ["api"], "2026-W38", TaskStatus.QUEUED, None, "", "", 0),
     ("Ship the release notes for 0.2", ["docs"], "2026-09-20", TaskStatus.BACKLOG, None, "", "", 0),
     ("Drop the legacy /v1 endpoints", ["api", "cleanup"], "", TaskStatus.BACKLOG, None, "", "", 0),
@@ -33,9 +36,14 @@ DEMO = [
 def build():
     root = Path(tempfile.mkdtemp()).resolve()
     paths = ProjectPaths(root); paths.ensure_layout()
-    cfg = Config(project_name="acme-api"); save_config(paths.config, cfg)
+    cfg = Config(project_name=PROJECT)
+    cfg.agents.planning = "agent"      # the sessions in these pictures are set by hand, below
+    cfg.remote.enabled = False
+    save_config(paths.config, cfg)
     orch = Orchestrator(paths, cfg)
     orch.tmux.kill_window = lambda *a, **k: None
+    orch.tmux.ensure_session = lambda *a, **k: None
+    orch.tmux.new_window = lambda *a, **k: "@0"   # nothing here starts a real session
     orch._auto_accept_dialogs = lambda *a, **k: None
     orch.ensure_manager = lambda: None
     orch._require_tmux = lambda: None
@@ -54,9 +62,11 @@ def build():
         t.created_at = NOW - 86400 * (6 - i) - 3600
         t.updated_at = NOW - age - 60
         if tool:
-            t.agent = AgentInfo(session_id="s", tmux_window=f"@{i}", cwd=str(root),
-                                rc_name=f"acme-api-{t.id}", tool=tool[0], model=tool[1],
-                                branch=f"sm/{t.id}", phase=phase, attention=attention,
+            planning = status == TaskStatus.PLANNING
+            t.agent = AgentInfo(session_id="s", tmux_window=f"@{i}", cwd=str(root), role="plan" if planning else "work",
+                                rc_name=f"{PROJECT}-{t.id}" + ("-plan" if planning else ""),
+                                tool=tool[0], model=tool[1],
+                                branch=None if planning else f"sm/{t.id}", phase=phase, attention=attention,
                                 started_at=NOW - age, last_activity=NOW - age / 4,
                                 session_open=status not in (TaskStatus.DONE,))
     return orch, paths
@@ -68,42 +78,14 @@ def sessions(orch):
             rows.append({"id": t.id, "title": t.title, "task": True, "status": str(t.status),
                          "agent": {**t.agent.__dict__}})
     rows.append({"id": "A-001", "title": "agent (no task)", "task": False, "status": "",
-                 "agent": {"rc_name": "acme-api-A-001", "tmux_window": "@9", "phase": "idle", "branch": None,
-                           "started_at": NOW - 5400, "last_activity": NOW - 900, "attention": "",
+                 "agent": {"rc_name": f"{PROJECT}-A-001", "tmux_window": "@9", "phase": "idle", "branch": None,
+                           "started_at": NOW - 5400, "last_activity": NOW - 900, "attention": "", "role": "work",
+                           "tool": "claude", "model": "", "effort": "", "session_open": True}})
+    rows.append({"id": "R-001", "title": "session from the Claude app", "task": False, "status": "",
+                 "agent": {"rc_name": PROJECT, "tmux_window": "", "phase": "busy", "branch": None, "role": "remote",
+                           "started_at": NOW - 600, "last_activity": NOW - 30, "attention": "",
                            "tool": "claude", "model": "", "effort": "", "session_open": True}})
     return rows
-
-class Bar(Horizontal):
-    """The strip tmux draws under every page: the pages on the left, whatever rings for you on the right."""
-    DEFAULT_CSS = """
-    Bar { dock: bottom; height: 1; background: #303030; color: #bcbcbc; }
-    Bar > .left { width: 1fr; padding: 0 1; }
-    Bar > .right { width: auto; padding: 0 1; }
-    """
-
-    def __init__(self, left: str, right: str) -> None:
-        super().__init__(Static(left, classes="left"), Static(right, classes="right"))
-
-
-def bar(active: str, tasks: int, agents: int) -> Static:
-    def tab(name: str, count: int = 0) -> str:
-        label = f"{name} ({count})" if count else name
-        return f"[black on #5fd7ff] {label} [/]" if name == active else f" {label} "
-    left = f"[b #5fd7ff] acme-api [/][#585858]│[/]"
-    tabs = "".join(tab(n, c) for n, c in (("manager", 0), ("tasks", tasks), ("agents", agents), ("config", 0)))
-    # An agent that rings for you sits on the right, where tmux puts it, next to the key that cycles the pages.
-    right = "[bold #ffaf00] 🔔 T-001 [/]  [#8a8a8a]ctrl+a / ← → pages[/]"
-    return Bar(f"{left}{tabs}", right)
-
-
-async def with_bar(app, active, tasks, agents):
-    """Screenshots show the bar too: on screen it is part of what you are looking at. The page's own footer is
-    nudged up by one row to make room for it, the way the terminal does."""
-    from textual.widgets import Footer
-    for footer in app.query(Footer):
-        footer.styles.offset = (0, -1)
-    await app.mount(bar(active, tasks, agents))
-
 
 def save(app, path) -> None:
     """The page as it looks, with none of the window Rich likes to draw around it."""
@@ -116,7 +98,7 @@ async def main():
     async with app.run_test(size=(150, 22)) as pilot:
         for _ in range(3):
             await pilot.pause()
-        await with_bar(app, "tasks", 5, 2)
+        await with_bar(app, PROJECT, "tasks", COUNTS, RINGING)
         for _ in range(3):
             await pilot.pause()
         save(app, OUT / "tasks.svg")
@@ -132,7 +114,7 @@ async def main():
     async with agents.run_test(size=(150, 14)) as pilot:
         for _ in range(3):
             await pilot.pause()
-        await with_bar(agents, "agents", 5, 2)
+        await with_bar(agents, PROJECT, "agents", COUNTS, RINGING)
         for _ in range(3):
             await pilot.pause()
         save(agents, OUT / "agents.svg")
@@ -141,7 +123,8 @@ async def main():
     async with config.run_test(size=(150, 20)) as pilot:
         for _ in range(3):
             await pilot.pause()
-        await with_bar(config, "config", 5, 2)
+        await with_bar(config, PROJECT, "config", COUNTS, RINGING)
+        await pilot.press("tab")   # the tasks tab: switches, text, and values you step through with ← →
         for _ in range(3):
             await pilot.pause()
         save(config, OUT / "config.svg")

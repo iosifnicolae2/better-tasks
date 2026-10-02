@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from . import __version__
+from . import __version__, usage
 from .client import DaemonClient, DaemonError, DaemonUnavailable
 from .config import SETTABLE_KEYS, Config, load_config, local_keys, local_path, save_config, set_key
 from .models import State
@@ -91,7 +91,8 @@ def root(ctx: typer.Context, project: Optional[Path] = PROJECT_OPT,
 @app.command()
 def init(project: Optional[Path] = PROJECT_OPT,
          concurrency: Optional[int] = typer.Option(None, help="How many agents may run at once."),
-         worktrees: Optional[bool] = typer.Option(None, help="Give each agent its own git worktree."),
+         worktrees: Optional[bool] = typer.Option(None, help="Give each agent its own git worktree "
+                                                  "(off = agents work in the project folder itself)."),
          yes: bool = typer.Option(False, "-y", help="Accept defaults without asking.")):
     """Create .supermanager/config.toml in this project (asks a few questions)."""
     paths = _paths(project)
@@ -106,12 +107,12 @@ def init(project: Optional[Path] = PROJECT_OPT,
         if worktrees is None:
             worktrees = typer.confirm("Give each agent its own git worktree (recommended, needs git)?", default=True)
     config.agents.concurrency = concurrency or config.agents.concurrency
-    config.agents.worktrees = True if worktrees is None else worktrees
+    config.agents.workdir = "worktree" if worktrees is None or worktrees else "project"
     paths.ensure_layout()
     save_config(paths.config, config)
     console.print(Panel.fit(
         f"Created [bold]{paths.config}[/bold]\n\n"
-        f"concurrency = {config.agents.concurrency}   worktrees = {config.agents.worktrees}\n"
+        f"concurrency = {config.agents.concurrency}   agents work in: {config.agents.workdir}\n"
         f"Manager RC name: [cyan]{config.manager_rc_name()}[/cyan]\n\n"
         "Next: run [bold]supermanager[/bold] to open the manager chat; [bold]ctrl+a[/bold] cycles through the pages.",
         title="supermanager", border_style="green"))
@@ -160,9 +161,9 @@ def up(project: Optional[Path] = PROJECT_OPT,
         with console.status("Starting supermanager..."):
             _wait(lambda: is_daemon_running(paths.socket), 20, "the daemon did not start; run `supermanager dashboard` to see why")
 
-    for name, command in ((AGENTS_WINDOW, "agents-page"), (CONFIG_WINDOW, "config-page")):
-        if tmux.session_exists() and not tmux.find_window(name):
-            tmux.new_window(name, paths.root, [*supermanager_argv(), command, "-C", str(paths.root)], {})
+    if tmux.session_exists():   # the daemon opens the agents and config pages, and keeps them open
+        _wait(lambda: all(tmux.find_window(name) for name in (AGENTS_WINDOW, CONFIG_WINDOW)), 15,
+              "the pages did not open; `supermanager dashboard` shows why")
     if not tmux.session_exists():
         console.print("[red]A supermanager daemon is running, but its workspace is not on this tmux server[/red] "
                       "(probably an older version). Stop it, then start again:\n"
@@ -178,7 +179,9 @@ def up(project: Optional[Path] = PROJECT_OPT,
     console.print(Panel.fit(
         f"[bold]{config.project_name}[/bold] is up.\n\n"
         f"  manager  → chat opens now; also in claude.ai as [cyan]{config.manager_rc_name()}[/cyan]\n"
-        f"  agents   → {st['concurrency'] - st['free_slots']}/{st['concurrency']} running\n\n"
+        f"  agents   → {st['concurrency'] - st['free_slots']}/{st['concurrency']} running\n"
+        + (f"  phone    → open [cyan]{config.remote_name()}[/cyan] in the Claude app to start a session in this "
+           "project; it shows on the agents page\n" if config.remote.enabled else "") + "\n"
         f"  [bold]{KEY}[/bold] cycles manager → tasks → agents → config. Every other key goes to Claude.\n"
         "  On the tasks page: enter opens a session, q leaves everything running, Q stops it all.",
         title="supermanager", border_style="green"))
@@ -267,7 +270,8 @@ def _auto_init(paths: ProjectPaths) -> None:
                   "Change with `supermanager config set` or the , key in the dashboard.")
     if not paths.is_git_repo():
         console.print("[yellow]This folder is not a git repository yet.[/yellow] Agents need one for worktrees: "
-                      "run `git init` here, or turn them off with `supermanager config set agents.worktrees false`.")
+                      "run `git init` here, or work in the project folder itself with "
+                      "`supermanager config set agents.workdir project`.")
 
 
 async def _run_headless(orch) -> None:
@@ -306,14 +310,18 @@ def status(project: Optional[Path] = PROJECT_OPT):
         for t in state.tasks.values():
             counts[t.status] = counts.get(t.status, 0) + 1
         st = {"project": config.project_name, "concurrency": config.agents.concurrency, "free_slots": "?",
-              "worktrees": config.agents.worktrees, "manager": None, "task_counts": counts}
+              "workdir": config.agents.workdir, "manager": None, "task_counts": counts}
         live = False
     m = st.get("manager")
     mgr = "not started" if not m else ("running" if m["running"] else "stopped") + f" ({m['phase']}, RC {m['rc_name']})"
+    r = st.get("remote_control")
+    remote = ("off" if not config.remote.enabled else "not started" if not r else
+              ("running" if r["running"] else "stopped") + f" as {r['name']} (spawn: {r['spawn']})")
     console.print(Panel.fit(
         f"project: [bold]{st['project']}[/bold]   daemon: {'[green]running[/green]' if live else '[red]not running[/red]'}\n"
         f"manager: {mgr}\n"
-        f"slots: {st['free_slots']} free of {st['concurrency']}   worktrees: {st['worktrees']}\n"
+        f"phone: {remote}\n"
+        f"slots: {st['free_slots']} free of {st['concurrency']}   agents work in: {st.get('workdir', '?')}\n"
         f"tasks: {json.dumps(st['task_counts'])}", title="supermanager status"))
 
 
@@ -363,7 +371,9 @@ def show(task_id: str, project: Optional[Path] = PROJECT_OPT):
 
 
 def _task_markdown(t) -> str:
-    lines = [f"[bold]Status:[/bold] {t.status}   [bold]Priority:[/bold] {t.priority}", "",
+    lines = [f"[bold]Status:[/bold] {t.status}   [bold]Priority:[/bold] {t.priority}"
+             + (f"   [bold]Group:[/bold] {t.group}" if t.group else "")
+             + (f"   [bold]Works in:[/bold] {t.workdir}" if t.workdir else ""), "",
              f"[bold]Problem[/bold]\n{t.problem}", "", f"[bold]Expected outcome[/bold]\n{t.expected_outcome}", "",
              "[bold]Acceptance criteria[/bold]"] + [f"  • {c}" for c in t.acceptance_criteria]
     lines += ["", f"[bold]Verification[/bold]\n{t.verification}"]
@@ -372,15 +382,76 @@ def _task_markdown(t) -> str:
     if t.agent:
         lines += ["", f"[bold]Agent[/bold] phase={t.agent.phase} RC={t.agent.rc_name} branch={t.agent.branch or '-'} "
                       f"worktree={t.agent.worktree or '-'}"]
+    spent, allowed = t.usage or {}, _budget_line(t)
+    if usage.tokens(spent) or allowed:
+        lines += ["", f"[bold]Spent[/bold] {usage.short(usage.tokens(spent))} tokens, "
+                      f"{usage.money(float(spent.get('cost', 0.0)), bool(spent.get('priced', True))) or '$0'}"
+                      + (f"   [bold]Budget[/bold] {allowed}" if allowed else "")
+                      + (f"   [red](reached: {t.budget_hit})[/red]" if t.budget_hit else "")]
     for s in t.sessions:
+        used = s.get("usage") or {}
         lines += ["", f"[bold]Session[/bold] {s.get('tool', '?')} {s.get('model', '')} {s.get('effort', '')} "
-                      f"id={s.get('session_id') or '-'}\n  transcript: {s.get('copy') or s.get('transcript') or '-'}"]
+                      f"id={s.get('session_id') or '-'}"
+                      + (f" · {usage.short(usage.tokens(used))} tokens"
+                         f" {usage.money(float(used.get('cost', 0.0)), bool(used.get('priced', True)))}"
+                         if usage.tokens(used) else "")
+                      + f"\n  transcript: {s.get('copy') or s.get('transcript') or '-'}"]
     if t.blocked_reason:
         lines += ["", f"[bold red]Blocked:[/bold red] {t.blocked_reason}"]
     if t.result:
         lines += ["", f"[bold green]Result[/bold green]\n{t.result['summary']}\n\n[bold]Verification notes[/bold]\n"
                       f"{t.result['verification_notes']}"]
     return "\n".join(lines)
+
+
+def _spend_from_files(paths: ProjectPaths, limit: int) -> dict:
+    """The same report as the daemon's, built from the task files alone. Nothing is recounted here — a session
+    running right now has spent more than this says."""
+    state = _load_state(paths)
+    tasks = sorted((t for t in state.tasks.values() if usage.tokens(t.usage)),
+                   key=lambda t: -float((t.usage or {}).get("cost", 0.0)))
+    spent = lambda u: {**{k: int((u or {}).get(k, 0)) for k in usage.COUNTS}, "tokens": usage.tokens(u),
+                       "cost": round(float((u or {}).get("cost", 0.0)), 4),
+                       "priced": bool((u or {}).get("priced", True))}
+    return {"project": spent(usage.total([t.usage for t in tasks])),
+            "tasks": [{"id": t.id, "title": t.title, "status": str(t.status), "budget_tokens": t.budget_tokens,
+                       "budget_usd": t.budget_usd, "budget_hit": t.budget_hit, **spent(t.usage)}
+                      for t in tasks[:limit]],
+            "free_agents": [], "manager": {}}
+
+
+def _budget_line(t) -> str:
+    """A task's own ceiling, as it reads on a page. Empty when it follows the project's."""
+    parts = [f"{usage.short(t.budget_tokens)} tokens" if t.budget_tokens else "",
+             f"${t.budget_usd:,.2f}" if t.budget_usd else ""]
+    return " and ".join(p for p in parts if p)
+
+
+@app.command()
+def spend(project: Optional[Path] = PROJECT_OPT, limit: int = 20):
+    """What this project has cost: the total, then the tasks that spent the most."""
+    paths = _paths(project)
+    try:
+        report = _client(paths).call("get_spend", limit=limit)
+    except (DaemonUnavailable, DaemonError):
+        report = _spend_from_files(paths, limit)   # no daemon: what was counted the last time one ran
+    whole = report["project"]
+    console.print(f"[bold]{usage.short(whole['tokens'])} tokens[/bold] · "
+                  f"[bold]{usage.money(whole['cost'], whole['priced']) or '$0'}[/bold]"
+                  + ("" if whole["priced"] else "  [dim](some of it ran on a model with no price here)[/dim]"))
+    table = Table(box=None, pad_edge=False)
+    for name in ("Task", "Status", "Tokens", "Cost", "Budget"):
+        table.add_column(name)
+    for row in report["tasks"]:
+        allowed = " and ".join(p for p in (f"{usage.short(row['budget_tokens'])} tokens" if row["budget_tokens"] else "",
+                                           f"${row['budget_usd']:,.2f}" if row["budget_usd"] else "") if p)
+        table.add_row(f"{row['id']} {row['title']}"[:48], row["status"], usage.short(row["tokens"]),
+                      usage.money(row["cost"], row["priced"]), allowed + (" ⚠" if row["budget_hit"] else ""))
+    if report["tasks"]:
+        console.print(table)
+    loose = report["free_agents"] + ([{"id": "manager", **report["manager"]}] if report["manager"].get("tokens") else [])
+    for row in loose:
+        console.print(f"{row['id']:<10} {usage.short(row['tokens'])} tokens  {usage.money(row['cost'], row['priced'])}")
 
 
 @app.command()
@@ -478,12 +549,39 @@ def start(task_id: str, project: Optional[Path] = PROJECT_OPT):
 
 
 @app.command()
-def stop(task_id: str, project: Optional[Path] = PROJECT_OPT,
-         requeue: bool = typer.Option(False, help="Put the task back in the backlog.")):
-    """Stop a running agent."""
+def stop(target: str = typer.Argument(..., help="A task (T-003), a free agent (A-001), or 'all'."),
+         project: Optional[Path] = PROJECT_OPT,
+         requeue: bool = typer.Option(False, help="Put the tasks back in the backlog.")):
+    """Stop a running agent for good (its branch and worktree stay). 'all' stops every one of them."""
     paths = _paths(project)
-    t = _call(paths, "stop_agent", task_id=task_id, requeue=requeue)
-    console.print(f"Stopped {t['id']}; status is now {t['status']}.")
+    if target.lower() == "all":
+        result = _call(paths, "stop_all_agents", requeue=requeue)
+        console.print(f"Stopped {result['count']} session(s): {', '.join(result['sessions']) or 'none were running'}.")
+        return
+    r = _call(paths, "stop_session", target=target, requeue=requeue)
+    console.print(f"Stopped {r['target']}; status is now {r['status']}.")
+
+
+@app.command()
+def pause(target: str = typer.Argument(..., help="A task (T-003), a free agent (A-001), 'manager', or 'all'."),
+          project: Optional[Path] = PROJECT_OPT):
+    """Press Esc in a session: it stops mid-turn and waits. Nothing is lost; `supermanager resume` starts it again."""
+    paths = _paths(project)
+    if target.lower() == "all":
+        result = _call(paths, "pause_all_agents")
+        console.print(f"Paused {result['count']} session(s): {', '.join(result['sessions']) or 'none were running'}.")
+        return
+    _call(paths, "pause_session", target=target)
+    console.print(f"Paused {target}; it waits for the next message.")
+
+
+@app.command()
+def resume(target: str = typer.Argument(..., help="A task (T-003), a free agent (A-001) or 'manager'."),
+           text: str = typer.Argument("", help="What to tell it; empty just asks it to carry on."),
+           project: Optional[Path] = PROJECT_OPT):
+    """Set a paused session going again."""
+    r = _call(_paths(project), "resume_session", target=target, text=text)
+    console.print(f"Sent to {r['target']}: {r['sent']}")
 
 
 @app.command()
@@ -520,6 +618,21 @@ def manager_stop(project: Optional[Path] = PROJECT_OPT):
     """Stop the manager Claude session."""
     _call(_paths(project), "stop_manager")
     console.print("Manager stopped.")
+
+
+@app.command("screen-off")
+def screen_off(project: Optional[Path] = PROJECT_OPT):
+    """Turn the screen off. Nothing stops: agents keep working, and a key press brings it back.
+
+    With the workspace up this goes through it, so the screen is also *kept* off (power.wake_with). Without
+    one there is nobody to watch, so it only goes out — whatever your machine does next, it does."""
+    paths = _paths(project)
+    try:
+        result = _client(paths).call("screen_off")
+        console.print(result["message"])
+    except (DaemonUnavailable, DaemonError):
+        from .power import screen_off as put_out   # no daemon here: do it ourselves
+        console.print(put_out("anything"))
 
 
 @config_app.command("show")
@@ -661,17 +774,24 @@ def hook(event: str = typer.Argument(...),
     no path from the machine that wrote them."""
     project = _session_project(project)
     task = task or os.environ.get("SUPERMANAGER_TASK") or None
+    # What this session is: what we started it as, else a task agent when it carries a task id, else a session
+    # someone started in this project themselves (from the Claude app, or by hand) that we only follow.
+    role = os.environ.get("SUPERMANAGER_ROLE") or ("agent" if task else "session")
     payload: dict = {}
     try:
         raw = sys.stdin.read()
         payload = json.loads(raw) if raw.strip() else {}
     except (json.JSONDecodeError, OSError):
         pass
-    keep = ("session_id", "transcript_path", "hook_event_name", "tool_name", "reason", "notification_type", "message")
+    keep = ("session_id", "transcript_path", "hook_event_name", "tool_name", "reason", "notification_type",
+            "message", "cwd")
     slim = {k: payload.get(k) for k in keep if k in payload}
+    if role == "session":
+        from .procs import session_pid
+        slim["pid"] = session_pid()   # a session we did not start: its process is how we know where it runs
     try:
         DaemonClient(ProjectPaths(project).socket).call(
-            "hook", timeout=3.0, role="agent" if task else "manager", task_id=task, event=event, payload=slim)
+            "hook", timeout=3.0, role=role, task_id=task, event=event, payload=slim)
     except (DaemonUnavailable, DaemonError):
         pass
     raise typer.Exit(0)
