@@ -5,6 +5,7 @@ import type { Task, Teammate, When } from '../types'
 import { Board, Header, sectionsOf, stepId } from './board'
 import type { BoardActions } from './board'
 import { ConfigPage } from './configpage'
+import { SessionView, linesOf } from './sessionview'
 import type { ConfigValue } from './configpage'
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
@@ -25,6 +26,8 @@ const REFRESH_MS = 30_000
 const DOCK_COLUMNS = 76
 const NATIVE_PREFIX = 'Supermanager: '
 
+type Page = 'board' | 'config' | 'session'
+
 /** register.tsx registers these at session start; this file answers them. */
 export const PANE_COMMANDS: CommandSpec[] = [
   { name: 'supermanager', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
@@ -35,7 +38,8 @@ const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as
 const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
 const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const, '')
 const menuState = atom({ plugin: 'supermanager', key: 'menu' } as const, '')
-const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as 'board' | 'config')
+const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as Page)
+const viewingState = atom({ plugin: 'supermanager', key: 'viewing' } as const, '')
 
 // ---- With $ ----
 
@@ -75,6 +79,12 @@ async function pressTask($: EngineInterface, task: Task): Promise<void> {
   await update($, menuState, menu => (menu === task.id ? '' : task.id))
 }
 
+/** The teammate page: a live look at its session, with how to switch Claude Code's own view to it. */
+async function viewSession($: EngineInterface, agentId: string): Promise<void> {
+  await update($, viewingState, () => agentId)
+  await update($, pageState, () => 'session')
+}
+
 /** j/k: selects the task, closes the menu and moves the focus ring onto it. */
 async function selectTask($: EngineInterface, id: string | undefined): Promise<void> {
   if (id === undefined) return
@@ -86,7 +96,7 @@ async function selectTask($: EngineInterface, id: string | undefined): Promise<v
 
 let refreshTimer: { cancel: () => void } | undefined
 
-async function openPane($: EngineInterface, page: 'board' | 'config'): Promise<void> {
+async function openPane($: EngineInterface, page: Page): Promise<void> {
   const files = filesOf($)
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
@@ -141,10 +151,22 @@ export function registerPane(on: On, options: PluginOptions): void {
     const { Box } = ui
     const files = filesOf($)
     const tasks = await read($, tasksState)
-    const team = (await read($, teamState)).filter(isActive)
+    const viewing = await read($, viewingState)
+    const everyone = await read($, teamState)
+    const team = everyone.filter(isActive)
+    const page = await read($, pageState)
+    const showPage = (to: Page) => () => void update($, pageState, () => to)
+
+    if (page === 'session') {
+      const mate = everyone.find(one => one.id === viewing)
+      const task = tasks.find(one => mate !== undefined && one.owner === mate.name && one.status === 'doing')
+      const found = mate && (await $.session.messages({ agentId: mate.id }))
+      const lines = found === undefined || 'deny' in found ? 'Its session cannot be read from here.' : linesOf(found)
+      return <SessionView ui={ui} mate={mate} task={task} lines={lines} limit={settings.contextLimit} onBack={showPage('board')} />
+    }
+
     const selectedId = await read($, selectedState)
     const menuId = await read($, menuState)
-    const page = await read($, pageState)
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
@@ -155,8 +177,11 @@ export function registerPane(on: On, options: PluginOptions): void {
     const doneCount = inSprint.filter(task => task.status === 'done').length
     const order = sections.flatMap(section => section.tasks.map(task => task.id))
     const selectedTask = sections.flatMap(section => section.tasks).find(task => task.id === selectedId)
-    const selected = selectedTask && { task: selectedTask, when: whenOf(selectedTask, day, settings.sprint) }
-    const showPage = (to: 'board' | 'config') => () => void update($, pageState, () => to)
+    const selected = selectedTask && {
+      task: selectedTask,
+      when: whenOf(selectedTask, day, settings.sprint),
+      mate: team.find(one => one.name === selectedTask.owner),
+    }
     const closeMenu = () => update($, menuState, () => '')
 
     const actions: BoardActions = {
@@ -166,6 +191,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       open: task => void openFile($, settings.editor, task.file).then(closeMenu),
       start: task => void $.prompt.submit({ text: startPrompt(task) }).then(closeMenu),
       done: task => void finishTask(files, task, {}, settings.sprint).then(closeMenu),
+      view: mate => void viewSession($, mate.id).then(closeMenu),
       showConfig: showPage('config'),
     }
 

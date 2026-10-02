@@ -1,8 +1,10 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { backlogToggle, filledCells, neighbour, sectionsOf, stepId } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
+import { linesOf } from '../hooks/sessionview'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
 
@@ -326,4 +328,64 @@ test('a task being worked on spins; the phone shows a still ✻', async ($, on) 
   }
   const phone = await $.ui.mount({ plugin: 'supermanager', surface: 'mobile', ...PANE })
   expect(await phone.find({ type: 'Text', text: '✻' })).toBeDefined()
+})
+
+// ---- Teammates ----
+
+const AUTH = { id: 'a1', name: 'auth', description: 'auth', type: 'teammate', status: 'running' }
+
+/** The auth teammate running T-001, its context at 63 %, its session two messages long. */
+async function withTeammate($: Engine, on: On) {
+  const { files } = fakeProject(on)
+  files.set(`${DIR}/T-001-fix-login.md`, taskFile('T-001', 'Fix login', '2026-10-05', 'doing', 'auth'))
+  on('agent.list', () => ({ value: [AUTH] }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000, percent: 10 }, rateLimits: [] } }))
+  on('session.messages', () => ({
+    value: [
+      { role: 'user' as const, text: 'Fix the login redirect', toolUses: [] },
+      { role: 'assistant' as const, text: 'Looking at the redirect.\nMore.', toolUses: [{ tool_use_id: 'u1', tool: 'Edit', input: { file_path: '/p/auth.ts' } }] },
+    ],
+  }))
+  on('turn.step', async function* ($, e) {
+    const usage = { input_tokens: 630, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'm' }
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
+  })
+  await $.command.run(sprintCommand())
+  for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'm', messageCount: 1, agentId: 'a1' })) void chunk
+}
+
+for (const surface of SURFACES) {
+  test(`a task in progress shows its teammate; View session shows its transcript (${surface})`, async ($, on) => {
+    await withTeammate($, on)
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    expect(await ui.find({ type: 'Text', text: /^⎿$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'working' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /63%/ })).toBeDefined()
+
+    await ui.press({ key: 'task-T-001' })
+    expect((await ui.find({ key: 'view' }))?.props).toMatchObject({ hotkey: 'v' })
+    await ui.press({ key: 'menu-view' })
+    expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: 'Looking at the redirect.' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /⎿ editing auth\.ts/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /↓ to auth in the agent list, Enter/ })).toBeDefined()
+    await ui.press({ key: 'back' })
+    expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
+  })
+}
+
+test('a session reads as transcript lines: what it was told, what it says, what it does', () => {
+  const lines = linesOf([
+    { role: 'user', text: 'Go', toolUses: [] },
+    { role: 'assistant', text: '', toolUses: [{ tool_use_id: 'u', tool: 'Bash', input: { command: 'npm test' } }] },
+    { role: 'assistant', text: 'All green.', toolUses: [] },
+  ])
+  expect(lines).toEqual([
+    { kind: 'you', text: 'Go' },
+    { kind: 'does', text: 'running npm test' },
+    { kind: 'says', text: 'All green.' },
+  ])
+  expect(linesOf([{ role: 'assistant', text: 'a', toolUses: [] }, { role: 'assistant', text: 'b', toolUses: [] }], 1)).toEqual([
+    { kind: 'says', text: 'b' },
+  ])
 })

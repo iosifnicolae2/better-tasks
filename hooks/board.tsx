@@ -2,6 +2,7 @@ import type { ElementTable } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
 import type { SprintConfig } from './sprints'
+import { stateWord } from './activity'
 import { isFull } from './team'
 import { isOpen, whenOf } from './tasks'
 
@@ -72,10 +73,12 @@ export type BoardActions = {
   open: (task: Task) => void
   start: (task: Task) => void
   done: (task: Task) => void
+  /** Shows the session of the teammate working on the task. */
+  view: (mate: Teammate) => void
   showConfig: () => void
 }
 
-export type Selected = { task: Task; when: When }
+export type Selected = { task: Task; when: When; mate?: Teammate }
 
 export type BoardProps = {
   ui: Ui
@@ -99,12 +102,13 @@ export function Board({ ui, sections, doneCount, selected, menuId, team, limit, 
           {section.tasks.length === 0 && <Text color="subtle">   Nothing planned yet</Text>}
           {section.tasks.map(task => {
             const isSelected = task.id === selected?.task.id
+            const mate = team.find(one => one.name === task.owner)
             return (
               <Box flexDirection="column">
-                <TaskRow ui={ui} task={task} isSelected={isSelected}
-                  owner={team.find(mate => mate.name === task.owner)} limit={limit} actions={actions} />
+                <TaskRow ui={ui} task={task} isSelected={isSelected} owner={mate} limit={limit} actions={actions} />
+                {mate && task.status === 'doing' && <MateLine ui={ui} mate={mate} limit={limit} />}
                 {isSelected && <MoveHint ui={ui} task={task} when={section.when} actions={actions} />}
-                {task.id === menuId && <TaskMenu ui={ui} task={task} when={section.when} actions={actions} />}
+                {task.id === menuId && <TaskMenu ui={ui} task={task} when={section.when} mate={mate} actions={actions} />}
               </Box>
             )
           })}
@@ -132,10 +136,14 @@ function SectionTitle({ ui, section }: { ui: Ui; section: Section }) {
 
 type RowProps = { ui: Ui; task: Task; isSelected: boolean; owner?: Teammate; limit: number; actions: BoardActions }
 
-/** Accent bar when selected, a spinner while worked on, id and title, then owner, context and roll-overs. */
+/**
+ * Accent bar when selected, a spinner while worked on, id and title, then owner, context and roll-overs.
+ * A teammate at work gets its own line under the row instead (MateLine).
+ */
 function TaskRow({ ui, task, isSelected, owner, limit, actions }: RowProps) {
   const { Box, Button, Text } = ui
   const isOverLimit = owner !== undefined && isFull(owner, limit)
+  const hasMateLine = owner !== undefined && task.status === 'doing'
   return (
     <Box flexDirection="row" columnGap={1} backgroundColor={isSelected ? 'userMessageBackground' : undefined}>
       <Text color="suggestion">{isSelected ? '▌' : ' '}</Text>
@@ -143,8 +151,8 @@ function TaskRow({ ui, task, isSelected, owner, limit, actions }: RowProps) {
       <Box flexGrow={1} flexShrink={1}>
         <Button key={`task-${task.id}`} plain label={`${task.id}  ${task.title}`} onPress={() => actions.pressTask(task)} />
       </Box>
-      {task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
-      {owner?.percent !== undefined && (
+      {task.owner !== '' && !hasMateLine && <Text color="subtle">{task.owner}</Text>}
+      {owner?.percent !== undefined && !hasMateLine && (
         <Text color={isOverLimit ? 'warning' : 'subtle'}>{percentText(owner)}</Text>
       )}
       {task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
@@ -160,7 +168,19 @@ function StatusIcon({ ui, task }: { ui: Ui; task: Task }) {
   return <Text color="claude">✻</Text>
 }
 
-type MenuProps = { ui: Ui; task: Task; when: When; actions: BoardActions }
+/** Under a task in progress: ⎿ who works on it, their state, what they are doing, their context. */
+function MateLine({ ui, mate, limit }: { ui: Ui; mate: Teammate; limit: number }) {
+  const { Box, Text } = ui
+  return (
+    <Box flexDirection="row" columnGap={1} paddingLeft={4}>
+      <Text color="subtle">⎿</Text>
+      <Text>{mate.name}</Text>
+      <MateFacts ui={ui} mate={mate} limit={limit} />
+    </Box>
+  )
+}
+
+type MenuProps = { ui: Ui; task: Task; when: When; mate?: Teammate; actions: BoardActions }
 
 /**
  * Under the selected row: ⌥↑ and ⌥↓ ride the engine's diff-list actions (meta+up/down and
@@ -181,7 +201,7 @@ function MoveHint({ ui, task, when, actions }: MenuProps) {
 }
 
 /** The clicked task's options in a small card right under its row. */
-function TaskMenu({ ui, task, when, actions }: MenuProps) {
+function TaskMenu({ ui, task, when, mate, actions }: MenuProps) {
   const { Box, Button, Text } = ui
   const targets = ORDER.filter(to => to !== when)
   return (
@@ -190,6 +210,7 @@ function TaskMenu({ ui, task, when, actions }: MenuProps) {
         <Button key="menu-open" plain label="↗ Open" onPress={() => actions.open(task)} />
         {task.status === 'todo' && <Button key="menu-start" plain label="▶ Start" onPress={() => actions.start(task)} />}
         <Button key="menu-done" plain label="✓ Mark as done" onPress={() => actions.done(task)} />
+        {mate && <Button key="menu-view" plain label="◉ View session" onPress={() => actions.view(mate)} />}
       </Box>
       <Box flexDirection="row" columnGap={2} flexWrap="wrap">
         <Text color="subtle">Move to</Text>
@@ -217,6 +238,7 @@ function KeyLine({ ui, selected, actions }: KeyLineProps) {
       {task && <Button key="open" plain dimColor hotkey="o" label="open" onPress={() => actions.open(task)} />}
       {task?.status === 'todo' && <Button key="start" plain dimColor hotkey="s" label="start" onPress={() => actions.start(task)} />}
       {task && <Button key="done" plain dimColor hotkey="d" label="mark as done" onPress={() => actions.done(task)} />}
+      {selected?.mate && <Button key="view" plain dimColor hotkey="v" label="view session" onPress={() => selected.mate && actions.view(selected.mate)} />}
       <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
     </Box>
   )
@@ -247,5 +269,20 @@ export function Header({ ui, label, goal, done, total }: HeaderProps) {
         <Text color="subtle" italic={goal === ''} wrap="truncate-end">{goal === '' ? 'No sprint goal yet' : goal}</Text>
       </Box>
     </Box>
+  )
+}
+
+/** "working · editing auth.ts · 63%": the state coloured by meaning, the rest quiet. */
+export function MateFacts({ ui, mate, limit }: { ui: Ui; mate: Teammate; limit: number }) {
+  const { Text } = ui
+  const state = stateWord(mate.status)
+  const isOverLimit = isFull(mate, limit)
+  const isWaiting = mate.activity === 'waiting for your answer'
+  return (
+    <Text wrap="truncate-end">
+      <Text color={isWaiting ? 'warning' : state === 'working' ? 'claude' : state === 'done' ? 'success' : 'subtle'}>{state}</Text>
+      {mate.activity ? <Text color="subtle"> · {mate.activity}</Text> : ''}
+      {mate.percent !== undefined ? <Text color={isOverLimit ? 'warning' : 'subtle'}> · {percentText(mate)}</Text> : ''}
+    </Text>
   )
 }
