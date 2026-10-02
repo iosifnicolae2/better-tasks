@@ -1,4 +1,4 @@
-import { update } from 'claude-code'
+import { atom, read, update } from 'claude-code'
 import type { CommandSpec, ElementTable, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
@@ -9,20 +9,20 @@ import { SPRINTS_FILE, goalOf, readSprints } from './sprintlog'
 import { sprintLabel, sprintStart } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
 import { isOpen, listTasks, today, whenOf } from './tasks'
-import { isActive } from './team'
+import { isActive, isFull } from './team'
 
 // The Tasks pane: /tasks opens it; it redraws whenever tasks or team change.
 
 const PANE = 'supermanager-tasks'
 
-/** register.tsx registers it at session start; this file answers it. */
-export const TASKS_COMMAND: CommandSpec = { name: 'tasks', description: 'Show the tasks of this sprint in a pane' }
+/** register.tsx registers these at session start; this file answers them. */
+export const PANE_COMMANDS: CommandSpec[] = [{ name: 'tasks', description: 'Show the tasks of this sprint in a pane' }]
 const REFRESH_MS = 30_000
 
-// The values the pane draws from ($.state); the validator wants their names written here.
-const TASKS = { plugin: 'supermanager', key: 'tasks' } as const
-const TEAM = { plugin: 'supermanager', key: 'team' } as const
-const SELECTED = { plugin: 'supermanager', key: 'selected' } as const
+// The values the pane draws from; the validator wants them declared in the file that uses them.
+const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as Task[])
+const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
+const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const, '')
 
 const SECTIONS: readonly { when: When; title: string }[] = [
   { when: 'now', title: 'Now' },
@@ -60,7 +60,7 @@ function filesOf($: EngineInterface): Files {
     read: path => $.fs.read(path),
     write: (path, text) => $.fs.write(path, text),
     list: path => $.fs.list(path),
-    publishTasks: tasks => update($, TASKS, () => tasks),
+    publishTasks: tasks => update($, tasksState, () => tasks),
   }
 }
 
@@ -98,7 +98,7 @@ type RowProps = {
 
 function TaskRow({ ui, task, owner, limit, isSelected, onSelect }: RowProps) {
   const { Box, Text, Button } = ui
-  const isFull = (owner?.percent ?? 0) > limit
+  const isOverLimit = owner !== undefined && isFull(owner, limit)
   return (
     <Box flexDirection="row" gap={1}>
       <Text color="suggestion">{isSelected ? '›' : ' '}</Text>
@@ -107,7 +107,7 @@ function TaskRow({ ui, task, owner, limit, isSelected, onSelect }: RowProps) {
       </Box>
       {task.status === 'doing' && <Text dimColor>doing</Text>}
       {task.owner !== '' && <Text dimColor>{task.owner}</Text>}
-      {owner?.percent !== undefined && <Text color={isFull ? 'warning' : undefined} dimColor={!isFull}>{percentText(owner)}</Text>}
+      {owner?.percent !== undefined && <Text color={isOverLimit ? 'warning' : undefined} dimColor={!isOverLimit}>{percentText(owner)}</Text>}
       {task.rolled > 0 && <Text dimColor>↻{task.rolled}</Text>}
     </Box>
   )
@@ -169,7 +169,7 @@ function TeamLine({ ui, team, limit }: { ui: Ui; team: Teammate[]; limit: number
     <Box flexDirection="row" gap={2} flexWrap="wrap">
       <Text dimColor>Teammates</Text>
       {team.map(mate => (
-        <Text color={(mate.percent ?? 0) > limit ? 'warning' : undefined}>
+        <Text color={isFull(mate, limit) ? 'warning' : undefined}>
           {mate.name} {percentText(mate)}
         </Text>
       ))}
@@ -212,10 +212,9 @@ export function registerPane(on: On, options: PluginOptions): void {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     const files = filesOf($)
-    const { value: tasks = [] } = await $.state.get(TASKS)
-    const { value: everyone = [] } = await $.state.get(TEAM)
-    const { value: selectedId = '' } = await $.state.get(SELECTED)
-    const team = everyone.filter(isActive)
+    const tasks = await read($, tasksState)
+    const team = (await read($, teamState)).filter(isActive)
+    const selectedId = await read($, selectedState)
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
@@ -224,13 +223,13 @@ export function registerPane(on: On, options: PluginOptions): void {
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
     const doneCount = inSprint.filter(task => task.status === 'done').length
     const ownerOf = (task: Task) => team.find(mate => mate.name === task.owner)
-    const select = (task: Task) => () => void update($, SELECTED, id => (id === task.id ? '' : task.id))
+    const select = (task: Task) => () => void update($, selectedState, id => (id === task.id ? '' : task.id))
     const actionsFor = (task: Task, when: When) => (
       <TaskActions ui={ui} task={task} when={when}
         onOpen={() => void openFile($, settings.editor, task.file)}
         onStart={() => void $.prompt.submit({ text: startPrompt(task) })}
-        onMove={to => void changeTask(files, task, { when: to }, settings.sprint)}
-        onDone={() => void finishTask(files, task, {}, settings.sprint)} />
+        onMove={to => void changeTask(files, task, { when: to }, settings.sprint).then(() => listTasks(files))}
+        onDone={() => void finishTask(files, task, {}, settings.sprint).then(() => listTasks(files))} />
     )
 
     return (
