@@ -1,8 +1,0 @@
-Screen { layout: vertical; }
-#sections { height: 2; background: $panel; }
-#sections Tab { padding: 0 2; }
-#about { height: 1; padding: 0 1; background: $panel; color: $text-muted; }
-#settings { height: 1fr; }
-#editor { height: 1; border: none; padding: 0 1; background: $surface; }
-#editor:focus { border: none; }
-#status { height: 1; padding: 0 1; background: $panel; }

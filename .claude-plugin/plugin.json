@@ -1,0 +1,69 @@
+{
+  "name": "supermanager",
+  "version": "0.1.0",
+  "description": "Turns the main session into a coordinator of agent teammates, with weekly sprints, task files and a Tasks pane.",
+  "author": {
+    "name": "Iosif Nicolae",
+    "email": "iosif@bringes.io"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "editor": {
+      "type": "string",
+      "title": "Editor",
+      "description": "Opens task files from the Tasks pane.",
+      "options": [
+        "default",
+        "code",
+        "idea",
+        "cursor",
+        "zed"
+      ],
+      "default": "default"
+    },
+    "worktree": {
+      "type": "boolean",
+      "title": "Worktree per teammate",
+      "description": "Each named teammate works in its own git worktree.",
+      "default": false
+    },
+    "contextLimit": {
+      "type": "number",
+      "title": "Context limit (%)",
+      "description": "No new work goes to a teammate whose context is fuller than this.",
+      "default": 50
+    },
+    "keepAwake": {
+      "type": "boolean",
+      "title": "Keep the Mac awake",
+      "description": "Holds caffeinate while any teammate runs.",
+      "default": true
+    },
+    "sprintWeeks": {
+      "type": "string",
+      "title": "Sprint length (weeks)",
+      "description": "How many weeks one sprint lasts.",
+      "options": [
+        "1",
+        "2"
+      ],
+      "default": "1"
+    },
+    "sprintStart": {
+      "type": "string",
+      "title": "Sprint starts on",
+      "description": "The weekday a sprint starts.",
+      "options": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "default": "monday"
+    }
+  }
+}

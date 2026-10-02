@@ -1,7 +1,0 @@
-Screen { layout: vertical; }
-
-#tasks-table { height: 1fr; }
-
-ModalScreen { align: center middle; }
-#confirm { width: 70; height: auto; border: thick $warning; background: $surface; padding: 1 2; }
-#help { width: 120; height: auto; border: thick $secondary; background: $surface; padding: 1 2; }
