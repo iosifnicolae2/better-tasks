@@ -1,6 +1,6 @@
 import type { AgentInfo, ModelUsage } from 'claude-code'
 
-import type { Teammate } from '../types'
+import type { Activity, Teammate } from '../types'
 import type { Io } from './io'
 
 // Teammates: who they are, how full their context is, and when they are too full for new work.
@@ -18,8 +18,13 @@ export function percentOf(tokens: number | undefined, window: number): number | 
   return tokens === undefined || window <= 0 ? undefined : Math.round((tokens / window) * 100)
 }
 
-/** The named agents of the session, with their context fill. */
-export function teamOf(agents: readonly AgentInfo[], tokens: Record<string, number>, window: number): Teammate[] {
+/** The named agents of the session, with their context fill and what they do now. */
+export function teamOf(
+  agents: readonly AgentInfo[],
+  tokens: Record<string, number>,
+  window: number,
+  activities: Record<string, Activity> = {},
+): Teammate[] {
   return agents
     .filter(agent => agent.name !== undefined || agent.type === 'teammate')
     .map(agent => ({
@@ -27,11 +32,13 @@ export function teamOf(agents: readonly AgentInfo[], tokens: Record<string, numb
       name: agent.name ?? agent.description,
       status: agent.status,
       percent: percentOf(tokens[agent.id], window),
+      activity: activities[agent.id]?.text,
+      activeAt: activities[agent.id]?.at,
     }))
 }
 
 export async function refreshTeam(io: Io): Promise<Teammate[]> {
-  const team = teamOf(await io.agents(), await io.tokens(), await io.window())
+  const team = teamOf(await io.agents(), await io.tokens(), await io.window(), await io.activities())
   await io.publishTeam(team)
   return team
 }
@@ -59,5 +66,5 @@ export function handoffAdvice(mate: Teammate, limit: number): string {
 
 export function mateLine(mate: Teammate): string {
   const fill = mate.percent === undefined ? 'context ?' : `context ${mate.percent} %`
-  return `${mate.name} · ${mate.status} · ${fill}`
+  return [mate.name, mate.status, fill, mate.activity].filter(Boolean).join(' · ')
 }

@@ -327,3 +327,20 @@ test('no command of ours takes a built-in name', () => {
   expect(ours).toEqual(['supermanager', 'away'])
   expect(ours.filter(name => BUILT_IN.includes(name))).toEqual([])
 })
+
+test("a teammate's tool call shows as its activity until its turn ends", async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on, [mate('a1', 'auth')])
+  on('tool.call', { tool: 'Edit' }, () => ({ result: 'edited' }))
+  on('turn.complete', ($, e) => ({ text: e.answer }))
+  await $.session.start(SESSION)
+  const status = async () => String((await $.tool.call({ tool: 'mcp__supermanager__team_status', tool_use_id: 'ts' })).result)
+
+  const teammateEdit = { tool: 'Edit', tool_use_id: 'e1', agentId: 'a1', file_path: '/p/src/auth.ts', old_string: 'a', new_string: 'b' }
+  await $.tool.call(teammateEdit as never) // agentId: as the engine raises a teammate's call
+  expect(await status()).toBe('auth · running · context ? · editing auth.ts')
+
+  await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', agentId: 'a1', reason: 'answer' })
+  expect(await status()).toBe('auth · running · context ?')
+})

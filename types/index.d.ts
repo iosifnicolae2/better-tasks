@@ -24,7 +24,13 @@ export type Teammate = {
   status: string
   /** Context fill, 0 to 100; undefined until its first step. */
   percent?: number
+  /** What it does right now ("editing auth.ts"); absent between turns. */
+  activity?: string
+  /** When that activity began, in ms. */
+  activeAt?: number
 }
+
+export type Activity = { text: string; at: number }
 
 export type TurnFacts = { asked: boolean; namedTime: boolean }
 
@@ -34,6 +40,8 @@ declare module 'claude-code' {
       tasks: Task[]
       team: Teammate[]
       tokens: Record<string, number>
+      /** The current activity per agent id; cleared when its turn ends. */
+      activity: Record<string, Activity>
       notice: string
       turn: TurnFacts
       /** The footer label: sprint progress. */
@@ -42,6 +50,8 @@ declare module 'claude-code' {
       selected: string
       /** The task id whose inline menu is open in the Tasks pane; '' for none. */
       menu: string
+      /** The agent id the pane's "View session" peek shows; '' for none. */
+      viewing: string
       /** The Tasks pane's page. */
       page: 'board' | 'config'
     }

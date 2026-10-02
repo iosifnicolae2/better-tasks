@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, ToolCallInput } from 'claude-code'
 
-import type { Task, Teammate, TurnFacts } from '../types'
+import type { Activity, Task, Teammate, TurnFacts } from '../types'
+import { activityOf } from './activity'
 import { rollOver } from './boundary'
 import { contextBlock, footerText, isPerson, namesTime, withRules } from './coordinator'
 import type { Io } from './io'
@@ -22,6 +23,7 @@ import { runTool, TOOLS } from './tools'
 const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as Task[])
 const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
 const tokensState = atom({ plugin: 'supermanager', key: 'tokens' } as const, {} as Record<string, number>)
+const activityState = atom({ plugin: 'supermanager', key: 'activity' } as const, {} as Record<string, Activity>)
 const noticeState = atom({ plugin: 'supermanager', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'supermanager', key: 'footer' } as const, '')
 const turnState = atom({ plugin: 'supermanager', key: 'turn' } as const, { asked: false, namedTime: false } as TurnFacts)
@@ -80,6 +82,26 @@ export const register: Register = (on, options) => {
     const team = await refreshTeam(ioOf($))
     const denial = sendDenial(team, String(e.to), e.message, settings.contextLimit)
     return denial ? { deny: denial } : next(e)
+  })
+
+  on('tool.call', async ($, e, next) => {
+    const agentId = e.agentId
+    if (agentId !== undefined) {
+      const now = await $.clock.now()
+      const text = activityOf(String(e.tool), e)
+      await update($, activityState, all => ({ ...all, [agentId]: { text, at: now } }))
+      await refreshTeam(ioOf($))
+    }
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const agentId = e.agentId
+    if (agentId !== undefined) {
+      await update($, activityState, ({ [agentId]: _ended, ...rest }) => rest)
+      await refreshTeam(ioOf($))
+    }
+    return next(e)
   })
 
   on('turn.step', async function* ($, e, next) {
@@ -145,6 +167,7 @@ function ioOf($: EngineInterface): Io {
     agents: () => $.agent.list(),
     window: async () => (await $.session.usage()).context.window,
     tokens: () => read($, tokensState),
+    activities: () => read($, activityState),
     publishTeam: team => update($, teamState, () => team),
   }
 }

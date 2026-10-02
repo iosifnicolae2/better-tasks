@@ -1,6 +1,6 @@
 import type { AgentInfo, FsEntry } from 'claude-code'
 
-import type { Task, Teammate } from '../types'
+import type { Activity, Task, Teammate } from '../types'
 
 // `$` never crosses an import (the validator refuses it), so the parts take these
 // instead; each hooks file builds them from `$` in a top-level function of its own.
@@ -21,5 +21,7 @@ export type Io = Files & {
   window: () => Promise<number>
   /** Context tokens per agent id, from its last step. */
   tokens: () => Promise<Record<string, number>>
+  /** The current activity per agent id. */
+  activities: () => Promise<Record<string, Activity>>
   publishTeam: (team: Teammate[]) => Promise<unknown>
 }
