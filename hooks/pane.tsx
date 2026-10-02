@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, Header, sectionsOf } from './board'
+import { Board, Header, sectionsOf, stepId } from './board'
 import type { BoardActions } from './board'
 import { ConfigPage } from './configpage'
 import type { ConfigValue } from './configpage'
@@ -74,6 +74,15 @@ async function pressTask($: EngineInterface, task: Task): Promise<void> {
   await update($, menuState, menu => (menu === task.id ? '' : task.id))
 }
 
+/** j/k: selects the task, closes the menu and moves the focus ring onto it. */
+async function selectTask($: EngineInterface, id: string | undefined): Promise<void> {
+  if (id === undefined) return
+  await update($, selectedState, () => id)
+  await update($, menuState, () => '')
+  // Best effort: the ring only moves while the pane holds the keys.
+  await $.ui.focus({ requestId: PANE, key: `task-${id}` }).catch(() => undefined)
+}
+
 let refreshTimer: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface, page: 'board' | 'config'): Promise<void> {
@@ -136,6 +145,7 @@ export function registerPane(on: On, options: PluginOptions): void {
     const sections = sectionsOf(tasks, day, settings.sprint)
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
     const doneCount = inSprint.filter(task => task.status === 'done').length
+    const order = sections.flatMap(section => section.tasks.map(task => task.id))
     const selectedTask = sections.flatMap(section => section.tasks).find(task => task.id === selectedId)
     const selected = selectedTask && { task: selectedTask, when: whenOf(selectedTask, day, settings.sprint) }
     const showPage = (to: 'board' | 'config') => () => void update($, pageState, () => to)
@@ -143,6 +153,7 @@ export function registerPane(on: On, options: PluginOptions): void {
 
     const actions: BoardActions = {
       pressTask: task => void pressTask($, task),
+      selectStep: step => void selectTask($, stepId(order, selectedTask?.id, step)),
       move: (task: Task, to: When) => void changeTask(files, task, { when: to }, settings.sprint).then(closeMenu),
       open: task => void openFile($, settings.editor, task.file).then(closeMenu),
       start: task => void $.prompt.submit({ text: startPrompt(task) }).then(closeMenu),

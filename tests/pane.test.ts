@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { sectionsOf, stepTarget } from '../hooks/board'
+import { sectionsOf, stepId } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -78,6 +78,7 @@ function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<st
     return { value: e.value }
   })
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('ui.focus', () => ({}))
   return { files, commands, settings }
 }
 
@@ -116,10 +117,12 @@ test('sections and moves', () => {
     ['next-sprint', []],
     ['backlog', ['T-002']],
   ])
-  expect(stepTarget('now', -1)).toBeUndefined()
-  expect(stepTarget('this-sprint', -1)).toBe('now')
-  expect(stepTarget('this-sprint', 1)).toBe('next-sprint')
-  expect(stepTarget('backlog', 1)).toBeUndefined()
+  expect(stepId(['a', 'b', 'c'], undefined, 1)).toBe('a')
+  expect(stepId(['a', 'b', 'c'], undefined, -1)).toBe('c')
+  expect(stepId(['a', 'b', 'c'], 'b', 1)).toBe('c')
+  expect(stepId(['a', 'b', 'c'], 'c', 1)).toBe('c')
+  expect(stepId(['a', 'b', 'c'], 'a', -1)).toBe('a')
+  expect(stepId([], undefined, 1)).toBeUndefined()
 })
 
 // ---- The pane ----
@@ -166,21 +169,26 @@ test('a click opens the task menu under its row; its options act and close it', 
 })
 
 for (const surface of SURFACES) {
-  test(`the key line moves the selected task up, down and to the backlog (${surface})`, async ($, on) => {
+  test(`j/k select, the digits 1-4 move the selected task (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     const file = () => files.get(`${DIR}/T-001-fix-login.md`)
     await $.command.run(tasksCommand())
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    await ui.press({ key: 'task-T-001' })
-    await ui.press({ key: 'up' })
+    expect(await ui.find({ key: 'to-now' })).toBeUndefined()
+    await ui.press({ key: 'next' })
+    expect(await ui.find({ key: 'to-now' })).toBeDefined()
+    expect((await ui.find({ key: 'start' }))).toBeDefined()
+    await ui.press({ key: 'to-now' })
     expect(file()).toContain('urgent: true')
-    await ui.press({ key: 'down' })
-    await ui.press({ key: 'down' })
+    await ui.press({ key: 'to-next-sprint' })
     expect(file()).toContain('sprint: 2026-10-12')
-    await ui.press({ key: 'backlog' })
+    await ui.press({ key: 'to-backlog' })
     expect(file()).toContain('sprint: backlog')
-    await ui.press({ key: 'down' })
-    expect(file()).toContain('sprint: backlog')
+    await ui.press({ key: 'to-this-sprint' })
+    expect(file()).toContain('sprint: 2026-10-05')
+    await ui.press({ key: 'next' })
+    await ui.press({ key: 'to-now' })
+    expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('urgent: true')
   })
 }
 
@@ -257,7 +265,6 @@ test('the phone draws the board and settings without pickers', async ($, on) => 
 
 test('the arrow keys select: the focus ring carries the selection', async ($, on) => {
   fakeProject(on)
-  on('ui.focus', () => ({}))
   await $.command.run(tasksCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
   const moved = await $.ui.focus({
@@ -268,6 +275,6 @@ test('the arrow keys select: the focus ring carries the selection', async ($, on
     origin: { kind: 'person' },
   })
   expect(moved.deny).toBeUndefined()
-  expect(await ui.find({ key: 'backlog' })).toBeDefined()
+  expect(await ui.find({ key: 'to-backlog' })).toBeDefined()
   expect(await ui.findAll({ type: 'Text', text: /^›$/ })).toHaveLength(1)
 })

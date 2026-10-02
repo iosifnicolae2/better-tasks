@@ -30,9 +30,14 @@ export function sectionsOf(tasks: readonly Task[], day: string, config: SprintCo
   }))
 }
 
-/** The section above (-1) or below (+1), if any. */
-export function stepTarget(from: When, step: -1 | 1): When | undefined {
-  return ORDER[ORDER.indexOf(from) + step]
+/** The digit that moves the selected task to each section, as on Linear and GitHub boards. */
+export const SECTION_KEYS: Record<When, string> = { now: '1', 'this-sprint': '2', 'next-sprint': '3', backlog: '4' }
+
+/** The id `step` rows after `id` (j: +1, k: -1), kept within the list; the first or last when none is selected. */
+export function stepId(ids: readonly string[], id: string | undefined, step: -1 | 1): string | undefined {
+  const at = id === undefined ? -1 : ids.indexOf(id)
+  if (at < 0) return step === 1 ? ids[0] : ids.at(-1)
+  return ids[Math.min(ids.length - 1, Math.max(0, at + step))]
 }
 
 export function percentText(mate: Teammate | undefined): string {
@@ -44,6 +49,8 @@ export function percentText(mate: Teammate | undefined): string {
 export type BoardActions = {
   /** A click or Enter on a task: opens its menu, or closes it when open. */
   pressTask: (task: Task) => void
+  /** j and k: the next or previous task. */
+  selectStep: (step: -1 | 1) => void
   move: (task: Task, to: When) => void
   open: (task: Task) => void
   start: (task: Task) => void
@@ -117,7 +124,7 @@ type MenuProps = { ui: Ui; task: Task; when: When; actions: BoardActions }
 /** The clicked task's options, right under its row. */
 function TaskMenu({ ui, task, when, actions }: MenuProps) {
   const { Box, Button, Text } = ui
-  const targets = (Object.keys(TITLES) as When[]).filter(to => to !== when)
+  const targets = ORDER.filter(to => to !== when)
   return (
     <Box flexDirection="row" columnGap={2} flexWrap="wrap" paddingLeft={4}>
       <Button key="menu-open" plain label="Open" onPress={() => actions.open(task)} />
@@ -126,7 +133,7 @@ function TaskMenu({ ui, task, when, actions }: MenuProps) {
       <Box flexDirection="row" columnGap={1}>
         <Text dimColor>Move to</Text>
         {targets.map(to => (
-          <Button key={`menu-${to}`} plain label={TITLES[to]} onPress={() => actions.move(task, to)} />
+          <Button key={`menu-${to}`} plain label={`${SECTION_KEYS[to]} ${TITLES[to]}`} onPress={() => actions.move(task, to)} />
         ))}
       </Box>
     </Box>
@@ -135,32 +142,40 @@ function TaskMenu({ ui, task, when, actions }: MenuProps) {
 
 type KeyLineProps = { ui: Ui; selected?: Selected; actions: BoardActions }
 
-/**
- * Every key the board takes, each one also a button. ⌥↑ and ⌥↓ ride engine actions bound to
- * meta+up and meta+down (also ctrl+up/down), the only modified keys a plugin can receive.
- */
+/** Every key the board takes, each one also a button: plain letters and digits, safe in any terminal. */
 function KeyLine({ ui, selected, actions }: KeyLineProps) {
   const { Box, Button, Text } = ui
+  const select = (
+    <Box flexDirection="row" columnGap={2}>
+      <Button key="next" plain dimColor hotkey="j" label="↓" onPress={() => actions.selectStep(1)} />
+      <Button key="previous" plain dimColor hotkey="k" label="↑" onPress={() => actions.selectStep(-1)} />
+    </Box>
+  )
   if (selected === undefined) {
     return (
-      <Box flexDirection="row" columnGap={2} marginTop={1}>
-        <Text dimColor>↑↓ select · enter menu</Text>
-        <Button key="config" plain hotkey="c" dimColor label="settings" onPress={actions.showConfig} />
+      <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
+        {select}
+        <Text dimColor>enter: menu</Text>
+        <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
       </Box>
     )
   }
-  const { task, when } = selected
-  const up = stepTarget(when, -1)
-  const down = stepTarget(when, 1)
+  const { task } = selected
   return (
-    <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
-      <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑ up" onPress={() => up && actions.move(task, up)} />
-      <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓ down" onPress={() => down && actions.move(task, down)} />
-      <Button key="backlog" plain dimColor hotkey="b" label="backlog" onPress={() => actions.move(task, 'backlog')} />
-      <Button key="open" plain dimColor hotkey="o" label="open" onPress={() => actions.open(task)} />
-      {task.status === 'todo' && <Button key="start" plain dimColor hotkey="s" label="start" onPress={() => actions.start(task)} />}
-      <Button key="done" plain dimColor hotkey="d" label="done" onPress={() => actions.done(task)} />
-      <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
+    <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="row" columnGap={2} flexWrap="wrap">
+        {ORDER.map(to => (
+          <Button key={`to-${to}`} plain dimColor hotkey={SECTION_KEYS[to]} label={TITLES[to]} onPress={() => actions.move(task, to)} />
+        ))}
+      </Box>
+      <Box flexDirection="row" columnGap={2} flexWrap="wrap">
+        <Button key="open" plain dimColor hotkey="o" label="open" onPress={() => actions.open(task)} />
+        {task.status === 'todo' && <Button key="start" plain dimColor hotkey="s" label="start" onPress={() => actions.start(task)} />}
+        <Button key="done" plain dimColor hotkey="d" label="done" onPress={() => actions.done(task)} />
+        {select}
+        <Text dimColor>enter: menu</Text>
+        <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
+      </Box>
     </Box>
   )
 }
