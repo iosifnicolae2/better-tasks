@@ -30,12 +30,23 @@ export const namesTime = (text: string) => TIME_WORDS.test(text)
 
 export const isPerson = (origin: PromptOrigin) => ['composer', 'bridge', 'sdk'].includes(origin.kind)
 
-/** The system prompt with the coordinator rules, except a teammate's. */
+/** The main session's own prompt: the full or short body, the Agent tool, and not a teammate's render. */
+export function isMainPrompt(
+  sections: readonly PromptComposeSection[],
+  traits: readonly PromptComposeTrait[],
+  tools: readonly string[],
+): boolean {
+  const hasMainBody = sections.some(section => section.id === 'intro' || section.id === 'lean_body')
+  return hasMainBody && tools.includes('Agent') && !traits.includes('teammate')
+}
+
+/** The system prompt with the coordinator rules, added only to the main session's. */
 export function withRules(
   sections: readonly PromptComposeSection[],
   traits: readonly PromptComposeTrait[],
+  tools: readonly string[],
 ): readonly PromptComposeSection[] {
-  return traits.includes('teammate') ? sections : [...sections, RULES_SECTION]
+  return isMainPrompt(sections, traits, tools) ? [...sections, RULES_SECTION] : sections
 }
 
 /** Why the main session may not create a task yet, or undefined when it may. */

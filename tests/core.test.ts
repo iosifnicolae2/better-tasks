@@ -84,22 +84,35 @@ test('a prompt that names the time needs no question', async ($, on) => {
   expect(String(made.result)).toContain('Created T-001 (backlog)')
 })
 
-test('each user prompt carries the sprint context; the system prompt the rules', async ($, on) => {
+test('each user prompt carries the sprint context', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on, [mate('a1', 'auth')])
-  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'mcp__supermanager__sprint_goal', tool_use_id: 'g1', goal: 'Ship login' })
   const entered = await $.prompt.submit(prompt('hi'))
   expect(entered.context?.at(-1)).toContain('[supermanager] Sprint 41 · Oct 5–11 · goal: Ship login · 0/0 done')
   expect(entered.context?.at(-1)).toContain('Teammate auth · running')
+})
 
-  const base = { model: 'm', promptModel: 'm', surfaces: [], tools: [], outputStyle: null } as const
-  const main = await $.prompt.compose({ ...base, traits: [] })
-  expect(main.sections.map(section => section.id)).toEqual(['intro', 'supermanager:coordinator'])
-  const teammate = await $.prompt.compose({ ...base, traits: ['teammate'] })
-  expect(teammate.sections.map(section => section.id)).toEqual(['intro'])
+test('the coordinator rules go into the main session prompt only', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on)
+  let body = 'intro'
+  on('prompt.compose', () => ({ sections: [{ id: body, text: 'You are Claude.', scope: 'shared' }] }))
+  const base = { model: 'm', promptModel: 'm', surfaces: [], outputStyle: null } as const
+  const MAIN_TOOLS = ['Agent', 'Read', 'SendMessage']
+  const idsFor = async (sectionId: string, tools: string[], traits: ('teammate' | 'lean')[] = []) => {
+    body = sectionId
+    return (await $.prompt.compose({ ...base, tools, traits })).sections.map(section => section.id)
+  }
+
+  expect(await idsFor('intro', MAIN_TOOLS)).toEqual(['intro', 'supermanager:coordinator'])
+  expect(await idsFor('lean_body', MAIN_TOOLS, ['lean'])).toEqual(['lean_body', 'supermanager:coordinator'])
+  expect(await idsFor('intro', MAIN_TOOLS, ['teammate'])).toEqual(['intro'])
+  expect(await idsFor('intro', ['Read', 'Grep', 'Bash'])).toEqual(['intro']) // an Explore scout: no Agent tool
+  expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
 test('SendMessage to a teammate over the context limit is refused with handoff advice', async ($, on) => {

@@ -39,7 +39,7 @@ export const register: Register = (on, options) => {
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
-    return { sections: withRules(composed.sections, e.traits) }
+    return { sections: withRules(composed.sections, e.traits, e.tools) }
   })
 
   on('prompt.submit', async ($, e, next) => {
