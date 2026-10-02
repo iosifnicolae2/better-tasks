@@ -228,8 +228,8 @@ export function registerPane(on: On, options: PluginOptions): void {
       <TaskActions ui={ui} task={task} when={when}
         onOpen={() => void openFile($, settings.editor, task.file)}
         onStart={() => void $.prompt.submit({ text: startPrompt(task) })}
-        onMove={to => void changeTask(files, task, { when: to }, settings.sprint).then(() => listTasks(files))}
-        onDone={() => void finishTask(files, task, {}, settings.sprint).then(() => listTasks(files))} />
+        onMove={to => void changeTask(files, task, { when: to }, settings.sprint)}
+        onDone={() => void finishTask(files, task, {}, settings.sprint)} />
     )
 
     return (
