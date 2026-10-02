@@ -11,6 +11,8 @@ export type Task = {
   status: TaskStatus
   owner: string
   rolled: number
+  /** Place within its section, smallest first; ties go by id. */
+  order: number
   created: string
   /** Absolute path of the task file. */
   file: string

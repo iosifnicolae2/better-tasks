@@ -4,7 +4,7 @@ import type { Task } from '../types'
 import { rolledOver, shippedIn } from '../hooks/boundary'
 import { goalOf, withGoal, withReview } from '../hooks/sprintlog'
 import { logRow } from '../hooks/taskflow'
-import { bodyOf, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withNote } from '../hooks/tasks'
+import { bodyOf, edgeOrder, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withNote } from '../hooks/tasks'
 
 const CONFIG = { weeks: 1, startDay: 1 } as const
 const TODAY = '2026-10-07'
@@ -18,6 +18,7 @@ const task = (fields: Partial<Task>): Task => ({
   status: 'todo',
   owner: '',
   rolled: 0,
+  order: 0,
   created: '2026-10-03',
   file: '/p/.claude/manager/tasks/T-001-fix-login-redirect.md',
   body: bodyOf('Users land on /home after login.'),
@@ -26,13 +27,13 @@ const task = (fields: Partial<Task>): Task => ({
 
 describe('task files', () => {
   test('frontmatter round-trips', () => {
-    const original = task({ owner: 'auth', rolled: 2, urgent: true, title: 'Fix: the redirect' })
+    const original = task({ owner: 'auth', rolled: 2, order: -3, urgent: true, title: 'Fix: the redirect' })
     expect(parseTask(formatTask(original), original.file)).toEqual(original)
   })
 
   test('a hand-edited file with missing fields still reads', () => {
     const parsed = parseTask('---\nid: T-009\ntitle: Hello\n---\nbody', '/f.md')
-    expect(parsed).toEqual(expect.objectContaining({ id: 'T-009', sprint: 'backlog', status: 'todo', rolled: 0, body: 'body' }))
+    expect(parsed).toEqual(expect.objectContaining({ id: 'T-009', sprint: 'backlog', status: 'todo', rolled: 0, order: 0, body: 'body' }))
   })
 
   test('ids and slugs', () => {
@@ -60,6 +61,21 @@ describe('when a task is', () => {
     for (const when of ['now', 'this-sprint', 'next-sprint', 'backlog'] as const) {
       expect(whenOf(task(placeOf(when, TODAY, CONFIG)), TODAY, CONFIG)).toBe(when)
     }
+  })
+})
+
+describe('order within a section', () => {
+  test('top and bottom edges count only the same section', () => {
+    const tasks = [
+      task({ id: 'T-001', order: 2 }),
+      task({ id: 'T-002', order: 5 }),
+      task({ id: 'T-003', order: 9, urgent: true }),
+      task({ id: 'T-004', order: 7, sprint: 'backlog' }),
+    ]
+    const thisSprint = { sprint: CURRENT, urgent: false }
+    expect(edgeOrder(tasks, thisSprint, 'bottom')).toBe(6)
+    expect(edgeOrder(tasks, thisSprint, 'top')).toBe(1)
+    expect(edgeOrder(tasks, { sprint: '2026-10-12', urgent: false }, 'bottom')).toBe(0)
   })
 })
 

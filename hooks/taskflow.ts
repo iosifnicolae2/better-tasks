@@ -3,7 +3,7 @@ import type { Files } from './io'
 import { settingsFrom } from './settings'
 import { sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
-import { placeOf, saveTask, today, withNote } from './tasks'
+import { edgeOrder, listTasks, placeOf, saveTask, today, withNote } from './tasks'
 
 // What happens to a task: changed, started, finished (finished ones are logged in docs/tasks.md).
 
@@ -46,7 +46,7 @@ export async function changeTask(
 ): Promise<Task> {
   const day = await today(files)
   let next: Task = { ...task }
-  if (change.when) next = { ...next, ...placeOf(change.when, day, config) }
+  if (change.when) next = { ...next, ...(await moved(files, task, change.when, day, config)) }
   if (change.owner !== undefined) next.owner = change.owner.trim()
   if (change.status) next.status = change.status
   if (change.note) next.body = withNote(next.body, day, change.note)
@@ -54,6 +54,14 @@ export async function changeTask(
   await saveTask(files, next)
   if (change.status === 'done' && task.status !== 'done') await logDone(files, next, day, change)
   return next
+}
+
+/** A task moved to another section lands at its edge: the top for now, the bottom otherwise. */
+async function moved(files: Files, task: Task, when: When, day: string, config: SprintConfig): Promise<Partial<Task>> {
+  const place = placeOf(when, day, config)
+  if (place.sprint === task.sprint && place.urgent === task.urgent) return place
+  const others = (await listTasks(files)).filter(one => one.id !== task.id)
+  return { ...place, order: edgeOrder(others, place, when === 'now' ? 'top' : 'bottom') }
 }
 
 async function logDone(files: Files, task: Task, day: string, change: TaskChange): Promise<void> {

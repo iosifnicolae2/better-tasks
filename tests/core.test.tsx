@@ -394,3 +394,21 @@ test('project_init writes the starter files once and keeps edits', async ($, on)
   const again = await $.tool.call({ tool: 'mcp__supermanager__project_init', tool_use_id: 'i2' })
   expect(String(again.result)).toContain('All override files exist already.')
 })
+
+test('tasks keep their order: new ones at the end, now at the top, a move lands at the edge', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('tasks for this sprint, one now'))
+  for (const [id, title, when] of [['t1', 'One', 'this-sprint'], ['t2', 'Two', 'this-sprint'], ['t3', 'Hot', 'now'], ['t4', 'Hotter', 'now']] as const) {
+    await $.tool.call({ ...create, tool_use_id: id, title, when })
+  }
+  const orderOf = (file: string) => host.files.get(`${TASKS}/${file}`)?.match(/^order: (-?\d+)$/m)?.[1]
+  expect([orderOf('T-001-one.md'), orderOf('T-002-two.md'), orderOf('T-003-hot.md'), orderOf('T-004-hotter.md')]).toEqual(['0', '1', '0', '-1'])
+
+  await $.tool.call({ tool: 'mcp__supermanager__task_update', tool_use_id: 'u1', id: 'T-003', when: 'this-sprint' })
+  expect(orderOf('T-003-hot.md')).toBe('2')
+  const list = String((await $.tool.call({ tool: 'mcp__supermanager__task_list', tool_use_id: 'l1' })).result)
+  expect(list.split('\n').map(line => line.split(' ')[0])).toEqual(['T-004', 'T-001', 'T-002', 'T-003'])
+})

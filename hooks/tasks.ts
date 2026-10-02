@@ -8,7 +8,7 @@ import { fill, projectText, SHIPPED } from './texts'
 
 const DEFAULT_NAMING = settingsOf({}).tasks
 
-const FIELDS = ['id', 'title', 'sprint', 'urgent', 'status', 'owner', 'rolled', 'created'] as const
+const FIELDS = ['id', 'title', 'sprint', 'urgent', 'status', 'owner', 'rolled', 'order', 'created'] as const
 const STATUSES: readonly TaskStatus[] = ['todo', 'doing', 'done', 'cancelled']
 
 // ---- Pure: one task file ----
@@ -25,6 +25,7 @@ export function parseTask(text: string, file: string): Task {
     status: STATUSES.includes(status) ? status : 'todo',
     owner: field('owner'),
     rolled: Number(field('rolled')) || 0,
+    order: Number(field('order')) || 0,
     created: field('created'),
     file,
     body,
@@ -74,6 +75,13 @@ export function whenOf(task: Task, today: string, config: SprintConfig): When {
   return task.urgent ? 'now' : 'this-sprint'
 }
 
+/** The order that puts a task at the top or bottom of the section `place` names (same sprint and urgency). */
+export function edgeOrder(tasks: readonly Task[], place: Pick<Task, 'sprint' | 'urgent'>, edge: 'top' | 'bottom'): number {
+  const orders = tasks.filter(task => task.sprint === place.sprint && task.urgent === place.urgent).map(task => task.order)
+  if (orders.length === 0) return 0
+  return edge === 'top' ? Math.min(...orders) - 1 : Math.max(...orders) + 1
+}
+
 /** A new task's body: the task template with {goal}, {title}, {id} and {created} filled in. */
 export function bodyOf(goal: string, template = SHIPPED['task-template'], values: Record<string, string> = {}): string {
   const body = fill(template, { ...values, goal: goal.trim() })
@@ -112,7 +120,7 @@ export async function today(files: Files): Promise<string> {
   return dayOf(await files.now())
 }
 
-const byId = (a: Task, b: Task) => a.id.localeCompare(b.id, undefined, { numeric: true })
+const byOrder = (a: Task, b: Task) => a.order - b.order || a.id.localeCompare(b.id, undefined, { numeric: true })
 
 /** Reads every task file and publishes the list to the pane. */
 export async function listTasks(files: Files): Promise<Task[]> {
@@ -122,7 +130,7 @@ export async function listTasks(files: Files): Promise<Task[]> {
   const parsed = await Promise.all(
     names.map(async entry => parseTask(await files.read(`${dir}/${entry.name}`), `${dir}/${entry.name}`)),
   )
-  const tasks = parsed.filter(task => task.id !== '').sort(byId)
+  const tasks = parsed.filter(task => task.id !== '').sort(byOrder)
   await files.publishTasks(tasks)
   return tasks
 }
@@ -142,16 +150,19 @@ export type NewTask = { title: string; goal: string; when: When }
 export async function createTask(files: Files, input: NewTask): Promise<Task> {
   const settings = await settingsFrom(files)
   const day = await today(files)
-  const id = nextId(await listTasks(files), settings.tasks)
+  const tasks = await listTasks(files)
+  const id = nextId(tasks, settings.tasks)
   const title = input.title.trim()
   const template = await projectText(files, 'task-template')
+  const place = placeOf(input.when, day, settings.sprint)
   const task: Task = {
     id,
     title,
-    ...placeOf(input.when, day, settings.sprint),
+    ...place,
     status: 'todo',
     owner: '',
     rolled: 0,
+    order: edgeOrder(tasks, place, input.when === 'now' ? 'top' : 'bottom'),
     created: day,
     file: `${await tasksDir(files)}/${fileNameOf(settings.tasks, id, title)}`,
     body: bodyOf(input.goal, template, { id, title, created: day }),
