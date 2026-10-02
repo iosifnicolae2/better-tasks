@@ -50,6 +50,8 @@ declare module 'claude-code' {
       footer: string
       /** The Tasks pane's selected task id. */
       selected: string
+      /** The task id the pane has picked up for moving; '' for none. */
+      moving: string
       /** The agent id the pane's "View session" peek shows; '' for none. */
       viewing: string
       /** The Tasks pane's page. */
