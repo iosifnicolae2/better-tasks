@@ -10,7 +10,7 @@ const WINDOW = 200_000
 
 const TEAMS_ON = { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
 
-type Host = { files: Map<string, string>; status: string[]; toasts: string[]; pluginPrompts: string[] }
+type Host = { files: Map<string, string>; status: string[]; toasts: string[]; pluginPrompts: string[]; notices: string[] }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
 
 /** The engine beneath the plugin: files in memory, a session, the given agents, agent teams on unless said. */
@@ -20,9 +20,13 @@ function fakeHost(
   seed: Record<string, string> = {},
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [] }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [] }
   mock.env(on, teams.env)
   on('settings.read', () => ({ value: { env: teams.settingsEnv } }))
+  on('ui.log', ($, e) => {
+    host.notices.push(e.text)
+    return { value: undefined }
+  })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.root', () => ({ value: ROOT }))
   on('session.id', () => ({ value: 'lead-session' }))
@@ -222,4 +226,34 @@ test('agent teams in settings but not in this session: toast and status, no prom
   expect(host.pluginPrompts).toEqual([])
   expect(host.toasts).toEqual(['Agent teams set: restart the session to turn them on'])
   expect(host.status.at(-1)).toBe('Agent teams set: restart the session to turn them on')
+})
+
+test('every session start shows the tips once, with the live sprint line', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const seed = {
+    [`${ROOT}/.claude/manager/sprints.md`]: '# Sprints\n\n## 2026-10-05 · Sprint 41 · Oct 5–11\nGoal: Ship login\n',
+    [`${TASKS}/T-001-a.md`]: '---\nid: T-001\ntitle: A\nsprint: 2026-10-05\nstatus: todo\n---\n',
+    [`${TASKS}/T-002-b.md`]: '---\nid: T-002\ntitle: B\nsprint: 2026-10-05\nstatus: done\n---\n',
+    [`${TASKS}/T-003-c.md`]: '---\nid: T-003\ntitle: C\nsprint: backlog\nstatus: todo\n---\n',
+  }
+  const host = fakeHost(on, [], seed)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.notices).toEqual([
+    'supermanager · Sprint 41 · Oct 5–11 · goal: Ship login · 1 open',
+    '/tasks  board: Open · Start · Move · Done',
+    '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
+    '/away  screens off, Mac keeps working',
+  ])
+})
+
+test('without agent teams the setup prompt comes first and no tips are shown', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], {}, { env: {}, settingsEnv: {} })
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.notices).toEqual([])
+  expect(host.pluginPrompts).toHaveLength(1)
 })

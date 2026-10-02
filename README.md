@@ -5,6 +5,19 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 
 > The old Python app (daemon, tmux, Textual dashboard) lives on the `main` branch.
 
+## Quick guide
+
+- **Create a task:** "create a task to fix the login redirect" → it asks *Now / This sprint / Next sprint / Backlog*. Nothing starts on its own.
+- **Sprint goal:** "set the sprint goal: ship login". New sprint → it asks for the next goal and which backlog tasks to pull in.
+- **Board:** `/tasks`. Select a row, then **Open** (editor) · **Start** · **Move** (to another sprint) · **Done**.
+- **Start work:** "start T-003" or **Start** → the coordinator gives it to the teammate that owns the area, or spawns one named by the area.
+- **Go:** "go" → this sprint's tasks are worked in order.
+- **Routing:** every message goes to the teammate already in that area. Teammate above the context limit (50 %) → handoff note in its task file, fresh teammate.
+- **Planning:** only when you ask ("plan T-003 first") → the teammate plans, you approve.
+- **Away:** `/away` → screens black, Mac keeps working; move the mouse to come back.
+- **Settings:** `/config` → `supermanager.*`, or the config row at the bottom of `/tasks`.
+- **Status line:** `2 teammates · 1 due`. Each session starts with a short tips notice.
+
 ## What it does
 
 - **Coordinator.** The main session routes every message to the teammate that already owns

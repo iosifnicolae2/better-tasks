@@ -13,6 +13,7 @@ import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { listTasks, today } from './tasks'
 import { contextTokens, refreshTeam, sendDenial } from './team'
+import { startupTips } from './tips'
 import { runTool, TOOLS } from './tools'
 
 // Wires the parts to the engine. `$` and the state refs stay in this file (the
@@ -36,6 +37,7 @@ export const register: Register = (on, options) => {
     if (!(await setUpTeams($))) return started
     await tick($, settings)
     $.clock.every(60_000, () => tick($, settings))
+    for (const line of await startupTips(ioOf($), settings)) $.ui.log(line)
     return started
   })
 
