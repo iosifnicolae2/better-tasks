@@ -8,7 +8,7 @@ import { isOpen, listTasks, today } from './tasks'
 // The model never reads them.
 
 export const TIPS = [
-  '/tasks  j/k select · enter menu · 1-4 move · o open · s start · d done',
+  '/sprint  j/k select · enter menu · 1-4 move · o open · s start · d done',
   '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
   '/away  screens off, Mac keeps working',
 ]

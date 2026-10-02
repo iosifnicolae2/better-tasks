@@ -1,6 +1,9 @@
 import type { AgentInfo, On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
+import { PANE_COMMANDS } from '../hooks/pane'
+import { SCREEN_COMMANDS } from '../hooks/screen'
+
 const ROOT = '/project'
 const TASKS = `${ROOT}/.claude/manager/tasks`
 const SESSION = { cwd: ROOT, surface: 'terminal', isInteractive: true } as const
@@ -10,7 +13,14 @@ const WINDOW = 200_000
 
 const TEAMS_ON = { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
 
-type Host = { files: Map<string, string>; status: string[]; toasts: string[]; pluginPrompts: string[]; notices: string[] }
+type Host = {
+  files: Map<string, string>
+  status: string[]
+  toasts: string[]
+  pluginPrompts: string[]
+  notices: string[]
+  registered: string[]
+}
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
 
 /** The engine beneath the plugin: files in memory, a session, the given agents, agent teams on unless said. */
@@ -19,8 +29,9 @@ function fakeHost(
   agents: AgentInfo[] = [],
   seed: Record<string, string> = {},
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
+  takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [] }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [] }
   mock.env(on, teams.env)
   on('settings.read', () => ({ value: { env: teams.settingsEnv } }))
   on('ui.log', ($, e) => {
@@ -32,8 +43,15 @@ function fakeHost(
   on('session.id', () => ({ value: 'lead-session' }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: WINDOW, percent: 10 }, rateLimits: [] } }))
   on('agent.list', () => ({ value: agents }))
-  on('tool.register', ($, e) => ({ value: { tool: `mcp__supermanager__${e.name}` } }))
-  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('tool.register', ($, e) => {
+    host.registered.push(e.name)
+    return { value: { tool: `mcp__supermanager__${e.name}` } }
+  })
+  on('command.register', ($, e) => {
+    if (takenNames.includes(e.name)) return { deny: `"/${e.name}" refused: it is the built-in /${e.name}` }
+    host.registered.push(`/${e.name}`)
+    return { value: { command: e.name } }
+  })
   on('ui.status', ($, e) => {
     host.status.push(String(e.text))
     return { value: undefined }
@@ -242,7 +260,7 @@ test('every session start shows the tips once, with the live sprint line', async
   await clock.advance(0)
   expect(host.notices).toEqual([
     'supermanager · Sprint 41 · Oct 5–11 · goal: Ship login · 1 open',
-    '/tasks  j/k select · enter menu · 1-4 move · o open · s start · d done',
+    '/sprint  j/k select · enter menu · 1-4 move · o open · s start · d done',
     '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
     '/away  screens off, Mac keeps working',
   ])
@@ -278,4 +296,33 @@ test('sprint progress goes in the footer; no teammate count anywhere the user se
   await footer.unmount()
   expect(host.status.join('\n')).not.toMatch(/teammate/i)
   expect(host.toasts.join('\n')).not.toMatch(/teammate/i)
+})
+
+test('a refused command name is logged; the other commands, the tools and the tips still come', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const first = PANE_COMMANDS[0]?.name ?? ''
+  const host = fakeHost(on, [], {}, undefined, [first])
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.registered).toEqual(expect.arrayContaining(['task_create', 'team_status', 'screen_off']))
+  expect(host.registered).not.toContain(`/${first}`)
+  expect(host.registered).toEqual(expect.arrayContaining(SCREEN_COMMANDS.map(command => `/${command.name}`)))
+  expect(host.notices.some(line => line.startsWith(`supermanager: /${first} failed:`))).toBe(true)
+  expect(host.notices.some(line => line.startsWith('supermanager · Sprint 41'))).toBe(true)
+})
+
+// Claude Code 2.1.288's built-in commands and bundled skills. The test kit refuses no name, so this list stands in.
+const BUILT_IN = [
+  'add-dir', 'agents', 'artifacts', 'bashes', 'bug', 'cd', 'clear', 'code-review', 'compact', 'config', 'context',
+  'cost', 'doctor', 'exit', 'export', 'fast', 'help', 'hooks', 'ide', 'init', 'install-github-app', 'keybindings-help',
+  'login', 'logout', 'loop', 'mcp', 'memory', 'model', 'output-style', 'permissions', 'plugin', 'plugins',
+  'pr-comments', 'privacy-settings', 'release-notes', 'resume', 'review', 'rewind', 'run', 'sandbox', 'schedule',
+  'security-review', 'simplify', 'skills', 'status', 'statusline', 'tasks', 'terminal-setup', 'theme', 'todos',
+  'ultrareview', 'update-config', 'upgrade', 'usage', 'vim',
+]
+
+test('no command of ours takes a built-in name', () => {
+  const ours = [...PANE_COMMANDS, ...SCREEN_COMMANDS].map(command => command.name)
+  expect(ours.filter(name => BUILT_IN.includes(name))).toEqual([])
 })

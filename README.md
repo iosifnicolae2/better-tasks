@@ -9,13 +9,13 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 
 - **Create a task:** "create a task to fix the login redirect" → it asks *Now / This sprint / Next sprint / Backlog*. Nothing starts on its own.
 - **Sprint goal:** "set the sprint goal: ship login". New sprint → it asks for the next goal and which backlog tasks to pull in.
-- **Board:** `/tasks` (right sidebar). `j/k` select · `enter` the task's menu · `1-4` move (now, this sprint, next sprint, backlog) · `o` open in editor · `s` start · `d` done · `c` settings.
+- **Board:** `/sprint` (right sidebar). `j/k` select · `enter` the task's menu · `1-4` move (now, this sprint, next sprint, backlog) · `o` open in editor · `s` start · `d` done · `c` settings.
 - **Start work:** "start T-003" or **Start** → the coordinator gives it to the teammate that owns the area, or spawns one named by the area.
 - **Go:** "go" → this sprint's tasks are worked in order.
 - **Routing:** every message goes to the teammate already in that area. Teammate above the context limit (50 %) → handoff note in its task file, fresh teammate.
 - **Planning:** only when you ask ("plan T-003 first") → the teammate plans, you approve.
 - **Away:** `/away` → screens black, Mac keeps working; move the mouse to come back.
-- **Settings:** `/config` → `supermanager.*`, or the config row at the bottom of `/tasks`.
+- **Settings:** `/config` → `supermanager.*`, or `c` in `/sprint` (or `/sprint config`).
 - **Footer:** `Sprint 41 · 1/4 done · 1 due` (teammates: Claude Code's own list). Each session starts with short tips.
 
 ## What it does
@@ -28,7 +28,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
   backlog → sprint, unfinished work rolls over, a short review of what shipped.
 - **Context-aware routing.** It tracks each teammate's context fill. A teammate above the
   limit (default 50 %) gets no new work: the coordinator asks it for a handoff note and starts a fresh one.
-- **Tasks pane** (`/tasks`): see the sprint, open a task in your editor, start, move, finish, change settings.
+- **Sprint board** (`/sprint`): see the sprint, open a task in your editor, start, move, finish, change settings.
 - **Screen off, Mac awake** (`/away`): black screens until you touch the mouse or keyboard; the Mac does not sleep or lock.
 - **Optional:** a git worktree per teammate; planning first only when you ask.
 
@@ -57,7 +57,7 @@ Talk to the main session as usual.
 - "Create a task to fix the login redirect" → it asks when, writes the task file, starts nothing.
 - "Set the sprint goal: ship login" → `sprint_goal`.
 - "Go" → this sprint's tasks are worked in order.
-- `/tasks` → the pane. `/away` → screens off.
+- `/sprint` → the board. `/away` → screens off.
 
 When a new sprint starts, open work rolls over, `sprints.md` gets the review, and the
 coordinator asks you for the new goal and which backlog tasks to pull in.

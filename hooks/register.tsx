@@ -33,12 +33,12 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    for (const tool of [...TOOLS, ...SCREEN_TOOLS]) await $.tool.register(tool)
-    for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) await $.command.register(command)
+    await declareAll($)
     if (!(await setUpTeams($))) return started
-    await tick($, settings)
+    await tick($, settings).catch(error => logFailure($, 'the first refresh', error))
     $.clock.every(60_000, () => tick($, settings))
-    for (const line of await startupTips(ioOf($), settings)) $.ui.log(line)
+    const tips = await startupTips(ioOf($), settings).catch(() => [])
+    for (const line of tips) $.ui.log(line)
     return started
   })
 
@@ -98,6 +98,21 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__supermanager__task_list' }, ($, e) => serveTool($, e, 'task_list', settings))
   on('tool.call', { tool: 'mcp__supermanager__sprint_goal' }, ($, e) => serveTool($, e, 'sprint_goal', settings))
   on('tool.call', { tool: 'mcp__supermanager__team_status' }, ($, e) => serveTool($, e, 'team_status', settings))
+}
+
+/** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */
+async function declareAll($: EngineInterface): Promise<void> {
+  for (const tool of [...TOOLS, ...SCREEN_TOOLS]) {
+    await $.tool.register(tool).catch(error => logFailure($, `tool ${tool.name}`, error))
+  }
+  for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) {
+    await $.command.register(command).catch(error => logFailure($, `/${command.name}`, error))
+  }
+}
+
+function logFailure($: EngineInterface, what: string, error: unknown): void {
+  const reason = error instanceof Error ? error.message : String(error)
+  $.ui.log(`supermanager: ${what} failed: ${reason}`)
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {
