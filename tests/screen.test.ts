@@ -2,8 +2,8 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import type { Teammate } from '../types'
+import { holdIsDue } from '../hooks/screen'
 
-const SESSION = { cwd: '/project', surface: 'terminal', isInteractive: true } as const
 const AWAY = {
   command: 'away',
   args: '',
@@ -11,13 +11,11 @@ const AWAY = {
   presentation: { isFullscreen: true, columns: 80 },
 } as const
 
-/** Answers the engine's side of the session; records every command the plugin starts. */
-function fakeHost(on: On, team: Teammate[] = [], blackoutSays = 'black\n') {
+/** Answers the engine's side; records every command the plugin starts. */
+function fakeHost(on: On, blackoutSays = 'black\n') {
   const spawned: string[][] = []
-  on('session.start', ($, e) => ({ cwd: e.cwd }))
-  on('command.register', ($, e) => ({ value: { command: e.name } }))
-  on('tool.register', ($, e) => ({ value: { tool: `mcp__supermanager__${e.name}` } }))
-  on('state.get', () => ({ value: { value: team, version: 1 } }))
+  on('state.set', () => ({ value: { isSet: true, version: 1 } }))
+  on('state.get', () => ({ value: { value: [], version: 0 } }))
   on('process.run', ($, e) => {
     spawned.push([...e.argv])
     return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -30,11 +28,13 @@ function fakeHost(on: On, team: Teammate[] = [], blackoutSays = 'black\n') {
   return spawned
 }
 
-const mate = (status: string): Teammate => ({ id: 'a1', name: 'mod-ui', status })
+const team = (...statuses: string[]): Teammate[] =>
+  statuses.map((status, i) => ({ id: `a${i}`, name: `mate-${i}`, status }))
+
+const caffeinates = (spawned: string[][]) => spawned.filter(argv => argv[0] === 'caffeinate')
 
 test('/away runs the blackout under caffeinate', async ($, on) => {
   const spawned = fakeHost(on)
-  await $.session.start(SESSION)
   const { text } = await $.command.run(AWAY)
   expect(text).toContain('Screens are black')
   const blackout = spawned.find(argv => argv.includes('osascript'))
@@ -44,39 +44,44 @@ test('/away runs the blackout under caffeinate', async ($, on) => {
 
 test('the screen_off tool does what /away does', async ($, on) => {
   const spawned = fakeHost(on)
-  await $.session.start(SESSION)
   await $.tool.call({ tool: 'mcp__supermanager__screen_off', tool_use_id: 't1' })
   expect(spawned.some(argv => argv.includes('osascript'))).toBe(true)
 })
 
 test('when the blackout fails, the displays sleep instead', async ($, on) => {
-  const spawned = fakeHost(on, [], 'failed: no screens\n')
-  await $.session.start(SESSION)
+  const spawned = fakeHost(on, 'failed: no screens\n')
   const { text } = await $.command.run(AWAY)
   expect(text).toContain('may lock')
   expect(spawned).toContainEqual(['pmset', 'displaysleepnow'])
 })
 
-test('keepAwake holds caffeinate while a teammate runs', async ($, on) => {
-  const clock = mock.clock(on)
-  const spawned = fakeHost(on, [mate('running')])
-  await $.session.start(SESSION)
-  await clock.advance(30_000)
-  expect(spawned).toContainEqual(['caffeinate', '-i', '-s', '-t', '60'])
+test('keepAwake: a hold is due while someone runs, at most every 30 s', () => {
+  const due = (keepAwake: boolean, mates: Teammate[], now: number, heldAt = -Infinity) =>
+    holdIsDue({ keepAwake, team: mates, now, heldAt })
+  expect(due(true, team('running', 'completed'), 0)).toBe(true)
+  expect(due(true, team('completed', 'failed', 'killed'), 0)).toBe(false)
+  expect(due(true, [], 0)).toBe(false)
+  expect(due(false, team('running'), 0)).toBe(false)
+  expect(due(true, team('running'), 29_999, 0)).toBe(false)
+  expect(due(true, team('running'), 30_000, 0)).toBe(true)
 })
 
-test('keepAwake holds nothing when no teammate runs', async ($, on) => {
-  const clock = mock.clock(on)
-  const spawned = fakeHost(on, [mate('completed')])
-  await $.session.start(SESSION)
-  await clock.advance(30_000)
-  expect(spawned.filter(argv => argv[0] === 'caffeinate')).toEqual([])
-})
-
-test('keepAwake off holds nothing', { options: { keepAwake: false } }, async ($, on) => {
-  const clock = mock.clock(on)
-  const spawned = fakeHost(on, [mate('running')])
-  await $.session.start(SESSION)
-  await clock.advance(30_000)
-  expect(spawned.filter(argv => argv[0] === 'caffeinate')).toEqual([])
+test('keepAwake: publishing a running team starts caffeinate', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  const spawned = fakeHost(on)
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.root', () => ({ value: '/project' }))
+  on('session.id', () => ({ value: 'lead' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000, percent: 10 }, rateLimits: [] } }))
+  on('agent.list', () => ({ value: [{ id: 'a1', name: 'ui', description: 'ui', type: 'teammate', status: 'running' }] }))
+  on('tool.register', ($, e) => ({ value: { tool: `mcp__supermanager__${e.name}` } }))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('fs.read', ($, e) => { throw new Error(`ENOENT ${e.path}`) })
+  on('fs.write', () => ({ value: undefined }))
+  on('fs.list', () => ({ value: [] }))
+  await $.session.start({ cwd: '/project', surface: 'terminal', isInteractive: true })
+  expect(caffeinates(spawned)).toEqual([['caffeinate', '-i', '-s', '-t', '120']])
 })
