@@ -1,7 +1,7 @@
 import type { Ui } from './board'
 import type { Settings } from './settings'
 
-// The settings page of the Tasks pane: one line per setting, each with the control its kind needs.
+// The settings page of the Sprint pane: one line per setting, each with the control its kind needs.
 
 export type ConfigValue = string | number | boolean
 

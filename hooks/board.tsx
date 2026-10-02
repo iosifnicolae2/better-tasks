@@ -5,7 +5,7 @@ import type { SprintConfig } from './sprints'
 import { isFull } from './team'
 import { isOpen, whenOf } from './tasks'
 
-// The board page of the Tasks pane: open tasks by section, a menu under the clicked task, a key line.
+// The board page of the Sprint pane: open tasks by section, a menu under the clicked task, a key line.
 
 export type Ui = ElementTable
 export type Section = { when: When; title: string; tasks: Task[] }

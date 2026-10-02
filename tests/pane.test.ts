@@ -13,9 +13,9 @@ const SURFACES = ['terminal', 'desktop'] as const
 
 const PANE = {
   component: 'Pane',
-  requestId: 'supermanager-tasks',
+  requestId: 'supermanager-sprint',
   props: {
-    title: 'Tasks',
+    title: 'Sprint',
     isFocused: true,
     bodyColumns: 76,
     placement: 'dock',
@@ -82,8 +82,8 @@ function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<st
   return { files, commands, settings }
 }
 
-const tasksCommand = (args = '') => ({
-  command: 'tasks',
+const sprintCommand = (args = '') => ({
+  command: 'sprint',
   args,
   origin: { kind: 'composer' as const },
   presentation: { isFullscreen: true, columns: 160 },
@@ -129,7 +129,7 @@ test('sections and moves', () => {
 
 test('a click opens the task menu under its row; its options act and close it', async ($, on) => {
   const { files, commands } = fakeProject(on)
-  await $.command.run(tasksCommand())
+  await $.command.run(sprintCommand())
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
@@ -172,7 +172,7 @@ for (const surface of SURFACES) {
   test(`j/k select, the digits 1-4 move the selected task (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     const file = () => files.get(`${DIR}/T-001-fix-login.md`)
-    await $.command.run(tasksCommand())
+    await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
     expect(await ui.find({ key: 'to-now' })).toBeUndefined()
     await ui.press({ key: 'next' })
@@ -194,16 +194,16 @@ for (const surface of SURFACES) {
 
 test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
   const { commands } = fakeProject(on, { __CFBundleIdentifier: 'com.jetbrains.intellij', TERMINAL_EMULATOR: 'JetBrains-JediTerm' })
-  await $.command.run(tasksCommand())
+  await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
   await ui.press({ key: 'task-T-001' })
   await ui.press({ key: 'open' })
   expect(commands.at(-1)).toEqual(['open', '-b', 'com.jetbrains.intellij', `${DIR}/T-001-fix-login.md`])
 })
 
-test('/tasks config: toggles flip, the stepper steps, pickers pick, all written at once', async ($, on) => {
+test('/sprint config: toggles flip, the stepper steps, pickers pick, all written at once', async ($, on) => {
   const { settings } = fakeProject(on)
-  await $.command.run(tasksCommand('config'))
+  await $.command.run(sprintCommand('config'))
   for (const surface of SURFACES) {
     settings.length = 0
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
@@ -230,7 +230,7 @@ test('/tasks config: toggles flip, the stepper steps, pickers pick, all written 
 
 test('only settings changed from the default are marked', { options: { worktree: true } }, async ($, on) => {
   fakeProject(on)
-  await $.command.run(tasksCommand('config'))
+  await $.command.run(sprintCommand('config'))
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
   expect(await ui.findAll({ type: 'Text', text: /^•$/ })).toHaveLength(1)
   expect((await ui.find({ key: 'worktree' }))?.text).toBe('● on')
@@ -244,7 +244,7 @@ test('the settings page hands off to /config, where our rows say whose they are'
     return { text: '' }
   })
   on('config.describe', ($, e) => ({ label: e.label, description: e.description, isHidden: e.isHidden }))
-  await $.command.run(tasksCommand('config'))
+  await $.command.run(sprintCommand('config'))
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
   await ui.press({ key: 'native' })
   expect(ran).toEqual(['config'])
@@ -255,7 +255,7 @@ test('the settings page hands off to /config, where our rows say whose they are'
 
 test('the phone draws the board and settings without pickers', async ($, on) => {
   fakeProject(on)
-  await $.command.run(tasksCommand())
+  await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'mobile', ...PANE })
   await ui.press({ key: 'task-T-001' })
   expect(await ui.find({ key: 'done' })).toBeDefined()
@@ -265,11 +265,11 @@ test('the phone draws the board and settings without pickers', async ($, on) => 
 
 test('the arrow keys select: the focus ring carries the selection', async ($, on) => {
   fakeProject(on)
-  await $.command.run(tasksCommand())
+  await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
   const moved = await $.ui.focus({
     component: 'Pane',
-    requestId: 'supermanager-tasks',
+    requestId: 'supermanager-sprint',
     plugin: 'supermanager',
     element: 'task-T-002',
     origin: { kind: 'person' },

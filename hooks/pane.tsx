@@ -17,16 +17,17 @@ import { changeTask, finishTask, startPrompt } from './taskflow'
 import { listTasks, today, whenOf } from './tasks'
 import { isActive } from './team'
 
-// The Tasks pane: /tasks opens the board, /tasks config its settings page. This file holds `$`.
+// The Sprint pane: /sprint opens the board, /sprint config its settings page. This file holds `$`.
+// (/tasks is Claude Code's own command, so the pane cannot take that name.)
 
-const PANE = 'supermanager-tasks'
+const PANE = 'supermanager-sprint'
 const REFRESH_MS = 30_000
 const DOCK_COLUMNS = 76
 const NATIVE_PREFIX = 'Supermanager: '
 
 /** register.tsx registers these at session start; this file answers them. */
 export const PANE_COMMANDS: CommandSpec[] = [
-  { name: 'tasks', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
+  { name: 'sprint', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
 ]
 
 // The values the pane draws from; the validator wants them declared in the file that uses them.
@@ -90,7 +91,7 @@ async function openPane($: EngineInterface, page: 'board' | 'config'): Promise<v
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
   await update($, pageState, () => page)
-  await $.ui.open({ id: PANE, title: 'Tasks', focus: true, columns: DOCK_COLUMNS })
+  await $.ui.open({ id: PANE, title: 'Sprint', focus: true, columns: DOCK_COLUMNS })
 }
 
 function dockTip(presentation: CommandPresentation): string {
@@ -106,10 +107,10 @@ function dockTip(presentation: CommandPresentation): string {
 export function registerPane(on: On, options: PluginOptions): void {
   const settings = settingsOf(options)
 
-  on('command.run', { command: 'tasks' }, async ($, e) => {
+  on('command.run', { command: 'sprint' }, async ($, e) => {
     const page = e.args.trim() === 'config' ? 'config' : 'board'
     await openPane($, page)
-    return { text: `Tasks pane opened.${dockTip(e.presentation)}` }
+    return { text: `Sprint board opened.${dockTip(e.presentation)}` }
   })
 
   // In Claude Code's own /config menu our rows read "Supermanager: …", so they are easy to find.
