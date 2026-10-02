@@ -69,7 +69,9 @@ test('keepAwake: a hold is due while someone runs, at most every 30 s', () => {
 test('keepAwake: publishing a running team starts caffeinate', async ($, on) => {
   mock.clock(on)
   mock.store(on)
+  mock.env(on, { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' })
   const spawned = fakeHost(on)
+  on('settings.read', () => ({ value: { env: { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' } } }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.root', () => ({ value: '/project' }))
   on('session.id', () => ({ value: 'lead' }))
