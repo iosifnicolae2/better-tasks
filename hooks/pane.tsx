@@ -17,7 +17,7 @@ import { changeTask, finishTask, startPrompt } from './taskflow'
 import { listTasks, today, whenOf } from './tasks'
 import { isActive } from './team'
 
-// The Sprint pane: /sprint opens the board, /sprint config its settings page. This file holds `$`.
+// The Supermanager pane: /supermanager opens the board, /supermanager config its settings page. This file holds `$`.
 // (/tasks is Claude Code's own command, so the pane cannot take that name.)
 
 const PANE = 'supermanager-sprint'
@@ -27,7 +27,7 @@ const NATIVE_PREFIX = 'Supermanager: '
 
 /** register.tsx registers these at session start; this file answers them. */
 export const PANE_COMMANDS: CommandSpec[] = [
-  { name: 'sprint', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
+  { name: 'supermanager', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
 ]
 
 // The values the pane draws from; the validator wants them declared in the file that uses them.
@@ -107,7 +107,7 @@ function dockTip(presentation: CommandPresentation): string {
 export function registerPane(on: On, options: PluginOptions): void {
   const settings = settingsOf(options)
 
-  on('command.run', { command: 'sprint' }, async ($, e) => {
+  on('command.run', { command: 'supermanager' }, async ($, e) => {
     const page = e.args.trim() === 'config' ? 'config' : 'board'
     await openPane($, page)
     return { text: `Sprint board opened.${dockTip(e.presentation)}` }

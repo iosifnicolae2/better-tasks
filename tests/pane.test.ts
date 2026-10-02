@@ -83,7 +83,7 @@ function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<st
 }
 
 const sprintCommand = (args = '') => ({
-  command: 'sprint',
+  command: 'supermanager',
   args,
   origin: { kind: 'composer' as const },
   presentation: { isFullscreen: true, columns: 160 },
@@ -201,7 +201,7 @@ test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
   expect(commands.at(-1)).toEqual(['open', '-b', 'com.jetbrains.intellij', `${DIR}/T-001-fix-login.md`])
 })
 
-test('/sprint config: toggles flip, the stepper steps, pickers pick, all written at once', async ($, on) => {
+test('/supermanager config: toggles flip, the stepper steps, pickers pick, all written at once', async ($, on) => {
   const { settings } = fakeProject(on)
   await $.command.run(sprintCommand('config'))
   for (const surface of SURFACES) {
