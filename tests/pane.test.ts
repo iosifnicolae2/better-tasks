@@ -434,14 +434,18 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /◆ 1 from config\.json; \/config does not override them/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /⚠ .*colour/ })).toBeDefined()
     expect((await ui.find({ key: 'init' }))?.text).toMatch(/^Create \d starter files$/)
+    expect((await ui.find({ key: 'file-config.json' }))?.text).toBe('↗ config.json')
+    expect((await ui.find({ key: 'file-teammate.md' }))?.text).toBe('+ teammate.md')
+    await ui.press({ key: 'file-teammate.md' })
+    expect(files.has(`${ROOT}/.claude/manager/teammate.md`)).toBe(true)
+    expect(files.has(`${ROOT}/.claude/manager/coordinator.md`)).toBe(false)
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/manager/teammate.md`])
+    expect((await ui.find({ key: 'file-teammate.md' }))?.text).toBe('↗ teammate.md')
 
     await ui.press({ key: 'init' })
-    expect(files.has(`${ROOT}/.claude/manager/teammate.md`)).toBe(true)
+    expect(files.has(`${ROOT}/.claude/manager/coordinator.md`)).toBe(true)
     expect(JSON.parse(files.get(`${ROOT}/.claude/manager/config.json`) ?? '{}')).toMatchObject({ contextLimit: 40 })
     expect(await ui.find({ key: 'init' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: '✓ All starter files are in place' })).toBeDefined()
-
-    await ui.press({ key: 'file-teammate.md' })
-    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/manager/teammate.md`])
   })
 }

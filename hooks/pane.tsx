@@ -125,15 +125,24 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
   const exists = (path: string) => files.read(`${root}/${path}`).then(() => true, () => false)
   const starters = Object.keys(starterFiles())
   const present = await Promise.all(starters.map(exists))
-  const created = () => initProject(files).then(() => $.ui.invalidate('ui.render'))
+  const redraw = () => $.ui.invalidate('ui.render')
+  const created = () => initProject(files).then(redraw)
+  const fileAt = (label: string) => PROJECT_FILES[label] ?? CONFIG_FILE
+  /** Opens one of the project's files, writing its starter text first when it is missing. */
+  const openOrCreate = async (label: string) => {
+    const path = fileAt(label)
+    if (!(await exists(path))) await files.write(`${root}/${path}`, starterFiles()[path] ?? '')
+    redraw()
+    await openFile($, editor, `${root}/${path}`)
+  }
   return {
     fromProject: Object.keys(overrides.values),
     project: {
       problems: overrides.problems,
       missing: starters.filter((path, at) => !present[at]),
-      files: Object.keys(PROJECT_FILES),
+      files: Object.keys(PROJECT_FILES).map(label => ({ label, exists: present[starters.indexOf(fileAt(label))] ?? false })),
       onCreate: () => void created(),
-      onOpen: label => void created().then(() => openFile($, editor, `${root}/${PROJECT_FILES[label] ?? CONFIG_FILE}`)),
+      onOpen: label => void openOrCreate(label),
     },
   }
 }

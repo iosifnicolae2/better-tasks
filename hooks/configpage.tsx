@@ -202,8 +202,8 @@ export type ProjectFacts = {
   problems: readonly string[]
   /** The starter files the project does not have yet (paths relative to its root). */
   missing: readonly string[]
-  /** The files to open, by label: config.json, coordinator.md, … */
-  files: readonly string[]
+  /** The project's own files by label (config.json, coordinator.md, …) and whether each exists. */
+  files: readonly { label: string; exists: boolean }[]
   onCreate: () => void
   onOpen: (label: string) => void
 }
@@ -233,12 +233,18 @@ function ProjectSection({ ui, fromProject, project }: { ui: Ui; fromProject: rea
       {line(
         project.missing.length === 0
           ? <Text dimColor>✓ All starter files are in place</Text>
-          : <Button key="init" plain hotkey="i" label={`Create ${project.missing.length} starter files`} onPress={project.onCreate} />,
+          : (
+            <Box flexDirection="row" columnGap={2}>
+              <Button key="init" plain hotkey="i" label={`Create ${project.missing.length} starter files`} onPress={project.onCreate} />
+              <Text dimColor>↗ opens a file · + creates it, then opens it</Text>
+            </Box>
+          ),
       )}
       <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
-        <Text dimColor>Open</Text>
-        {project.files.map(label => (
-          <Button key={`file-${label}`} plain dimColor label={label} onPress={() => project.onOpen(label)} />
+        <Text dimColor>Files</Text>
+        {project.files.map(file => (
+          <Button key={`file-${file.label}`} plain dimColor={file.exists} label={`${file.exists ? '↗' : '+'} ${file.label}`}
+            onPress={() => project.onOpen(file.label)} />
         ))}
       </Box>
     </Box>
