@@ -40,8 +40,6 @@ declare module 'claude-code' {
       footer: string
       /** The Tasks pane's selected task id. */
       selected: string
-      /** Old pane layout; goes once the pane stops using it. */
-      view: 'table' | 'kanban'
       /** The task id whose inline menu is open in the Tasks pane; '' for none. */
       menu: string
       /** The Tasks pane's page. */
