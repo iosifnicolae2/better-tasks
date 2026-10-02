@@ -242,7 +242,7 @@ test('every session start shows the tips once, with the live sprint line', async
   await clock.advance(0)
   expect(host.notices).toEqual([
     'supermanager · Sprint 41 · Oct 5–11 · goal: Ship login · 1 open',
-    '/tasks  ↑↓ select · h/l move · o open · s start · d done · v view · c settings',
+    '/tasks  ↑↓ select · enter menu · ⌥↑ ⌥↓ move · b backlog · c settings',
     '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
     '/away  screens off, Mac keeps working',
   ])
