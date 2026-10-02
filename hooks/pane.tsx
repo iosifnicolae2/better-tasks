@@ -23,6 +23,7 @@ const PANE = 'supermanager-tasks'
 const REFRESH_MS = 30_000
 const DOCK_COLUMNS = 76
 const VIEW_KEY = 'pane.view'
+const NATIVE_PREFIX = 'Supermanager: '
 
 /** register.tsx registers these at session start; this file answers them. */
 export const PANE_COMMANDS: CommandSpec[] = [
@@ -104,6 +105,12 @@ export function registerPane(on: On, options: PluginOptions): void {
     return { text: `Tasks pane opened.${dockTip(e.presentation)}` }
   })
 
+  // In Claude Code's own /config menu our rows read "Supermanager: …", so they are easy to find.
+  on('config.describe', { key: /^supermanager\./ }, async ($, e, next) => {
+    const described = await next(e)
+    return described.label.startsWith(NATIVE_PREFIX) ? described : { ...described, label: NATIVE_PREFIX + described.label }
+  })
+
   // Selection follows the focus ring, so the arrow keys select.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
@@ -153,6 +160,7 @@ export function registerPane(on: On, options: PluginOptions): void {
           <Box marginTop={1}>
             <ConfigPage ui={ui} settings={settings}
               onChange={(field, value) => void setConfig($, field, value)}
+              onOpenNative={() => void $.command.run({ command: 'config' })}
               onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
               onBack={showPage('board')} />
           </Box>

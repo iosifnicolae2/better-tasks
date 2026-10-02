@@ -176,26 +176,56 @@ test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
   expect(commands.at(-1)).toEqual(['open', '-b', 'com.jetbrains.intellij', `${DIR}/T-001-fix-login.md`])
 })
 
-test('/tasks config shows the settings page and writes the settings', async ($, on) => {
+test('/tasks config: toggles flip, the stepper steps, pickers pick, all written at once', async ($, on) => {
   const { settings } = fakeProject(on)
   await $.command.run(tasksCommand('config'))
   for (const surface of SURFACES) {
+    settings.length = 0
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
     expect(await ui.find({ key: 'card-T-001' })).toBeUndefined()
-    expect(await ui.find({ type: 'Text', text: 'Context limit' })).toBeDefined()
+    expect((await ui.find({ key: 'worktree' }))?.text).toBe('○ off')
+    await ui.press({ key: 'worktree' })
+    await ui.press({ key: 'keepAwake' })
+    await ui.press({ key: 'contextLimit-up' })
+    await ui.press({ key: 'contextLimit-down' })
     await ui.select({ key: 'editor', value: 'code' })
-    await ui.select({ key: 'worktree', value: 'on' })
-    await ui.select({ key: 'contextLimit', value: '60' })
+    expect(settings).toEqual([
+      ['supermanager.worktree', true],
+      ['supermanager.keepAwake', false],
+      ['supermanager.contextLimit', 55],
+      ['supermanager.contextLimit', 45],
+      ['supermanager.editor', 'code'],
+    ])
     await ui.unmount()
   }
-  expect(settings.slice(0, 3)).toEqual([
-    ['supermanager.editor', 'code'],
-    ['supermanager.worktree', true],
-    ['supermanager.contextLimit', 60],
-  ])
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
   await ui.press({ key: 'board' })
   expect(await ui.find({ key: 'card-T-001' })).toBeDefined()
+})
+
+test('only settings changed from the default are marked', { options: { worktree: true } }, async ($, on) => {
+  fakeProject(on)
+  await $.command.run(tasksCommand('config'))
+  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
+  expect(await ui.findAll({ type: 'Text', text: /^•$/ })).toHaveLength(1)
+  expect((await ui.find({ key: 'worktree' }))?.text).toBe('● on')
+})
+
+test('the settings page hands off to /config, where our rows say whose they are', async ($, on) => {
+  fakeProject(on)
+  const ran: string[] = []
+  on('command.run', { command: 'config' }, ($, e) => {
+    ran.push(e.command)
+    return { text: '' }
+  })
+  on('config.describe', ($, e) => ({ label: e.label, description: e.description, isHidden: e.isHidden }))
+  await $.command.run(tasksCommand('config'))
+  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  await ui.press({ key: 'native' })
+  expect(ran).toEqual(['config'])
+  const row = { label: 'Editor', isHidden: false, provider: { plugin: 'supermanager', tier: 'user' as const } }
+  expect((await $.config.describe({ key: 'supermanager.editor', ...row })).label).toBe('Supermanager: Editor')
+  expect((await $.config.describe({ key: 'theme', ...row, label: 'Theme' })).label).toBe('Theme')
 })
 
 test('the phone draws the board and settings without pickers', async ($, on) => {
