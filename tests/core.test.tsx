@@ -260,7 +260,7 @@ test('every session start shows the tips once, with the live sprint line', async
   await clock.advance(0)
   expect(host.notices).toEqual([
     'supermanager · Sprint 41 · Oct 5–11 · goal: Ship login · 1 open',
-    '/sprint  j/k select · enter menu · 1-4 move · o open · s start · d done',
+    '/supermanager  j/k select · enter menu · 1-4 move · o open · s start',
     '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
     '/away  screens off, Mac keeps working',
   ])
@@ -315,11 +315,11 @@ test('a refused command name is logged; the other commands, the tools and the ti
 // Claude Code 2.1.288's built-in commands and bundled skills. The test kit refuses no name, so this list stands in.
 const BUILT_IN = [
   'add-dir', 'agents', 'artifacts', 'bashes', 'bug', 'cd', 'clear', 'code-review', 'compact', 'config', 'context',
-  'cost', 'doctor', 'exit', 'export', 'fast', 'help', 'hooks', 'ide', 'init', 'install-github-app', 'keybindings-help',
+  'cost', 'doctor', 'exit', 'export', 'fast', 'focus', 'goal', 'help', 'hooks', 'ide', 'init', 'install-github-app', 'keybindings-help',
   'login', 'logout', 'loop', 'mcp', 'memory', 'model', 'output-style', 'permissions', 'plugin', 'plugins',
-  'pr-comments', 'privacy-settings', 'release-notes', 'resume', 'review', 'rewind', 'run', 'sandbox', 'schedule',
-  'security-review', 'simplify', 'skills', 'status', 'statusline', 'tasks', 'terminal-setup', 'theme', 'todos',
-  'ultrareview', 'update-config', 'upgrade', 'usage', 'vim',
+  'plan', 'pr-comments', 'privacy-settings', 'release-notes', 'resume', 'review', 'rewind', 'run', 'sandbox',
+  'schedule', 'security-review', 'session', 'simplify', 'skills', 'status', 'statusline', 'stop', 'tasks',
+  'terminal-setup', 'theme', 'todos', 'ultrareview', 'update-config', 'upgrade', 'usage', 'vim', 'loops', 'workflows',
 ]
 
 test('no command of ours takes a built-in name', () => {
