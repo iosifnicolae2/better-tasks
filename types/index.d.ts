@@ -53,7 +53,7 @@ declare module 'claude-code' {
       /** The agent id the pane's "View session" peek shows; '' for none. */
       viewing: string
       /** The Tasks pane's page. */
-      page: 'board' | 'config'
+      page: 'board' | 'config' | 'session'
     }
   }
 }
