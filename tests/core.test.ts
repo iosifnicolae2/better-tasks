@@ -19,6 +19,7 @@ function fakeHost(on: On, agents: AgentInfo[] = [], seed: Record<string, string>
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: WINDOW, percent: 10 }, rateLimits: [] } }))
   on('agent.list', () => ({ value: agents }))
   on('tool.register', ($, e) => ({ value: { tool: `mcp__supermanager__${e.name}` } }))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('ui.status', ($, e) => {
     host.status.push(String(e.text))
     return { value: undefined }
