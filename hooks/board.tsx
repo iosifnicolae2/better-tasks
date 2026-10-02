@@ -189,7 +189,7 @@ function TaskMenu({ ui, task, when, actions }: MenuProps) {
       <Box flexDirection="row" columnGap={3}>
         <Button key="menu-open" plain label="↗ Open" onPress={() => actions.open(task)} />
         {task.status === 'todo' && <Button key="menu-start" plain label="▶ Start" onPress={() => actions.start(task)} />}
-        <Button key="menu-done" plain label="✓ Done" onPress={() => actions.done(task)} />
+        <Button key="menu-done" plain label="✓ Mark as done" onPress={() => actions.done(task)} />
       </Box>
       <Box flexDirection="row" columnGap={2} flexWrap="wrap">
         <Text color="subtle">Move to</Text>
@@ -216,7 +216,7 @@ function KeyLine({ ui, selected, actions }: KeyLineProps) {
       {task && <Text color="subtle">⌥↑↓ move</Text>}
       {task && <Button key="open" plain dimColor hotkey="o" label="open" onPress={() => actions.open(task)} />}
       {task?.status === 'todo' && <Button key="start" plain dimColor hotkey="s" label="start" onPress={() => actions.start(task)} />}
-      {task && <Button key="done" plain dimColor hotkey="d" label="done" onPress={() => actions.done(task)} />}
+      {task && <Button key="done" plain dimColor hotkey="d" label="mark as done" onPress={() => actions.done(task)} />}
       <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
     </Box>
   )

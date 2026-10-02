@@ -201,6 +201,7 @@ test('a click opens the task menu under its row; its options act and close it', 
 
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
   await ui.press({ key: 'task-T-001' })
+  expect((await ui.find({ key: 'menu-done' }))?.text).toBe('✓ Mark as done')
   await ui.press({ key: 'menu-done' })
   expect(files.get(`${DIR}/T-001-fix-login.md`)).toContain('status: done')
   expect(await ui.find({ type: 'Text', text: /^2\/2$/ })).toBeDefined()
@@ -292,7 +293,7 @@ test('the phone draws the board and settings without pickers', async ($, on) => 
   await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'mobile', ...PANE })
   await ui.press({ key: 'task-T-001' })
-  expect(await ui.find({ key: 'done' })).toBeDefined()
+  expect((await ui.find({ key: 'done' }))?.text).toBe('mark as done')
   await ui.press({ key: 'config' })
   expect(await ui.find({ type: 'Text', text: 'auto' })).toBeDefined()
 })
