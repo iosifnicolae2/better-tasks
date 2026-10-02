@@ -16,7 +16,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 - **Planning:** only when you ask ("plan T-003 first") → the teammate plans, you approve.
 - **Away:** `/away` → screens black, Mac keeps working; move the mouse to come back.
 - **Settings:** `/config` → `supermanager.*`, or the config row at the bottom of `/tasks`.
-- **Status line:** `2 teammates · 1 due`. Each session starts with a short tips notice.
+- **Footer:** `Sprint 41 · 1/4 done · 1 due` (teammates: Claude Code's own list). Each session starts with short tips.
 
 ## What it does
 
