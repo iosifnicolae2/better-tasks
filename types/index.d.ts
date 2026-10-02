@@ -36,6 +36,8 @@ declare module 'claude-code' {
       tokens: Record<string, number>
       notice: string
       turn: TurnFacts
+      /** The footer label: sprint progress. */
+      footer: string
       /** The Tasks pane's selected task id. */
       selected: string
       /** The Tasks pane's board layout. */

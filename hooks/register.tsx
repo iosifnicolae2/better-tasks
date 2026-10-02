@@ -3,7 +3,7 @@ import type { EngineInterface, Register, ToolCallInput } from 'claude-code'
 
 import type { Task, Teammate, TurnFacts } from '../types'
 import { rollOver } from './boundary'
-import { contextBlock, isPerson, namesTime, statusText, withRules } from './coordinator'
+import { contextBlock, footerText, isPerson, namesTime, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -23,6 +23,7 @@ const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as
 const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
 const tokensState = atom({ plugin: 'supermanager', key: 'tokens' } as const, {} as Record<string, number>)
 const noticeState = atom({ plugin: 'supermanager', key: 'notice' } as const, '')
+const footerState = atom({ plugin: 'supermanager', key: 'footer' } as const, '')
 const turnState = atom({ plugin: 'supermanager', key: 'turn' } as const, { asked: false, namedTime: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
@@ -41,6 +42,11 @@ export const register: Register = (on, options) => {
     return started
   })
 
+  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
+    const footer = await read($, footerState)
+    return footer ? next({ ...e, props: { ...e.props, modes: [...e.props.modes, footer] } }) : next(e)
+  })
+
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (!(await teamsOn($))) return composed
@@ -54,7 +60,7 @@ export const register: Register = (on, options) => {
     await update($, turnState, () => ({ asked: false, namedTime: namesTime(e.text) }))
     const block = await contextBlock(ioOf($), settings, await read($, noticeState))
     await update($, noticeState, () => '')
-    await showStatus($)
+    await showStatus($, settings)
     return next({ ...e, context: [...(e.context ?? []), block] })
   })
 
@@ -133,8 +139,11 @@ async function serveTool($: EngineInterface, e: ToolCallInput, name: string, set
   return runTool(ioOf($), { name, input: e as never, facts, agentId: e.agentId }, settings)
 }
 
-async function showStatus($: EngineInterface): Promise<void> {
-  $.ui.status(statusText(await read($, teamState), await read($, tasksState)))
+/** Sprint progress in the footer; the status line stays free for what needs attention. */
+async function showStatus($: EngineInterface, settings: Settings): Promise<void> {
+  const start = sprintStart(await today(ioOf($)), settings.sprint)
+  const tasks = await read($, tasksState)
+  await update($, footerState, () => footerText(tasks, start))
 }
 
 /** Once a minute: a new sprint? then fresh tasks, team and status line. */
@@ -142,7 +151,7 @@ async function tick($: EngineInterface, settings: Settings): Promise<void> {
   await checkSprint($, settings)
   await listTasks(ioOf($))
   await refreshTeam(ioOf($))
-  await showStatus($)
+  await showStatus($, settings)
 }
 
 async function checkSprint($: EngineInterface, settings: Settings): Promise<void> {

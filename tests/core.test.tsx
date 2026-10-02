@@ -257,3 +257,25 @@ test('without agent teams the setup prompt comes first and no tips are shown', a
   expect(host.notices).toEqual([])
   expect(host.pluginPrompts).toHaveLength(1)
 })
+
+test('sprint progress goes in the footer; no teammate count anywhere the user sees', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [mate('a1', 'auth')])
+  const drawn: string[][] = []
+  on('ui.render', { component: 'SessionMode' }, ($, e) => {
+    drawn.push([...e.props.modes])
+    const { Text } = $.ui.resolve(e)
+    return <Text>{e.props.modes.join(' & ')}</Text>
+  })
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('add this now: fix the login loop'))
+  await $.tool.call(create)
+  await $.prompt.submit(prompt('ok'))
+
+  const footer = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', component: 'SessionMode', props: { modes: ['focus'] } })
+  expect(drawn.at(-1)).toEqual(['focus', 'Sprint 41 · 0/1 done · 1 due'])
+  await footer.unmount()
+  expect(host.status.join('\n')).not.toMatch(/teammate/i)
+  expect(host.toasts.join('\n')).not.toMatch(/teammate/i)
+})

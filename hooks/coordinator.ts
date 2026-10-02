@@ -1,10 +1,10 @@
 import type { PromptComposeSection, PromptComposeTrait, PromptOrigin } from 'claude-code'
 
-import type { Task, Teammate, TurnFacts } from '../types'
+import type { Task, TurnFacts } from '../types'
 import type { Io } from './io'
 import type { Settings } from './settings'
 import { goalOf, readSprints } from './sprintlog'
-import { sprintLabel, sprintStart } from './sprints'
+import { sprintLabel, sprintNumber, sprintStart } from './sprints'
 import { isOpen, listTasks, today } from './tasks'
 import { isActive, isFull, mateLine, refreshTeam } from './team'
 
@@ -79,11 +79,10 @@ function waitingLines(tasks: readonly Task[]): string[] {
   return [`Due now, not started: ${list}. Remind the user and ask whether to start.`]
 }
 
-/** The status line: "2 teammates · 1 due". */
-export function statusText(team: readonly Teammate[], tasks: readonly Task[]): string {
-  const active = team.filter(isActive).length
-  const due = tasks.filter(task => task.urgent && isOpen(task)).length
-  const parts = [`${active} teammate${active === 1 ? '' : 's'}`]
-  if (due > 0) parts.push(`${due} due`)
-  return parts.join(' · ')
+/** The footer label: "Sprint 41 · 1/4 done", plus " · 1 due" when a now-task waits. Teammates are Claude Code's to show. */
+export function footerText(tasks: readonly Task[], start: string): string {
+  const sprint = tasks.filter(task => task.sprint === start)
+  const done = sprint.filter(task => task.status === 'done').length
+  const due = sprint.filter(task => task.urgent && isOpen(task)).length
+  return `Sprint ${sprintNumber(start)} · ${done}/${sprint.length} done${due > 0 ? ` · ${due} due` : ''}`
 }
