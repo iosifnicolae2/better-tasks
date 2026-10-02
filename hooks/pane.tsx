@@ -119,6 +119,13 @@ export function registerPane(on: On, options: PluginOptions): void {
     return described.label.startsWith(NATIVE_PREFIX) ? described : { ...described, label: NATIVE_PREFIX + described.label }
   })
 
+  // A closed pane needs no refresh; the spinners stop with their rows.
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    refreshTimer?.cancel()
+    refreshTimer = undefined
+    return next(e)
+  })
+
   // Selection follows the focus ring, so the arrow keys select; another task closes the menu.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
