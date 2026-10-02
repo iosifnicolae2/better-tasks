@@ -42,6 +42,7 @@ const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as T
 const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const, '')
 const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as Page)
 const viewingState = atom({ plugin: 'supermanager', key: 'viewing' } as const, '')
+const movingState = atom({ plugin: 'supermanager', key: 'moving' } as const, '')
 
 // ---- With $ ----
 
@@ -188,14 +189,18 @@ export function registerPane(on: On, options: PluginOptions): void {
   on('ui.close', { id: PANE }, async ($, e, next) => {
     refreshTimer?.cancel()
     refreshTimer = undefined
+    await update($, movingState, () => '')
     return next(e)
   })
 
   // Selection follows the focus ring, so the arrow keys select.
+  // The person moving the ring (an arrow, a click: the event cannot tell which) drops a picked-up task.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
     const id = e.element?.match(/^task-(.+)$/)?.[1]
-    if (id !== undefined && moved.deny === undefined) await update($, selectedState, () => id)
+    if (moved.deny !== undefined) return moved
+    if (e.origin.kind === 'person' && id !== (await read($, movingState))) await update($, movingState, () => '')
+    if (id !== undefined) await update($, selectedState, () => id)
     return moved
   })
 
@@ -220,6 +225,7 @@ export function registerPane(on: On, options: PluginOptions): void {
     }
 
     const selectedId = await read($, selectedState)
+    const movingId = await read($, movingState)
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
@@ -236,20 +242,29 @@ export function registerPane(on: On, options: PluginOptions): void {
       task: selectedTask,
       when: whenOf(selectedTask, day, settings.sprint),
       mate: team.find(one => one.name === selectedTask.owner),
+      isMoving: selectedTask.id === movingId,
     }
     const keepFocus = (id: string | undefined) => () => selectTask($, id)
     const nextAfter = (id: string) => order[order.indexOf(id) + 1] ?? order[order.indexOf(id) - 1]
 
+    const pickUp = (id: string) => update($, movingState, () => id)
+    const drop = () => update($, movingState, () => '')
+    const shift = (task: Task, step: -1 | 1) => shiftTask(files, sections, task, step, settings.sprint).then(keepFocus(task.id))
+    const movingTask = shown.find(task => task.id === movingId)
+
+    // Enter or a click: on the picked-up task drops it, on the selected one picks it up, else selects.
+    // Every other action drops it first; each step is already saved, so dropping undoes nothing.
     const actions: BoardActions = {
-      pressTask: (task, isSelected) => void (isSelected ? openFile($, settings.editor, task.file) : selectTask($, task.id)),
-      selectStep: step => void selectTask($, stepId(order, selectedTask?.id, step)),
-      shift: (task, step) => void shiftTask(files, sections, task, step, settings.sprint).then(keepFocus(task.id)),
-      move: (task: Task, to: When) => void changeTask(files, task, { when: to }, settings.sprint).then(keepFocus(task.id)),
-      open: task => void openFile($, settings.editor, task.file),
-      start: task => void $.prompt.submit({ text: startPrompt(task) }),
-      done: task => void finishTask(files, task, {}, settings.sprint).then(keepFocus(nextAfter(task.id))),
-      view: mate => void viewSession($, mate.id),
-      showConfig: showPage('config'),
+      pressTask: (task, isSelected) =>
+        void (task.id === movingId ? drop() : isSelected ? pickUp(task.id) : drop().then(() => selectTask($, task.id))),
+      selectStep: step => void (movingTask ? shift(movingTask, step) : selectTask($, stepId(order, selectedTask?.id, step))),
+      shift: (task, step) => void shift(task, step),
+      move: (task: Task, to: When) => void drop().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
+      open: task => void drop().then(() => openFile($, settings.editor, task.file)),
+      start: task => void drop().then(() => $.prompt.submit({ text: startPrompt(task) })),
+      done: task => void drop().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
+      view: mate => void drop().then(() => viewSession($, mate.id)),
+      showConfig: () => void drop().then(showPage('config')),
     }
 
     return (

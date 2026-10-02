@@ -89,9 +89,9 @@ export function percentText(mate: Teammate | undefined): string {
 // ---- Drawing ----
 
 export type BoardActions = {
-  /** A click or Enter on a task: selects it, or opens it when it is already selected. */
+  /** A click or Enter on a task: selects it, picks the selected one up, drops the picked-up one. */
   pressTask: (task: Task, isSelected: boolean) => void
-  /** j and k: the next or previous task. */
+  /** j and k: the next or previous task; with a task picked up, move it down or up. */
   selectStep: (step: -1 | 1) => void
   /** ⌥↑ and ⌥↓: one place up or down in the list. */
   shift: (task: Task, step: -1 | 1) => void
@@ -104,7 +104,8 @@ export type BoardActions = {
   showConfig: () => void
 }
 
-export type Selected = { task: Task; when: When; mate?: Teammate }
+/** The selected task; `isMoving` while it is picked up (Enter or a click) for j/k to move. */
+export type Selected = { task: Task; when: When; mate?: Teammate; isMoving?: boolean }
 
 export type BoardProps = {
   ui: Ui
@@ -129,6 +130,7 @@ export function Board({ ui, sections, doneCount, selected, team, limit, hasKeys,
           {section.tasks.length === 0 && <Text color="subtle">   Nothing planned yet</Text>}
           {section.tasks.map(task => (
             <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id} hasKeys={hasKeys}
+              isMoving={task.id === selected?.task.id && selected.isMoving === true}
               owner={team.find(one => one.name === task.owner)} limit={limit} actions={actions} />
           ))}
         </Box>
@@ -138,7 +140,7 @@ export function Board({ ui, sections, doneCount, selected, team, limit, hasKeys,
         <Text color="subtle">{doneCount} done this sprint</Text>
       </Box>
       <Detail ui={ui} selected={selected} limit={limit} actions={actions} />
-      <KeyLine ui={ui} hasKeys={hasKeys} actions={actions} />
+      <KeyLine ui={ui} hasKeys={hasKeys} isMoving={selected?.isMoving === true} actions={actions} />
     </Box>
   )
 }
@@ -159,27 +161,29 @@ type RowProps = {
   task: Task
   isSelected: boolean
   hasKeys: boolean
+  isMoving: boolean
   owner?: Teammate
   limit: number
   actions: BoardActions
 }
 
 /** Always one line: selection bar, status, id and title, then owner, context and roll-overs. */
-function TaskRow({ ui, task, isSelected, hasKeys, owner, limit, actions }: RowProps) {
+function TaskRow({ ui, task, isSelected, hasKeys, isMoving, owner, limit, actions }: RowProps) {
   const { Box, Button, Text } = ui
   const isOverLimit = owner !== undefined && isFull(owner, limit)
   return (
     <Box flexDirection="row" columnGap={1} height={1} overflow="hidden"
       backgroundColor={isSelected ? 'userMessageBackground' : undefined}>
-      <Text color={hasKeys ? 'suggestion' : 'subtle'}>{isSelected ? '▌' : ' '}</Text>
+      <Text color={isMoving ? 'claude' : hasKeys ? 'suggestion' : 'subtle'}>{isMoving ? '↕' : isSelected ? '▌' : ' '}</Text>
       <StatusIcon ui={ui} task={task} />
       <Box flexGrow={1} flexShrink={1}>
         <Button key={`task-${task.id}`} plain autoFocus={isSelected ? true : undefined}
           label={`${task.id}  ${task.title}`} onPress={() => actions.pressTask(task, isSelected)} />
       </Box>
-      {task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
-      {owner?.percent !== undefined && <Text color={isOverLimit ? 'warning' : 'subtle'}>{percentText(owner)}</Text>}
-      {task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
+      {isMoving && <Text color="claude">moving</Text>}
+      {!isMoving && task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
+      {!isMoving && owner?.percent !== undefined && <Text color={isOverLimit ? 'warning' : 'subtle'}>{percentText(owner)}</Text>}
+      {!isMoving && task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
     </Box>
   )
 }
@@ -255,7 +259,11 @@ function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, '
       <DetailLine ui={ui}>
         <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
         <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
-        <Text color="subtle">move up/down</Text>
+        {selected.isMoving ? (
+          <Text color="claude">↕ j/k move it · ⏎ or click: drop</Text>
+        ) : (
+          <Text color="subtle">move up/down · ⏎ pick up, then j/k</Text>
+        )}
         <Button key="toggle" plain dimColor hotkey="b" label={TITLES[toggle]} onPress={() => actions.move(task, toggle)} />
       </DetailLine>
       <DetailLine ui={ui}>
@@ -268,18 +276,18 @@ function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, '
   )
 }
 
-type KeyLineProps = { ui: Ui; hasKeys: boolean; actions: BoardActions }
+type KeyLineProps = { ui: Ui; hasKeys: boolean; isMoving: boolean; actions: BoardActions }
 
 /**
  * One line at the bottom. While the pane holds the keys: how to select. While it does not: the
  * one key that gives them to it, so a key that does nothing is never a mystery.
  */
-function KeyLine({ ui, hasKeys, actions }: KeyLineProps) {
+function KeyLine({ ui, hasKeys, isMoving, actions }: KeyLineProps) {
   const { Box, Button, Text } = ui
   return (
     <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
       {hasKeys ? (
-        <Text color="subtle">↑↓ select · ⏎ open</Text>
+        <Text color={isMoving ? 'claude' : 'subtle'}>{isMoving ? 'j/k move · ⏎ drop' : '↑↓ select · ⏎ pick up · o open'}</Text>
       ) : (
         <Text color="suggestion">ctrl+x tab to use the keys here</Text>
       )}
