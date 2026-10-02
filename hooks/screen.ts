@@ -22,8 +22,8 @@ export const SCREEN_TOOLS: ToolSpec[] = [{
     + 'presses a key. Call it when the user says they are leaving and wants the screen off.',
 }]
 
-export const blackoutArgv = (root: string) =>
-  ['caffeinate', '-d', '-i', '-s', 'osascript', '-l', 'JavaScript', `${root}/bin/blackout.js`]
+/** Starts the blackout detached (a reload can't cut it off) and prints "black" once it shows. */
+export const awayArgv = (root: string) => ['/bin/sh', `${root}/bin/away.sh`]
 
 export const keepAwakeArgv = ['caffeinate', '-i', '-s', '-t', String(HOLD_SECONDS)]
 
@@ -51,22 +51,11 @@ export function holdIsDue(hold: { keepAwake: boolean; team: Teammate[]; now: num
 }
 
 async function screenOff($: EngineInterface): Promise<string> {
-  if (await startBlackout($)) return BACK_TEXT
+  const { stdout } = await $.process.run(awayArgv($.plugin.root))
+  if (stdout.startsWith('black')) return BACK_TEXT
   await $.process.run(['pmset', 'displaysleepnow'])
   $.ui.toast(FALLBACK_TEXT)
   return FALLBACK_TEXT
-}
-
-/** Starts the blackout; resolves true once it says the screens are black. */
-function startBlackout($: EngineInterface): Promise<boolean> {
-  return new Promise(resolve => {
-    void (async () => {
-      for await (const { text } of $.process.spawn({ argv: blackoutArgv($.plugin.root) })) {
-        if (text.includes('black')) resolve(true)
-      }
-      resolve(false)
-    })().catch(() => resolve(false))
-  })
 }
 
 async function drain(output: AsyncIterable<unknown>): Promise<void> {

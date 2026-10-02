@@ -12,17 +12,17 @@ const AWAY = {
 } as const
 
 /** Answers the engine's side; records every command the plugin starts. */
-function fakeHost(on: On, blackoutSays = 'black\n') {
+function fakeHost(on: On, awaySays = 'black') {
   const spawned: string[][] = []
   on('state.set', () => ({ value: { isSet: true, version: 1 } }))
   on('state.get', () => ({ value: { value: [], version: 0 } }))
   on('process.run', ($, e) => {
     spawned.push([...e.argv])
-    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    const stdout = e.argv[1]?.endsWith('/bin/away.sh') ? awaySays : ''
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('process.spawn', async function* ($, e) {
     spawned.push([...e.argv])
-    if (e.argv.includes('osascript')) yield { stream: 'stdout' as const, text: blackoutSays }
     return { value: { code: 0, signal: null } }
   })
   return spawned
@@ -33,23 +33,23 @@ const team = (...statuses: string[]): Teammate[] =>
 
 const caffeinates = (spawned: string[][]) => spawned.filter(argv => argv[0] === 'caffeinate')
 
-test('/away runs the blackout under caffeinate', async ($, on) => {
+const isAway = (argv: string[]) => argv[0] === '/bin/sh' && /\/bin\/away\.sh$/.test(argv[1] ?? '')
+
+test('/away starts the detached blackout', async ($, on) => {
   const spawned = fakeHost(on)
   const { text } = await $.command.run(AWAY)
   expect(text).toContain('Screens are black')
-  const blackout = spawned.find(argv => argv.includes('osascript'))
-  expect(blackout?.slice(0, 7)).toEqual(['caffeinate', '-d', '-i', '-s', 'osascript', '-l', 'JavaScript'])
-  expect(blackout?.[7]).toMatch(/\/bin\/blackout\.js$/)
+  expect(spawned.filter(isAway)).toHaveLength(1)
 })
 
 test('the screen_off tool does what /away does', async ($, on) => {
   const spawned = fakeHost(on)
   await $.tool.call({ tool: 'mcp__supermanager__screen_off', tool_use_id: 't1' })
-  expect(spawned.some(argv => argv.includes('osascript'))).toBe(true)
+  expect(spawned.filter(isAway)).toHaveLength(1)
 })
 
 test('when the blackout fails, the displays sleep instead', async ($, on) => {
-  const spawned = fakeHost(on, 'failed: no screens\n')
+  const spawned = fakeHost(on, 'failed: no answer in 5 s')
   const { text } = await $.command.run(AWAY)
   expect(text).toContain('may lock')
   expect(spawned).toContainEqual(['pmset', 'displaysleepnow'])
