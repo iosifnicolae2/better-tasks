@@ -260,7 +260,7 @@ test('every session start shows the tips once, with the live sprint line', async
   await clock.advance(0)
   expect(host.notices).toEqual([
     'supermanager · Sprint 41 · Oct 5–11 · goal: Ship login · 1 open',
-    '/supermanager  j/k select · enter menu · 1-4 move · o open · s start',
+    '/supermanager  j/k select · enter menu · 1-4 move · o open · s start · d done',
     '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
     '/away  screens off, Mac keeps working',
   ])
@@ -324,5 +324,6 @@ const BUILT_IN = [
 
 test('no command of ours takes a built-in name', () => {
   const ours = [...PANE_COMMANDS, ...SCREEN_COMMANDS].map(command => command.name)
+  expect(ours).toEqual(['supermanager', 'away'])
   expect(ours.filter(name => BUILT_IN.includes(name))).toEqual([])
 })
