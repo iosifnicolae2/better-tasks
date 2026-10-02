@@ -86,6 +86,33 @@ async function viewSession($: EngineInterface, agentId: string): Promise<void> {
   await update($, pageState, () => 'session')
 }
 
+/** Enter on the selected task: the keys go to its actions in the detail box. */
+async function toActions($: EngineInterface): Promise<void> {
+  await $.ui.focus({ requestId: PANE, key: 'open' }).catch(() => undefined)
+}
+
+/** Move: the task is marked moving and the ring goes back to its row, where ↑↓ now carry it. */
+async function startMoving($: EngineInterface, id: string): Promise<void> {
+  await update($, movingState, () => id)
+  await selectTask($, id)
+}
+
+/**
+ * Moves the moving task one step toward where the person sent the ring: a task row above or
+ * below it, past the last row (the first action, "open"), or wrapping round from the top (the
+ * last element, "config").
+ */
+async function carry($: EngineInterface, options: PluginOptions, movingId: string, element: string | undefined): Promise<void> {
+  const files = filesOf($, options)
+  const settings = await settingsFrom(files)
+  const sections = sectionsOf(await read($, tasksState), await today(files), settings.sprint)
+  const ids = sections.flatMap(section => section.tasks.map(task => task.id))
+  const target = element?.match(/^task-(.+)$/)?.[1]
+  const step = target !== undefined ? Math.sign(ids.indexOf(target) - ids.indexOf(movingId)) : element === 'open' ? 1 : element === 'config' ? -1 : 0
+  const task = sections.flatMap(section => section.tasks).find(one => one.id === movingId)
+  if (task !== undefined && (step === 1 || step === -1)) await shiftTask(files, sections, task, step, settings.sprint)
+}
+
 /** Selects the task and keeps the focus ring on it (best effort: only while the pane holds the keys). */
 async function selectTask($: EngineInterface, id: string | undefined): Promise<void> {
   if (id === undefined) return
@@ -194,13 +221,16 @@ export function registerPane(on: On, options: PluginOptions): void {
   })
 
   // Selection follows the focus ring, so the arrow keys select.
-  // The person moving the ring (an arrow, a click: the event cannot tell which) drops a picked-up task.
+  // Selection follows the ring. While a task moves, the person's ↑↓ carry it instead: the ring stays.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
+    const movingId = await read($, movingState)
+    if (movingId !== '' && e.origin.kind === 'person' && e.element !== `task-${movingId}`) {
+      await carry($, options, movingId, e.element)
+      return { deny: 'the moving task follows the arrows' }
+    }
     const moved = await next(e)
     const id = e.element?.match(/^task-(.+)$/)?.[1]
-    if (moved.deny !== undefined) return moved
-    if (e.origin.kind === 'person' && id !== (await read($, movingState))) await update($, movingState, () => '')
-    if (id !== undefined) await update($, selectedState, () => id)
+    if (id !== undefined && moved.deny === undefined) await update($, selectedState, () => id)
     return moved
   })
 
@@ -247,7 +277,6 @@ export function registerPane(on: On, options: PluginOptions): void {
     const keepFocus = (id: string | undefined) => () => selectTask($, id)
     const nextAfter = (id: string) => order[order.indexOf(id) + 1] ?? order[order.indexOf(id) - 1]
 
-    const pickUp = (id: string) => update($, movingState, () => id)
     const drop = () => update($, movingState, () => '')
     const shift = (task: Task, step: -1 | 1) => shiftTask(files, sections, task, step, settings.sprint).then(keepFocus(task.id))
     const movingTask = shown.find(task => task.id === movingId)
@@ -256,7 +285,8 @@ export function registerPane(on: On, options: PluginOptions): void {
     // Every other action drops it first; each step is already saved, so dropping undoes nothing.
     const actions: BoardActions = {
       pressTask: (task, isSelected) =>
-        void (task.id === movingId ? drop() : isSelected ? pickUp(task.id) : drop().then(() => selectTask($, task.id))),
+        void (task.id === movingId ? drop().then(keepFocus(task.id)) : isSelected ? toActions($) : drop().then(() => selectTask($, task.id))),
+      startMoving: task => void startMoving($, task.id),
       selectStep: step => void (movingTask ? shift(movingTask, step) : selectTask($, stepId(order, selectedTask?.id, step))),
       shift: (task, step) => void shift(task, step),
       move: (task: Task, to: When) => void drop().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),

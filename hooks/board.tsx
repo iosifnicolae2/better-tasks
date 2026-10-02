@@ -89,7 +89,7 @@ export function percentText(mate: Teammate | undefined): string {
 // ---- Drawing ----
 
 export type BoardActions = {
-  /** A click or Enter on a task: selects it, picks the selected one up, drops the picked-up one. */
+  /** A click or Enter on a task: selects it and takes the keys to its actions; on the moving one, stops. */
   pressTask: (task: Task, isSelected: boolean) => void
   /** j and k: the next or previous task; with a task picked up, move it down or up. */
   selectStep: (step: -1 | 1) => void
@@ -101,10 +101,12 @@ export type BoardActions = {
   done: (task: Task) => void
   /** Shows the session of the teammate working on the task. */
   view: (mate: Teammate) => void
+  /** Move: the task follows ↑↓ (and j/k) until Enter. */
+  startMoving: (task: Task) => void
   showConfig: () => void
 }
 
-/** The selected task; `isMoving` while it is picked up (Enter or a click) for j/k to move. */
+/** The selected task; `isMoving` after Move, while ↑↓ carry it. */
 export type Selected = { task: Task; when: When; mate?: Teammate; isMoving?: boolean }
 
 export type BoardProps = {
@@ -255,14 +257,15 @@ function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, '
         {task.status === 'todo' && <Button key="start" plain hotkey="s" label="Start" onPress={() => actions.start(task)} />}
         <Button key="done" plain hotkey="d" label="Mark as done" onPress={() => actions.done(task)} />
         {mate && <Button key="view" plain hotkey="v" label="View session" onPress={() => actions.view(mate)} />}
+        <Button key="move" plain hotkey="m" label="Move" onPress={() => actions.startMoving(task)} />
       </DetailLine>
       <DetailLine ui={ui}>
         <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
         <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
         {selected.isMoving ? (
-          <Text color="claude">↕ j/k move it · ⏎ or click: drop</Text>
+          <Text color="claude">↕ ↑↓ move it · ⏎ stop</Text>
         ) : (
-          <Text color="subtle">move up/down · ⏎ pick up, then j/k</Text>
+          <Text color="subtle">move up/down</Text>
         )}
         <Button key="toggle" plain dimColor hotkey="b" label={TITLES[toggle]} onPress={() => actions.move(task, toggle)} />
       </DetailLine>
@@ -287,7 +290,7 @@ function KeyLine({ ui, hasKeys, isMoving, actions }: KeyLineProps) {
   return (
     <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
       {hasKeys ? (
-        <Text color={isMoving ? 'claude' : 'subtle'}>{isMoving ? 'j/k move · ⏎ drop' : '↑↓ select · ⏎ pick up · o open'}</Text>
+        <Text color={isMoving ? 'claude' : 'subtle'}>{isMoving ? '↑↓ move · ⏎ stop' : '↑↓ select · ⏎ actions'}</Text>
       ) : (
         <Text color="suggestion">ctrl+x tab to use the keys here</Text>
       )}

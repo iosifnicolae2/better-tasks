@@ -220,40 +220,47 @@ for (const surface of SURFACES) {
     expect(await title()).toBe('T-001  Fix login')
   })
 
-  test(`Enter or a click picks a task up, j/k carry it, Enter or a click drops it (${surface})`, async ($, on) => {
+  test(`Enter → actions → Move: then ↑↓ carry the task and Enter stops (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     const head = (id: string) => files.get([...files.keys()].find(path => path.includes(id)) ?? '') ?? ''
     const rows = async () => (await ui.findAll({ type: 'Button' })).map(found => found.key).filter(key => key?.startsWith('task-'))
+    const arrowTo = (element: string) =>
+      $.ui.focus({ component: 'Pane', requestId: 'supermanager-sprint', plugin: 'supermanager', element, origin: { kind: 'person' } })
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
     const before = await listShape(ui, 3)
 
     await ui.press({ key: 'task-T-001' })
+    expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
+    await ui.press({ key: 'move' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '↕ j/k move it · ⏎ or click: drop' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '↕ ↑↓ move it · ⏎ stop' })).toBeDefined()
     expect(await listShape(ui, 3)).toBe(before)
 
-    await ui.press({ key: 'next' })
+    expect((await arrowTo('task-T-004')).deny).toBeDefined()
     expect(await rows()).toEqual(['task-T-004', 'task-T-001', 'task-T-002'])
     expect(head('T-001')).toContain('order: 1')
+    await arrowTo('open')
+    expect(head('T-001')).toContain('sprint: 2026-10-12')
+    await arrowTo('task-T-004')
+    expect(head('T-001')).toContain('sprint: 2026-10-05')
     await ui.press({ key: 'next' })
     expect(head('T-001')).toContain('sprint: 2026-10-12')
     await ui.press({ key: 'previous' })
-    expect(head('T-001')).toContain('sprint: 2026-10-05')
-    expect(await rows()).toEqual(['task-T-004', 'task-T-001', 'task-T-002'])
 
     await ui.press({ key: 'task-T-001' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
-    await ui.press({ key: 'next' })
+    expect((await arrowTo('task-T-002')).deny).toBeUndefined()
     expect(await rows()).toEqual(['task-T-004', 'task-T-001', 'task-T-002'])
     expect(await ui.find({ type: 'Text', text: /^T-002 {2}Dark mode$/ })).toBeDefined()
   })
 
-  test(`any other action drops a picked-up task (${surface})`, async ($, on) => {
+  test(`any other action stops moving (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    await ui.press({ key: 'task-T-001' })
+    await ui.press({ key: 'move' })
+    expect(await ui.find({ type: 'Text', text: 'moving' })).toBeDefined()
     await ui.press({ key: 'toggle' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
   })
