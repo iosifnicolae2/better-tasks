@@ -24,6 +24,11 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 Needs Claude Code with agent teams on (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) and in-process
 teammates (`teammateMode: in-process`; in tmux mode the context fill of teammates is not seen).
 
+First load without agent teams: the mod stays off and asks Claude to add
+`"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` to the `env` block of `~/.claude/settings.json`
+(you approve the edit), then to tell you to restart. If the flag is already in settings but
+not in this session, the status line says to restart. The mod itself never writes settings.
+
 Try it in one session (loads it for that session only):
 
 ```sh

@@ -7,6 +7,7 @@ import { contextBlock, isPerson, namesTime, statusText, withRules } from './coor
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
+import { RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine } from './setup'
 import { settingsOf } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
@@ -32,6 +33,7 @@ export const register: Register = (on, options) => {
     const started = await next(e)
     for (const tool of [...TOOLS, ...SCREEN_TOOLS]) await $.tool.register(tool)
     for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) await $.command.register(command)
+    if (!(await setUpTeams($))) return started
     await tick($, settings)
     $.clock.every(60_000, () => tick($, settings))
     return started
@@ -39,11 +41,14 @@ export const register: Register = (on, options) => {
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
+    if (!(await teamsOn($))) return composed
     return { sections: withRules(composed.sections, e.traits, e.tools) }
   })
 
   on('prompt.submit', async ($, e, next) => {
     if (!isPerson(e.origin)) return next(e)
+    const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
+    if (state !== 'on') return next({ ...e, context: [...(e.context ?? []), waitingLine(state)] })
     await update($, turnState, () => ({ asked: false, namedTime: namesTime(e.text) }))
     const block = await contextBlock(ioOf($), settings, await read($, noticeState))
     await update($, noticeState, () => '')
@@ -57,11 +62,13 @@ export const register: Register = (on, options) => {
     return answered
   })
 
-  on('tool.call', { tool: 'Agent' }, ($, e, next) =>
-    settings.worktree && e.name && !e.isolation ? next({ ...e, isolation: 'worktree' }) : next(e),
-  )
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
+    const isTeammate = settings.worktree && e.name && !e.isolation && (await teamsOn($))
+    return isTeammate ? next({ ...e, isolation: 'worktree' }) : next(e)
+  })
 
   on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {
+    if (!(await teamsOn($))) return next(e)
     const team = await refreshTeam(ioOf($))
     const denial = sendDenial(team, String(e.to), e.message, settings.contextLimit)
     return denial ? { deny: denial } : next(e)
@@ -83,6 +90,24 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__supermanager__task_list' }, ($, e) => serveTool($, e, 'task_list', settings))
   on('tool.call', { tool: 'mcp__supermanager__sprint_goal' }, ($, e) => serveTool($, e, 'sprint_goal', settings))
   on('tool.call', { tool: 'mcp__supermanager__team_status' }, ($, e) => serveTool($, e, 'team_status', settings))
+}
+
+async function teamsOn($: EngineInterface): Promise<boolean> {
+  return (await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS')) === '1'
+}
+
+/** Once per session: true when agent teams are on; else asks Claude to set them up, or says to restart. */
+async function setUpTeams($: EngineInterface): Promise<boolean> {
+  const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
+  if (state === 'restart') {
+    $.ui.toast(RESTART_TEXT)
+    $.ui.status(RESTART_TEXT)
+  }
+  if (state === 'missing') {
+    $.ui.status('supermanager: agent teams are off')
+    void $.prompt.submit({ text: SETUP_PROMPT })
+  }
+  return state === 'on'
 }
 
 function ioOf($: EngineInterface): Io {

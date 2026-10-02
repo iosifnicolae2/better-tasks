@@ -8,11 +8,21 @@ const MONDAY_OCT_5 = new Date(2026, 9, 5, 9).getTime()
 const SUNDAY_OCT_11_LATE = new Date(2026, 9, 11, 23, 58).getTime()
 const WINDOW = 200_000
 
-type Host = { files: Map<string, string>; status: string[]; toasts: string[] }
+const TEAMS_ON = { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
 
-/** The engine beneath the plugin: files in memory, a session, the given agents. */
-function fakeHost(on: On, agents: AgentInfo[] = [], seed: Record<string, string> = {}): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [] }
+type Host = { files: Map<string, string>; status: string[]; toasts: string[]; pluginPrompts: string[] }
+type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
+
+/** The engine beneath the plugin: files in memory, a session, the given agents, agent teams on unless said. */
+function fakeHost(
+  on: On,
+  agents: AgentInfo[] = [],
+  seed: Record<string, string> = {},
+  teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
+): Host {
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [] }
+  mock.env(on, teams.env)
+  on('settings.read', () => ({ value: { env: teams.settingsEnv } }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.root', () => ({ value: ROOT }))
   on('session.id', () => ({ value: 'lead-session' }))
@@ -45,7 +55,10 @@ function fakeHost(on: On, agents: AgentInfo[] = [], seed: Record<string, string>
   on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'Now' } } }))
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
   on('tool.call', { tool: 'Agent' }, ($, e) => ({ result: { isolation: e.isolation ?? 'none' } }))
-  on('prompt.submit', ($, e) => ({ text: e.text, context: e.context }))
+  on('prompt.submit', ($, e) => {
+    if (e.origin.kind === 'plugin') host.pluginPrompts.push(e.text)
+    return { text: e.text, context: e.context }
+  })
   on('process.spawn', async function* () {
     return { value: { code: 0, signal: null } }
   })
@@ -167,4 +180,46 @@ test('a new sprint rolls unfinished work over and writes the review', async ($, 
   expect(host.toasts.at(-1)).toContain('Sprint 42 · Oct 12–18 started')
   const entered = await $.prompt.submit(prompt('morning'))
   expect(entered.context?.at(-1)).toContain('Ask the user for its goal')
+})
+
+const COMPOSE_BASE = { model: 'm', promptModel: 'm', surfaces: [], tools: ['Agent'], outputStyle: null, traits: [] } as const
+
+test('agent teams on: no setup prompt, no restart toast', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.pluginPrompts).toEqual([])
+  expect(host.toasts).toEqual([])
+})
+
+test('agent teams missing everywhere: one prompt asks Claude to set them up; the mod stays off', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [mate('a1', 'auth')], {}, { env: {}, settingsEnv: {} })
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.pluginPrompts).toHaveLength(1)
+  expect(host.pluginPrompts[0]).toContain('"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"')
+  expect(host.pluginPrompts[0]).toContain('~/.claude/settings.json')
+  expect(host.pluginPrompts[0]).toContain('restart the session')
+  expect([...host.files.keys()]).toEqual([])
+
+  const composed = await $.prompt.compose(COMPOSE_BASE)
+  expect(composed.sections.map(section => section.id)).toEqual(['intro'])
+  const entered = await $.prompt.submit(prompt('hi'))
+  expect(entered.context).toEqual(['[supermanager] off: agent teams are not set up (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1).'])
+})
+
+test('agent teams in settings but not in this session: toast and status, no prompt', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], {}, { env: {}, settingsEnv: TEAMS_ON })
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.pluginPrompts).toEqual([])
+  expect(host.toasts).toEqual(['Agent teams set: restart the session to turn them on'])
+  expect(host.status.at(-1)).toBe('Agent teams set: restart the session to turn them on')
 })
