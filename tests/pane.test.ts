@@ -424,3 +424,24 @@ test("the pane follows the project's config.json, and its settings page says whi
   await ui.press({ key: 'sprints' })
   expect(commands.at(-1)).toEqual(['code', `${ROOT}/docs/sprints.md`])
 })
+
+for (const surface of SURFACES) {
+  test(`"This project" shows config.json's problems, creates the starter files and opens them (${surface})`, async ($, on) => {
+    const { files, commands } = fakeProject(on)
+    files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ contextLimit: 40, colour: 'blue' }))
+    await $.command.run(sprintCommand('config'))
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    expect(await ui.find({ type: 'Text', text: /◆ 1 from config\.json; \/config does not override them/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /⚠ .*colour/ })).toBeDefined()
+    expect((await ui.find({ key: 'init' }))?.text).toMatch(/^Create \d starter files$/)
+
+    await ui.press({ key: 'init' })
+    expect(files.has(`${ROOT}/.claude/manager/teammate.md`)).toBe(true)
+    expect(JSON.parse(files.get(`${ROOT}/.claude/manager/config.json`) ?? '{}')).toMatchObject({ contextLimit: 40 })
+    expect(await ui.find({ key: 'init' })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: '✓ All starter files are in place' })).toBeDefined()
+
+    await ui.press({ key: 'file-teammate.md' })
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/manager/teammate.md`])
+  })
+}

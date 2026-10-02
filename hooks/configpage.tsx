@@ -120,13 +120,14 @@ export type ConfigPageProps = {
   settings: Settings
   /** The fields this project's config.json sets; those win over /config. */
   fromProject: readonly string[]
+  project: ProjectFacts
   onChange: OnChange
   onOpenNative: () => void
   onOpenSprints: () => void
   onBack: () => void
 }
 
-export function ConfigPage({ ui, settings, fromProject, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
+export function ConfigPage({ ui, settings, fromProject, project, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
   const { Box, Button, Text } = ui
   return (
     <Box flexDirection="column">
@@ -135,7 +136,7 @@ export function ConfigPage({ ui, settings, fromProject, onChange, onOpenNative, 
         <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
       ))}
       <Text dimColor>• changed from the default · saved at once</Text>
-      {fromProject.length > 0 && <Text dimColor>◆ set by this project's .claude/manager/config.json, which wins over these</Text>}
+      <ProjectSection ui={ui} fromProject={fromProject} project={project} />
       <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
         <Button key="board" plain hotkey="b" label="Board" onPress={onBack} />
         <Button key="native" plain hotkey="n" dimColor label="All settings (/config)" onPress={onOpenNative} />
@@ -192,5 +193,54 @@ function Control({ ui, field, settings, onChange }: FieldRowProps) {
   return (
     <ui.Select key={field.field} options={options} value={value}
       onSelect={picked => onChange(field.field, field.stored(picked))} />
+  )
+}
+
+/** What the settings page knows about the project's own files in .claude/manager/. */
+export type ProjectFacts = {
+  /** Bad keys and other problems in config.json. */
+  problems: readonly string[]
+  /** The starter files the project does not have yet (paths relative to its root). */
+  missing: readonly string[]
+  /** The files to open, by label: config.json, coordinator.md, … */
+  files: readonly string[]
+  onCreate: () => void
+  onOpen: (label: string) => void
+}
+
+/**
+ * "This project": always four lines (where values come from, problems, starter files, files to
+ * open), so creating the files or fixing a key never moves the rows above.
+ */
+function ProjectSection({ ui, fromProject, project }: { ui: Ui; fromProject: readonly string[]; project: ProjectFacts }) {
+  const { Box, Button, Text } = ui
+  const line = (children: JSX.Children) => (
+    <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">{children}</Box>
+  )
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold>This project</Text>
+      {line(
+        fromProject.length === 0
+          ? <Text dimColor>No values from .claude/manager/config.json</Text>
+          : <Text color="suggestion" wrap="truncate-end">◆ {fromProject.length} from config.json; /config does not override them</Text>,
+      )}
+      {line(
+        project.problems.length === 0
+          ? <Text dimColor>config.json: no problems</Text>
+          : <Text color="warning" wrap="truncate-end">⚠ {project.problems.join(' · ')}</Text>,
+      )}
+      {line(
+        project.missing.length === 0
+          ? <Text dimColor>✓ All starter files are in place</Text>
+          : <Button key="init" plain hotkey="i" label={`Create ${project.missing.length} starter files`} onPress={project.onCreate} />,
+      )}
+      <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
+        <Text dimColor>Open</Text>
+        {project.files.map(label => (
+          <Button key={`file-${label}`} plain dimColor label={label} onPress={() => project.onOpen(label)} />
+        ))}
+      </Box>
+    </Box>
   )
 }

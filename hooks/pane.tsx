@@ -6,11 +6,11 @@ import { Board, Header, sectionsOf, shifted, stepId } from './board'
 import type { BoardActions, Section } from './board'
 import { ConfigPage } from './configpage'
 import { SessionView, linesOf } from './sessionview'
-import type { ConfigValue } from './configpage'
+import type { ConfigValue, ProjectFacts } from './configpage'
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
 import type { Files } from './io'
-import { projectSettings, readOverrides, settingsFrom } from './settings'
+import { CONFIG_FILE, projectSettings, readOverrides, settingsFrom } from './settings'
 import type { Editor } from './settings'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintLabel, sprintStart } from './sprints'
@@ -18,6 +18,7 @@ import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
 import { listTasks, placeOf, saveTask, today, whenOf } from './tasks'
 import { isActive } from './team'
+import { initProject, overridePath, starterFiles } from './texts'
 
 // The Supermanager pane: /supermanager opens the board, /supermanager config its settings page. This file holds `$`.
 // (/tasks is Claude Code's own command, so the pane cannot take that name.)
@@ -109,6 +110,34 @@ async function shiftTask(files: Files, sections: Section[], task: Task, step: -1
   }
 }
 
+/** The files the settings page offers to open, by label, relative to the project root. */
+const PROJECT_FILES: Record<string, string> = {
+  'config.json': CONFIG_FILE,
+  'coordinator.md': overridePath('coordinator'),
+  'teammate.md': overridePath('teammate'),
+  'task-template.md': overridePath('task-template'),
+}
+
+/** "This project" on the settings page: what config.json sets, its problems, the starter files. */
+async function projectFacts($: EngineInterface, files: Files, editor: Editor): Promise<{ fromProject: string[]; project: ProjectFacts }> {
+  const root = await files.root()
+  const overrides = await readOverrides(files)
+  const exists = (path: string) => files.read(`${root}/${path}`).then(() => true, () => false)
+  const starters = Object.keys(starterFiles())
+  const present = await Promise.all(starters.map(exists))
+  const created = () => initProject(files).then(() => $.ui.invalidate('ui.render'))
+  return {
+    fromProject: Object.keys(overrides.values),
+    project: {
+      problems: overrides.problems,
+      missing: starters.filter((path, at) => !present[at]),
+      files: Object.keys(PROJECT_FILES),
+      onCreate: () => void created(),
+      onOpen: label => void created().then(() => openFile($, editor, `${root}/${PROJECT_FILES[label] ?? CONFIG_FILE}`)),
+    },
+  }
+}
+
 let refreshTimer: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
@@ -186,7 +215,6 @@ export function registerPane(on: On, options: PluginOptions): void {
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
     const sprintsFile = `${await $.session.root()}/${settings.paths.sprints}`
-    const fromProject = Object.keys((await readOverrides(files)).values)
 
     const sections = sectionsOf(tasks, day, settings.sprint)
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
@@ -220,7 +248,7 @@ export function registerPane(on: On, options: PluginOptions): void {
         <Header ui={ui} label={sprintLabel(current, settings.sprint)} goal={goal} done={doneCount} total={inSprint.length} />
         {page === 'config' ? (
           <Box marginTop={1}>
-            <ConfigPage ui={ui} settings={settings} fromProject={fromProject}
+            <ConfigPage ui={ui} settings={settings} {...await projectFacts($, files, settings.editor)}
               onChange={(field, value) => void setConfig($, field, value)}
               onOpenNative={() => void $.command.run({ command: 'config' })}
               onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
