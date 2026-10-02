@@ -409,3 +409,18 @@ test('a session reads as transcript lines: what it was told, what it says, what 
     { kind: 'says', text: 'b' },
   ])
 })
+
+test("the pane follows the project's config.json, and its settings page says which values come from it", async ($, on) => {
+  const { files, commands } = fakeProject(on)
+  files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ sprintWeeks: '2', editor: 'code', sprintsFile: 'docs/sprints.md' }))
+  await $.command.run(sprintCommand())
+  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  expect(await ui.find({ type: 'Text', text: 'Sprint 40 · Sep 28–Oct 11' })).toBeDefined()
+  await ui.press({ key: 'open' })
+  expect(commands.at(-1)).toEqual(['code', `${DIR}/T-001-fix-login.md`])
+
+  await ui.press({ key: 'config' })
+  expect(await ui.findAll({ type: 'Text', text: '◆ from project' })).toHaveLength(2)
+  await ui.press({ key: 'sprints' })
+  expect(commands.at(-1)).toEqual(['code', `${ROOT}/docs/sprints.md`])
+})

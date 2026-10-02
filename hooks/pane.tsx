@@ -10,9 +10,9 @@ import type { ConfigValue } from './configpage'
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
 import type { Files } from './io'
-import { settingsOf } from './settings'
+import { projectSettings, readOverrides, settingsFrom } from './settings'
 import type { Editor } from './settings'
-import { SPRINTS_FILE, goalOf, readSprints } from './sprintlog'
+import { goalOf, readSprints } from './sprintlog'
 import { sprintLabel, sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
@@ -44,8 +44,9 @@ const viewingState = atom({ plugin: 'supermanager', key: 'viewing' } as const, '
 
 // ---- With $ ----
 
-function filesOf($: EngineInterface): Files {
-  return {
+/** The task files of the session's project, with its settings (/config, then its config.json). */
+function filesOf($: EngineInterface, options: PluginOptions): Files {
+  const files: Files = {
     root: () => $.session.root(),
     now: () => $.clock.now(),
     sessionId: () => $.session.id(),
@@ -53,7 +54,9 @@ function filesOf($: EngineInterface): Files {
     write: (path, text) => $.fs.write(path, text),
     list: path => $.fs.list(path),
     publishTasks: tasks => update($, tasksState, () => tasks),
+    config: () => projectSettings(files, options),
   }
+  return files
 }
 
 async function hostOf($: EngineInterface, editor: Editor): Promise<HostApp> {
@@ -108,8 +111,8 @@ async function shiftTask(files: Files, sections: Section[], task: Task, step: -1
 
 let refreshTimer: { cancel: () => void } | undefined
 
-async function openPane($: EngineInterface, page: Page): Promise<void> {
-  const files = filesOf($)
+async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
+  const files = filesOf($, options)
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
   await update($, pageState, () => page)
@@ -130,11 +133,10 @@ function dockTip(presentation: CommandPresentation): string {
 // ---- Wiring ----
 
 export function registerPane(on: On, options: PluginOptions): void {
-  const settings = settingsOf(options)
 
   on('command.run', { command: 'supermanager' }, async ($, e) => {
     const page = e.args.trim() === 'config' ? 'config' : 'board'
-    await openPane($, page)
+    await openPane($, options, page)
     return { text: `Sprint board opened. If its keys do nothing, ctrl+x tab gives it the keyboard.${dockTip(e.presentation)}` }
   })
 
@@ -162,7 +164,8 @@ export function registerPane(on: On, options: PluginOptions): void {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box } = ui
-    const files = filesOf($)
+    const files = filesOf($, options)
+    const settings = await settingsFrom(files)
     const tasks = await read($, tasksState)
     const viewing = await read($, viewingState)
     const everyone = await read($, teamState)
@@ -182,7 +185,8 @@ export function registerPane(on: On, options: PluginOptions): void {
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
-    const sprintsFile = `${await $.session.root()}/${SPRINTS_FILE}`
+    const sprintsFile = `${await $.session.root()}/${settings.paths.sprints}`
+    const fromProject = Object.keys((await readOverrides(files)).values)
 
     const sections = sectionsOf(tasks, day, settings.sprint)
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
@@ -216,7 +220,7 @@ export function registerPane(on: On, options: PluginOptions): void {
         <Header ui={ui} label={sprintLabel(current, settings.sprint)} goal={goal} done={doneCount} total={inSprint.length} />
         {page === 'config' ? (
           <Box marginTop={1}>
-            <ConfigPage ui={ui} settings={settings}
+            <ConfigPage ui={ui} settings={settings} fromProject={fromProject}
               onChange={(field, value) => void setConfig($, field, value)}
               onOpenNative={() => void $.command.run({ command: 'config' })}
               onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}

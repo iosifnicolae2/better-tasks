@@ -118,21 +118,24 @@ type OnChange = (field: string, value: ConfigValue) => void
 export type ConfigPageProps = {
   ui: Ui
   settings: Settings
+  /** The fields this project's config.json sets; those win over /config. */
+  fromProject: readonly string[]
   onChange: OnChange
   onOpenNative: () => void
   onOpenSprints: () => void
   onBack: () => void
 }
 
-export function ConfigPage({ ui, settings, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
+export function ConfigPage({ ui, settings, fromProject, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
   const { Box, Button, Text } = ui
   return (
     <Box flexDirection="column">
       <Text bold>Settings</Text>
       {FIELDS.map(field => (
-        <FieldRow ui={ui} field={field} settings={settings} onChange={onChange} />
+        <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
       ))}
       <Text dimColor>• changed from the default · saved at once</Text>
+      {fromProject.length > 0 && <Text dimColor>◆ set by this project's .claude/manager/config.json, which wins over these</Text>}
       <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
         <Button key="board" plain hotkey="b" label="Board" onPress={onBack} />
         <Button key="native" plain hotkey="n" dimColor label="All settings (/config)" onPress={onOpenNative} />
@@ -142,10 +145,10 @@ export function ConfigPage({ ui, settings, onChange, onOpenNative, onOpenSprints
   )
 }
 
-type FieldRowProps = { ui: Ui; field: Field; settings: Settings; onChange: OnChange }
+type FieldRowProps = { ui: Ui; field: Field; settings: Settings; isFromProject?: boolean; onChange: OnChange }
 
 /** Marker, label, control, and the hint dim beside them. */
-function FieldRow({ ui, field, settings, onChange }: FieldRowProps) {
+function FieldRow({ ui, field, settings, isFromProject, onChange }: FieldRowProps) {
   const { Box, Text } = ui
   return (
     <Box flexDirection="row" columnGap={1}>
@@ -157,7 +160,11 @@ function FieldRow({ ui, field, settings, onChange }: FieldRowProps) {
         <Control ui={ui} field={field} settings={settings} onChange={onChange} />
       </Box>
       <Box flexShrink={1}>
-        <Text dimColor wrap="truncate-end">{field.hint}</Text>
+        {isFromProject ? (
+          <Text color="suggestion" wrap="truncate-end">◆ from project</Text>
+        ) : (
+          <Text dimColor wrap="truncate-end">{field.hint}</Text>
+        )}
       </Box>
     </Box>
   )
