@@ -78,7 +78,6 @@ export function Board({ ui, view, columns, selected, team, limit, actions }: Boa
   return (
     <Box flexDirection="column">
       {view === 'kanban' ? <Kanban columns={columns} {...cardProps} /> : <Table columns={columns} {...cardProps} />}
-      <TeamLine ui={ui} team={team} limit={limit} />
       <Box flexDirection="column" marginTop={1}>
         {selected && <ActionBar ui={ui} task={selected.task} column={selected.column} actions={actions} />}
         <NavBar ui={ui} view={view} hasSelection={selected !== undefined} actions={actions} />
@@ -176,19 +175,6 @@ function CardFacts({ ui, task, team, limit }: { ui: Ui; task: Task; team: Teamma
         <Text color={isOverLimit ? 'warning' : undefined} dimColor={!isOverLimit}>{percentText(owner)}</Text>
       )}
       {task.rolled > 0 && <Text dimColor>↻{task.rolled}</Text>}
-    </Box>
-  )
-}
-
-function TeamLine({ ui, team, limit }: { ui: Ui; team: Teammate[]; limit: number }) {
-  const { Box, Text } = ui
-  if (team.length === 0) return null
-  return (
-    <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
-      <Text dimColor>Team</Text>
-      {team.map(mate => (
-        <Text color={isFull(mate, limit) ? 'warning' : undefined}>{mate.name} {percentText(mate)}</Text>
-      ))}
     </Box>
   )
 }
