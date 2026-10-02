@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { sectionsOf, stepId } from '../hooks/board'
+import { nearMoves, sectionsOf, stepId } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -124,6 +124,34 @@ test('sections and moves', () => {
   expect(stepId(['a', 'b', 'c'], 'a', -1)).toBe('a')
   expect(stepId([], undefined, 1)).toBeUndefined()
 })
+
+test('the moves shown next to a task depend on its section', () => {
+  const shown = (when: Parameters<typeof nearMoves>[0]) => nearMoves(when).map(move => `${move.arrow}${move.to}`)
+  expect(shown('now')).toEqual(['↓this-sprint', 'backlog'])
+  expect(shown('this-sprint')).toEqual(['↑now', '↓next-sprint', 'backlog'])
+  expect(shown('next-sprint')).toEqual(['↑this-sprint', '↓backlog'])
+  expect(shown('backlog')).toEqual(['↑next-sprint'])
+})
+
+for (const surface of SURFACES) {
+  test(`the selected row shows its move keys until its menu opens (${surface})`, async ($, on) => {
+    const { files } = fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    expect(await ui.find({ key: 'hint-now' })).toBeUndefined()
+    await ui.press({ key: 'next' })
+    expect((await ui.find({ key: 'hint-now' }))?.text).toBe('1 ↑ Now')
+    expect((await ui.find({ key: 'hint-next-sprint' }))?.text).toBe('3 ↓ Next sprint')
+    expect((await ui.find({ key: 'hint-backlog' }))?.text).toBe('4 Backlog')
+    await ui.press({ key: 'task-T-001' })
+    expect(await ui.find({ key: 'hint-now' })).toBeUndefined()
+    await ui.press({ key: 'task-T-002' })
+    await ui.press({ key: 'task-T-002' })
+    expect((await ui.findAll({ type: 'Button', text: /^\d / })).map(found => found.text)).toEqual(['3 ↑ Next sprint'])
+    await ui.press({ key: 'hint-next-sprint' })
+    expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('sprint: 2026-10-12')
+  })
+}
 
 // ---- The pane ----
 

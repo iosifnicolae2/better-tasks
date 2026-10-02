@@ -40,6 +40,20 @@ export function stepId(ids: readonly string[], id: string | undefined, step: -1 
   return ids[Math.min(ids.length - 1, Math.max(0, at + step))]
 }
 
+export type Move = { to: When; arrow: '↑' | '↓' | '' }
+
+/** The moves worth showing next to a task: one section up, one down, and the backlog. */
+export function nearMoves(when: When): Move[] {
+  const at = ORDER.indexOf(when)
+  const up = ORDER[at - 1]
+  const down = ORDER[at + 1]
+  const moves: Move[] = []
+  if (up) moves.push({ to: up, arrow: '↑' })
+  if (down) moves.push({ to: down, arrow: '↓' })
+  if (when !== 'backlog' && down !== 'backlog') moves.push({ to: 'backlog', arrow: '' })
+  return moves
+}
+
 export function percentText(mate: Teammate | undefined): string {
   return mate?.percent === undefined ? '' : `${Math.round(mate.percent)}%`
 }
@@ -85,6 +99,9 @@ export function Board({ ui, sections, doneCount, selected, menuId, team, limit, 
               <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id}
                 owner={team.find(mate => mate.name === task.owner)} limit={limit} actions={actions} />
               {task.id === menuId && <TaskMenu ui={ui} task={task} when={section.when} actions={actions} />}
+              {task.id === selected?.task.id && task.id !== menuId && (
+                <MoveHint ui={ui} task={task} when={section.when} actions={actions} />
+              )}
             </Box>
           ))}
         </Box>
@@ -115,6 +132,19 @@ function TaskRow({ ui, task, isSelected, owner, limit, actions }: RowProps) {
         <Text color={isOverLimit ? 'warning' : undefined} dimColor={!isOverLimit}>{percentText(owner)}</Text>
       )}
       {task.rolled > 0 && <Text dimColor>↻{task.rolled}</Text>}
+    </Box>
+  )
+}
+
+/** Under the selected row: the digit for the section above, below, and the backlog; each one clickable. */
+function MoveHint({ ui, task, when, actions }: MenuProps) {
+  const { Box, Button } = ui
+  return (
+    <Box flexDirection="row" columnGap={2} paddingLeft={4}>
+      {nearMoves(when).map(move => (
+        <Button key={`hint-${move.to}`} plain dimColor label={[SECTION_KEYS[move.to], move.arrow, TITLES[move.to]].filter(Boolean).join(' ')}
+          onPress={() => actions.move(task, move.to)} />
+      ))}
     </Box>
   )
 }
