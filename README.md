@@ -1,155 +1,80 @@
 # supermanager
 
-**Run a team of coding agents on one project, from one terminal — or from your phone.**
+A Claude Code mod that turns your main session into a **coordinator** of agent teammates,
+with **weekly sprints**, **task files** and a **Tasks pane**.
 
-Tell it what you want. It writes the task, reads your code and plans it, asks you what is unclear, then puts an
-agent on it in its own copy of your repo and asks before it merges. Agents run on **Claude Code** or
-**OpenAI Codex** — your pick, per task.
+> The old Python app (daemon, tmux, Textual dashboard) lives on the `main` branch.
 
-<img src="docs/screenshots/board.svg" alt="The backlog as a board" width="100%">
+## What it does
+
+- **Coordinator.** The main session routes every message to the teammate that already owns
+  that area, or creates a task and spawns a teammate named by its area. It does not do the work itself.
+- **Tasks ask "when?".** Creating a task never starts it. The coordinator asks
+  *Now / This sprint / Next sprint / Backlog* unless you already said. "Now" starts at once.
+- **Sprints** (YC / Linear style): fixed 1- or 2-week sprints, one sprint goal,
+  backlog → sprint, unfinished work rolls over, a short review of what shipped.
+- **Context-aware routing.** It tracks each teammate's context fill. A teammate above the
+  limit (default 50 %) gets no new work: the coordinator asks it for a handoff note and starts a fresh one.
+- **Tasks pane** (`/tasks`): see the sprint, open a task in your editor, start, move, finish, change settings.
+- **Screen off, Mac awake** (`/away`): black screens until you touch the mouse or keyboard; the Mac does not sleep or lock.
+- **Optional:** a git worktree per teammate; planning first only when you ask.
 
 ## Install
 
-```sh
-git clone https://github.com/bringes/supermanager
-cd supermanager
-make install
-```
+Needs Claude Code with agent teams on (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) and in-process
+teammates (`teammateMode: in-process`; in tmux mode the context fill of teammates is not seen).
 
-Then, in any project of yours:
+One session:
 
 ```sh
-cd your-project
-supermanager
+claude --plugin-dir ~/Documents/Projects/claude-manager
 ```
 
-You need `git`, and `claude` and/or `codex` on your PATH. `make install` takes care of `uv` and `tmux`.
+Every session: add the folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of `~/.claude/settings.json`.
 
----
+## Use
 
-## A walk through it
+Talk to the main session as usual.
 
-**1. Say what you want.** The first run drops you in a chat with the manager. No ticket format, just words.
+- "Create a task to fix the login redirect" → it asks when, writes the task file, starts nothing.
+- "Set the sprint goal: ship login" → `sprint_goal`.
+- "Go" → this sprint's tasks are worked in order.
+- `/tasks` → the pane. `/away` → screens off.
 
-<img src="docs/screenshots/walkthrough-manager.svg" alt="Asking the manager to fix the CSV import" width="100%">
+When a new sprint starts, open work rolls over, `sprints.md` gets the review, and the
+coordinator asks you for the new goal and which backlog tasks to pull in.
 
-**2. It writes the task and puts a planner on it.** `ctrl+a` any time shows your backlog: what is running,
-what is queued, what needs you. T-001 is the one it just wrote.
+## Settings
 
-<img src="docs/screenshots/tasks.svg" alt="The tasks page with the new task at the top" width="100%">
+In `/config` (rows `supermanager.*`) or the pane's config row.
 
-**3. One row per session.** Every notice lands on the agents page — a 🔔 next to whoever is waiting for you —
-so the roadmap stays quiet. Sessions you start yourself are here too: 📱 from the Claude app, 💻 in a terminal.
+| setting | default | what |
+| --- | --- | --- |
+| `editor` | `default` | opens task files: `default` (macOS `open`), `code`, `idea`, `cursor`, `zed` |
+| `worktree` | off | each named teammate works in its own git worktree |
+| `contextLimit` | 50 | % of context above which a teammate gets no new work |
+| `keepAwake` | on | holds `caffeinate` while any teammate runs |
+| `sprintWeeks` | 1 | sprint length in weeks (1 or 2) |
+| `sprintStart` | monday | weekday a sprint starts |
 
-<img src="docs/screenshots/agents.svg" alt="The agents page" width="100%">
+## Files it keeps (per project)
 
-**4. The planner comes back with a plan.** It has read your code by now, and asked you anything it could not
-work out from the code alone. What it found, the steps, the files it touches, what it assumed — short enough to
-read on a phone, which is where you often will. Nothing is changed before you say start, here or in the Claude
-app. Then a fresh agent takes that plan and builds it in its own copy of the repo.
+- `.claude/manager/tasks/T-001-short-slug.md`: one task: frontmatter (`sprint`, `status`, `owner`, `rolled`, …) + Goal, Notes, Plan.
+- `.claude/manager/sprints.md`: each sprint's goal and review.
+- `docs/tasks.md`: one row per finished task.
 
-<img src="docs/screenshots/walkthrough-plan.svg" alt="The agent presenting its plan" width="100%">
+## The model's tools
 
-**5. It works, and stops for what only you can answer.**
+`task_create`, `task_update`, `task_list`, `sprint_goal`, `team_status`, `screen_off`
+(listed as `mcp__supermanager__*`).
 
-<img src="docs/screenshots/walkthrough-input.svg" alt="The agent asking a question while it works" width="100%">
+## Develop
 
-Then it runs your tests and reports. From there supermanager closes the task out: it commits, merges into your
-branch, marks the task done, closes the session and deletes its copy of the repo. One setting
-(`agents.on_finish`) makes that ask you first instead, or leaves every branch for you to merge by hand.
+```sh
+claude plugin validate .   # what the engine will load
+claude plugin test .       # tests/*.test.ts
+```
 
-**6. How much happens without you is a setting.** One tab per section, saved the moment you change it. `←` `→`
-step through the values a setting can take. The `auto` tab is where you hand steps over: nothing is, by default.
-
-<img src="docs/screenshots/config.svg" alt="The config page" width="100%">
-
-That is the whole loop. Ask for three things at once and three agents run at once, each in its own copy of the
-repo; ask for ten and the rest queue up and start by themselves.
-
----
-
-## The pages
-
-`ctrl+a` (or `←` `→`) moves between the manager chat, each agent, and these three. Every other key belongs to
-whatever you are looking at.
-
-**tasks** — your roadmap, grouped by status, the work that is on at the top and the backlog at the bottom.
-`enter` opens the agent on a task, `s` starts one, `n` writes a new task, `ctrl+w` searches, `h` shows what is
-finished, a click on a column title sorts by it.
-
-Press `v` and the same tasks become the board at the top of this page. Arrows select, **shift+←/→ move a task**
-— starting it, finishing it, or putting it back — shift+↑/↓ move it inside its column, and `g` regroups the
-columns by label, by date, or by any field you add. **Or drag a card with the mouse:** hold it and the column
-under the pointer lights up with a line where it will land. Cards stay in the order you put them in.
-
-**agents** — one row per running session, what it is doing, and a 🔔 when it needs you. supermanager runs
-Claude's Remote Control for the project, so it is in the Claude app under the project's name: a session you
-start there works in this project and shows up here with the rest.
-
-**config** — a tab per section: `manager`, `tasks`, `agents`, `auto`, `remote`, `notify`. A switch flips with `enter`, a
-setting whose values are a set lists them and steps through them with `←` `→`, anything else opens a line to
-type in. `ctrl+w` searches every section at once.
-
----
-
-## What you get
-
-| | |
-| --- | --- |
-| **Talk, don't file tickets** | every request becomes a task with a problem, a list you can check off, and a command that proves it |
-| **Several agents at once** | each in its own copy of the repo on its own branch, so they never trip over each other |
-| **Nothing stops to ask** | agents run with every permission granted, so a task does not sit waiting for a yes while you are away |
-| **A queue** | ask for more than you have slots for; the rest start by themselves, in order |
-| **Planned before it is built** | every task gets a planner that reads the code and asks you what it cannot work out; the agent that does the work starts from that plan |
-| **Questions that find you** | a planner or an agent asks with options to pick, in the terminal or in the Claude app |
-| **As hands-off as you like** | off by default: hand over starting work, approving plans, merging — one switch each, or all four at once |
-| **Claude or Codex** | per project or per task, with the model and effort you want |
-| **Approve from your phone** | the plan waiting in your terminal is the same one in the Claude app |
-| **Your own sessions, too** | start a session in this project from the Claude app or a terminal and it shows on the agents page with the rest |
-| **Finished means finished** | merged into your branch, the copy of the repo gone, the session closed — or it asks first, or leaves the branch for you: one setting |
-| **Conflicts are work, not errors** | a merge that clashes becomes its own urgent task that an agent resolves |
-| **The whole story** | each task file keeps your words, the plan, what the agent found, and every session that touched it |
-| **A manager that can look** | ask it what an agent is doing, tell it to pass something on, or search every session and transcript for a word |
-| **What it cost, per task** | tokens and dollars counted from each session's own transcript; give a task a budget and say what happens when it runs out |
-| **A manager with the controls** | "pause T-003", "tell it to carry on", "stop everything" — it pauses, resumes and kills agents for you, one or all of them |
-| **Walk away from it** | the computer is held awake — lid shut too — so the agents keep going; say "lights out" and the screen goes black, bell and all, until you press a key |
-| **A tidy disk** | copies of the repo are deleted when their task is done |
-| **Your own fields** | labels and a date come as standard; add whatever else you sort work by |
-| **A shared backlog** | plain Markdown in git: your teammate clones and sees the same board |
-
-## Keys
-
-**Anywhere:** `ctrl+a` / `←` `→` next page · `ctrl+w` search · `q` leave (everything keeps running) ·
-`ctrl+c` `ctrl+c` stop everything.
-
-**tasks:** `enter` open the file · `o` open the agent · `n` new · `s` start or queue · `p` pause · `d` done ·
-`x` delete · `v` board · `g` group by · `h` finished · `?` all of them.
-With the mouse: a click opens the file, a click on **Agent** or **Needs you** opens that agent — or starts one.
-
-**board:** arrows select · `shift+←/→` move the task to another column · `shift+↑/↓` move it inside one ·
-drag a card to do either with the mouse.
-
-**agents:** `enter` open · `i` its task file · `n` an agent with no task · `x` stop.
-
-**config:** `tab` next section · `enter` flip a switch or type a value · `←` `→` the values a setting can take.
-
-## Ask it to change itself
-
-supermanager knows where its own code is. In any project, ask the manager:
-
-> *"On the tasks page, `p` should pause every running agent, not just the selected one."*
-
-An agent does the work in supermanager's own checkout, and when the task is done **your workspace restarts with
-the new code** — your other agents keep running. It only restarts if supermanager still starts: that is checked
-before the task may finish and again before the restart, and either failure leaves you on the version that
-works, with the error handed back to the agent. If your clone is a public fork, the manager also asks whether to
-send the change upstream as a pull request.
-
-## More
-
-- [Settings, files and how it works](docs/settings.md) — every key, what gets written where, what talks to what.
-- `supermanager status` · `tasks` · `show T-001` · `events` read the state from any shell;
-  `spend` shows what it has all cost;
-  `spawn` · `pause` · `resume` · `stop` · `attach` · `clean` · `screen-off` · `upgrade` do the obvious things
-  (`pause all` and `stop all` take every running agent at once).
-- The screenshots above are drawn from the real pages — `make screenshots` redraws them.
+Code map: `hooks/register.tsx` wires every core hook (`$` and state refs never cross an import);
+`tasks.ts`, `taskflow.ts`, `sprints.ts`, `sprintlog.ts`, `boundary.ts`, `team.ts`, `coordinator.ts`,
+`tools.ts` hold the logic; `pane.tsx` the Tasks pane; `screen.ts` + `bin/blackout.js` the screen-off.

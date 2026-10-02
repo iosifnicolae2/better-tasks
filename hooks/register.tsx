@@ -6,7 +6,7 @@ import { rollOver } from './boundary'
 import { contextBlock, isPerson, namesTime, statusText, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
-import { registerScreen } from './screen'
+import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
 import { settingsOf } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
@@ -30,8 +30,8 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    for (const tool of TOOLS) await $.tool.register(tool)
-    for (const command of PANE_COMMANDS) await $.command.register(command)
+    for (const tool of [...TOOLS, ...SCREEN_TOOLS]) await $.tool.register(tool)
+    for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) await $.command.register(command)
     await tick($, settings)
     $.clock.every(60_000, () => tick($, settings))
     return started
