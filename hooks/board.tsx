@@ -5,44 +5,34 @@ import type { SprintConfig } from './sprints'
 import { isFull } from './team'
 import { isOpen, whenOf } from './tasks'
 
-// The board page of the Tasks pane: its columns, the Table and Kanban views, and the action bar.
+// The board page of the Tasks pane: open tasks by section, a menu under the clicked task, a key line.
 
 export type Ui = ElementTable
-export type View = 'table' | 'kanban'
-export type ColumnId = When | 'done'
-export type Column = { id: ColumnId; title: string; tasks: Task[] }
+export type Section = { when: When; title: string; tasks: Task[] }
 
-const OPEN_COLUMNS: readonly When[] = ['now', 'this-sprint', 'next-sprint', 'backlog']
+const ORDER: readonly When[] = ['now', 'this-sprint', 'next-sprint', 'backlog']
 
-export const TITLES: Record<ColumnId, string> = {
+export const TITLES: Record<When, string> = {
   now: 'Now',
   'this-sprint': 'This sprint',
   'next-sprint': 'Next sprint',
   backlog: 'Backlog',
-  done: 'Done',
 }
 
 // ---- Pure ----
 
-export function columnOf(task: Task, day: string, config: SprintConfig): ColumnId {
-  return task.status === 'done' ? 'done' : whenOf(task, day, config)
-}
-
-/** The board's columns: open work by when, and what was finished in this sprint. */
-export function columnsOf(tasks: readonly Task[], day: string, config: SprintConfig, current: string): Column[] {
-  const open = OPEN_COLUMNS.map(id => ({
-    id,
-    title: TITLES[id],
-    tasks: tasks.filter(task => isOpen(task) && whenOf(task, day, config) === id),
+/** The open tasks, one section per "when". */
+export function sectionsOf(tasks: readonly Task[], day: string, config: SprintConfig): Section[] {
+  return ORDER.map(when => ({
+    when,
+    title: TITLES[when],
+    tasks: tasks.filter(task => isOpen(task) && whenOf(task, day, config) === when),
   }))
-  const done = tasks.filter(task => task.status === 'done' && task.sprint === current)
-  return [...open, { id: 'done', title: TITLES.done, tasks: done }]
 }
 
-/** Where ◀ (-1) or ▶ (+1) takes a task; ◀ from Done reopens it in this sprint. */
-export function stepTarget(from: ColumnId, step: -1 | 1): When | undefined {
-  if (from === 'done') return step === -1 ? 'this-sprint' : undefined
-  return OPEN_COLUMNS[OPEN_COLUMNS.indexOf(from) + step]
+/** The section above (-1) or below (+1), if any. */
+export function stepTarget(from: When, step: -1 | 1): When | undefined {
+  return ORDER[ORDER.indexOf(from) + step]
 }
 
 export function percentText(mate: Teammate | undefined): string {
@@ -52,124 +42,67 @@ export function percentText(mate: Teammate | undefined): string {
 // ---- Drawing ----
 
 export type BoardActions = {
-  /** A press on a card: selects it, or opens it when it is already selected. */
-  pressCard: (task: Task, isSelected: boolean) => void
-  move: (task: Task, from: ColumnId, to: When) => void
+  /** A click or Enter on a task: opens its menu, or closes it when open. */
+  pressTask: (task: Task) => void
+  move: (task: Task, to: When) => void
   open: (task: Task) => void
   start: (task: Task) => void
   done: (task: Task) => void
-  toggleView: () => void
   showConfig: () => void
 }
 
+export type Selected = { task: Task; when: When }
+
 export type BoardProps = {
   ui: Ui
-  view: View
-  columns: Column[]
-  selected?: { task: Task; column: ColumnId }
+  sections: Section[]
+  doneCount: number
+  selected?: Selected
+  menuId: string
   team: Teammate[]
   limit: number
   actions: BoardActions
 }
 
-export function Board({ ui, view, columns, selected, team, limit, actions }: BoardProps) {
-  const { Box } = ui
-  const cardProps = { ui, team, limit, selectedId: selected?.task.id, actions }
-  return (
-    <Box flexDirection="column">
-      {view === 'kanban' ? <Kanban columns={columns} {...cardProps} /> : <Table columns={columns} {...cardProps} />}
-      <Box flexDirection="column" marginTop={1}>
-        {selected && <ActionBar ui={ui} task={selected.task} column={selected.column} actions={actions} />}
-        <NavBar ui={ui} view={view} hasSelection={selected !== undefined} actions={actions} />
-      </Box>
-    </Box>
-  )
-}
-
-type CardsProps = {
-  ui: Ui
-  columns: Column[]
-  team: Teammate[]
-  limit: number
-  selectedId?: string
-  actions: BoardActions
-}
-
-function Table({ ui, columns, team, limit, selectedId, actions }: CardsProps) {
+export function Board({ ui, sections, doneCount, selected, menuId, team, limit, actions }: BoardProps) {
   const { Box, Text } = ui
-  const done = columns.find(column => column.id === 'done')
-  const visible = columns.filter(column => column.id !== 'done' && (column.tasks.length > 0 || column.id === 'this-sprint'))
+  const visible = sections.filter(section => section.tasks.length > 0 || section.when === 'this-sprint')
   return (
     <Box flexDirection="column">
-      {visible.map(column => (
+      {visible.map(section => (
         <Box flexDirection="column" marginTop={1}>
-          <ColumnTitle ui={ui} column={column} />
-          {column.tasks.length === 0 && <Text dimColor>  Nothing planned yet.</Text>}
-          {column.tasks.map(task => (
-            <Box flexDirection="row" gap={1}>
-              <Box flexGrow={1} flexShrink={1}>
-                <Card ui={ui} task={task} isSelected={task.id === selectedId} actions={actions} />
-              </Box>
-              <CardFacts ui={ui} task={task} team={team} limit={limit} />
+          <Text bold dimColor>{section.title.toUpperCase()}</Text>
+          {section.tasks.length === 0 && <Text dimColor>  Nothing planned yet.</Text>}
+          {section.tasks.map(task => (
+            <Box flexDirection="column">
+              <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id}
+                owner={team.find(mate => mate.name === task.owner)} limit={limit} actions={actions} />
+              {task.id === menuId && <TaskMenu ui={ui} task={task} when={section.when} actions={actions} />}
             </Box>
           ))}
         </Box>
       ))}
       <Box marginTop={1}>
-        <Text dimColor bold>DONE · {done?.tasks.length ?? 0}</Text>
+        <Text bold dimColor>DONE THIS SPRINT · {doneCount}</Text>
       </Box>
+      <KeyLine ui={ui} selected={selected} actions={actions} />
     </Box>
   )
 }
 
-function Kanban({ ui, columns, team, limit, selectedId, actions }: CardsProps) {
-  const { Box, Text } = ui
-  return (
-    <Box flexDirection="row" marginTop={1} columnGap={1}>
-      {columns.map(column => (
-        <Box flexDirection="column" flexGrow={1} flexShrink={1} width="20%">
-          <ColumnTitle ui={ui} column={column} />
-          {column.tasks.length === 0 && <Text dimColor>—</Text>}
-          {column.tasks.map(task => (
-            <Box flexDirection="column" marginBottom={1}>
-              <Card ui={ui} task={task} isSelected={task.id === selectedId} actions={actions} />
-              <CardFacts ui={ui} task={task} team={team} limit={limit} />
-            </Box>
-          ))}
-        </Box>
-      ))}
-    </Box>
-  )
-}
+type RowProps = { ui: Ui; task: Task; isSelected: boolean; owner?: Teammate; limit: number; actions: BoardActions }
 
-function ColumnTitle({ ui, column }: { ui: Ui; column: Column }) {
-  const { Text } = ui
-  return (
-    <Text bold dimColor wrap="truncate-end">
-      {column.title.toUpperCase()} {column.tasks.length > 0 ? `· ${column.tasks.length}` : ''}
-    </Text>
-  )
-}
-
-type CardProps = { ui: Ui; task: Task; isSelected: boolean; actions: BoardActions }
-
-function Card({ ui, task, isSelected, actions }: CardProps) {
-  const { Button } = ui
-  const label = `${isSelected ? '›' : ' '} ${task.id}  ${task.title}`
-  return (
-    <Button key={`card-${task.id}`} plain dimColor={task.status === 'done'} label={label}
-      onPress={() => actions.pressCard(task, isSelected)} />
-  )
-}
-
-/** Owner, their context fill, and how often the task rolled over. */
-function CardFacts({ ui, task, team, limit }: { ui: Ui; task: Task; team: Teammate[]; limit: number }) {
-  const { Box, Text } = ui
-  const owner = team.find(mate => mate.name === task.owner)
+/** Marker, id and title (the clickable part), then owner, context fill and roll-overs. */
+function TaskRow({ ui, task, isSelected, owner, limit, actions }: RowProps) {
+  const { Box, Button, Text } = ui
   const isOverLimit = owner !== undefined && isFull(owner, limit)
-  if (task.owner === '' && task.rolled === 0) return null
   return (
-    <Box flexDirection="row" gap={1} paddingLeft={2}>
+    <Box flexDirection="row" columnGap={1}>
+      <Text color="suggestion">{isSelected ? '›' : ' '}</Text>
+      <Box flexGrow={1} flexShrink={1}>
+        <Button key={`task-${task.id}`} plain label={`${task.id}  ${task.title}`} onPress={() => actions.pressTask(task)} />
+      </Box>
+      {task.status === 'doing' && <Text dimColor>doing</Text>}
       {task.owner !== '' && <Text dimColor>{task.owner}</Text>}
       {owner?.percent !== undefined && (
         <Text color={isOverLimit ? 'warning' : undefined} dimColor={!isOverLimit}>{percentText(owner)}</Text>
@@ -179,36 +112,55 @@ function CardFacts({ ui, task, team, limit }: { ui: Ui; task: Task; team: Teamma
   )
 }
 
-type ActionBarProps = { ui: Ui; task: Task; column: ColumnId; actions: BoardActions }
+type MenuProps = { ui: Ui; task: Task; when: When; actions: BoardActions }
 
-/** What can be done to the selected task; every button has its key. */
-function ActionBar({ ui, task, column, actions }: ActionBarProps) {
+/** The clicked task's options, right under its row. */
+function TaskMenu({ ui, task, when, actions }: MenuProps) {
   const { Box, Button, Text } = ui
-  const back = stepTarget(column, -1)
-  const forward = stepTarget(column, 1)
+  const targets = (Object.keys(TITLES) as When[]).filter(to => to !== when)
   return (
-    <Box flexDirection="column">
-      <Text bold wrap="truncate-end">{task.id}  {task.title}</Text>
-      <Box flexDirection="row" columnGap={2} flexWrap="wrap">
-        {back && <Button key="back" plain hotkey="h" label={`◀ ${TITLES[back]}`} onPress={() => actions.move(task, column, back)} />}
-        {forward && <Button key="forward" plain hotkey="l" label={`${TITLES[forward]} ▶`} onPress={() => actions.move(task, column, forward)} />}
-        <Button key="open" plain hotkey="o" label="Open" onPress={() => actions.open(task)} />
-        {task.status === 'todo' && <Button key="start" plain hotkey="s" label="Start" onPress={() => actions.start(task)} />}
-        {column !== 'done' && <Button key="done" plain hotkey="d" label="Done" onPress={() => actions.done(task)} />}
+    <Box flexDirection="row" columnGap={2} flexWrap="wrap" paddingLeft={4}>
+      <Button key="menu-open" plain label="Open" onPress={() => actions.open(task)} />
+      {task.status === 'todo' && <Button key="menu-start" plain label="Start" onPress={() => actions.start(task)} />}
+      <Button key="menu-done" plain label="Done" onPress={() => actions.done(task)} />
+      <Box flexDirection="row" columnGap={1}>
+        <Text dimColor>Move to</Text>
+        {targets.map(to => (
+          <Button key={`menu-${to}`} plain label={TITLES[to]} onPress={() => actions.move(task, to)} />
+        ))}
       </Box>
     </Box>
   )
 }
 
-type NavBarProps = { ui: Ui; view: View; hasSelection: boolean; actions: BoardActions }
+type KeyLineProps = { ui: Ui; selected?: Selected; actions: BoardActions }
 
-function NavBar({ ui, view, hasSelection, actions }: NavBarProps) {
+/**
+ * Every key the board takes, each one also a button. ⌥↑ and ⌥↓ ride engine actions bound to
+ * meta+up and meta+down (also ctrl+up/down), the only modified keys a plugin can receive.
+ */
+function KeyLine({ ui, selected, actions }: KeyLineProps) {
   const { Box, Button, Text } = ui
+  if (selected === undefined) {
+    return (
+      <Box flexDirection="row" columnGap={2} marginTop={1}>
+        <Text dimColor>↑↓ select · enter menu</Text>
+        <Button key="config" plain hotkey="c" dimColor label="settings" onPress={actions.showConfig} />
+      </Box>
+    )
+  }
+  const { task, when } = selected
+  const up = stepTarget(when, -1)
+  const down = stepTarget(when, 1)
   return (
-    <Box flexDirection="row" columnGap={2} flexWrap="wrap">
-      <Button key="view" plain hotkey="v" dimColor label={view === 'table' ? 'Kanban' : 'Table'} onPress={actions.toggleView} />
-      <Button key="config" plain hotkey="c" dimColor label="Config" onPress={actions.showConfig} />
-      <Text dimColor>{hasSelection ? '↑↓ select · enter open' : '↑↓ select a task'}</Text>
+    <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
+      <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑ up" onPress={() => up && actions.move(task, up)} />
+      <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓ down" onPress={() => down && actions.move(task, down)} />
+      <Button key="backlog" plain dimColor hotkey="b" label="backlog" onPress={() => actions.move(task, 'backlog')} />
+      <Button key="open" plain dimColor hotkey="o" label="open" onPress={() => actions.open(task)} />
+      {task.status === 'todo' && <Button key="start" plain dimColor hotkey="s" label="start" onPress={() => actions.start(task)} />}
+      <Button key="done" plain dimColor hotkey="d" label="done" onPress={() => actions.done(task)} />
+      <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
     </Box>
   )
 }

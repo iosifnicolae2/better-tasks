@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { columnsOf, stepTarget } from '../hooks/board'
+import { sectionsOf, stepTarget } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -107,71 +107,88 @@ test('auto opens the IDE Claude runs inside', () => {
   expect(openCommand('auto', '/a.md', { bundleId: 'com.apple.Terminal', hasIdeaCli: false })).toEqual(['open', '/a.md'])
 })
 
-test('columns and moves', () => {
+test('sections and moves', () => {
   const tasks = Object.entries(FILES).map(([file, text]) => parseTask(text, file))
-  const columns = columnsOf(tasks, '2026-10-07', { weeks: 1, startDay: 1 }, '2026-10-05')
-  expect(columns.map(column => [column.id, column.tasks.map(task => task.id)])).toEqual([
+  const sections = sectionsOf(tasks, '2026-10-07', { weeks: 1, startDay: 1 })
+  expect(sections.map(section => [section.when, section.tasks.map(task => task.id)])).toEqual([
     ['now', []],
     ['this-sprint', ['T-001']],
     ['next-sprint', []],
     ['backlog', ['T-002']],
-    ['done', ['T-003']],
   ])
   expect(stepTarget('now', -1)).toBeUndefined()
+  expect(stepTarget('this-sprint', -1)).toBe('now')
   expect(stepTarget('this-sprint', 1)).toBe('next-sprint')
   expect(stepTarget('backlog', 1)).toBeUndefined()
-  expect(stepTarget('done', -1)).toBe('this-sprint')
 })
 
 // ---- The pane ----
 
-test('both views select, move, open and finish a task', async ($, on) => {
+test('a click opens the task menu under its row; its options act and close it', async ($, on) => {
   const { files, commands } = fakeProject(on)
   await $.command.run(tasksCommand())
 
   for (const surface of SURFACES) {
-    for (const view of ['table', 'kanban'] as const) {
-      const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-      if ((await ui.find({ key: 'view' }))?.text !== (view === 'table' ? 'Kanban' : 'Table')) await ui.press({ key: 'view' })
-      expect(await ui.find({ type: 'Text', text: 'Sprint 41 · Oct 5–11' })).toBeDefined()
-      expect(await ui.find({ key: 'card-T-002' })).toBeDefined()
-      expect((await ui.find({ key: 'card-T-003' })) !== undefined).toBe(view === 'kanban')
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    expect(await ui.find({ type: 'Text', text: 'Sprint 41 · Oct 5–11' })).toBeDefined()
+    expect(await ui.find({ key: 'task-T-003' })).toBeUndefined()
+    expect(await ui.find({ key: 'menu-open' })).toBeUndefined()
 
-      await ui.press({ key: 'card-T-002' })
-      expect((await ui.find({ key: 'back' }))?.text).toContain('Next sprint')
-      await ui.press({ key: 'back' })
-      expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('sprint: 2026-10-12')
-      await ui.press({ key: 'forward' })
-      expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('sprint: backlog')
+    await ui.press({ key: 'task-T-002' })
+    expect(await ui.find({ key: 'menu-open' })).toBeDefined()
+    expect(await ui.find({ key: 'menu-backlog' })).toBeUndefined()
+    await ui.press({ key: 'task-T-001' })
+    expect(await ui.find({ key: 'menu-this-sprint' })).toBeUndefined()
+    await ui.press({ key: 'task-T-001' })
+    expect(await ui.find({ key: 'menu-open' })).toBeUndefined()
 
-      commands.length = 0
-      await ui.press({ key: 'card-T-002' })
-      expect(commands.at(-1)).toEqual(['open', `${DIR}/T-002-dark-mode.md`])
-      await ui.unmount()
-    }
+    await ui.press({ key: 'task-T-002' })
+    await ui.press({ key: 'menu-next-sprint' })
+    expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('sprint: 2026-10-12')
+    expect(await ui.find({ key: 'menu-open' })).toBeUndefined()
+
+    commands.length = 0
+    await ui.press({ key: 'task-T-002' })
+    await ui.press({ key: 'menu-open' })
+    expect(commands.at(-1)).toEqual(['open', `${DIR}/T-002-dark-mode.md`])
+    await ui.press({ key: 'task-T-002' })
+    await ui.press({ key: 'menu-backlog' })
+    expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('sprint: backlog')
+    await ui.unmount()
   }
 
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
-  await ui.press({ key: 'card-T-001' })
-  await ui.press({ key: 'done' })
+  await ui.press({ key: 'task-T-001' })
+  await ui.press({ key: 'menu-done' })
   expect(files.get(`${DIR}/T-001-fix-login.md`)).toContain('status: done')
   expect(await ui.find({ type: 'Text', text: '2/2 done' })).toBeDefined()
   expect(files.get(`${ROOT}/docs/tasks.md`)).toContain('T-001 Fix login')
 })
 
-test('the pane opens in the view picked last time', async ($, on) => {
-  fakeProject(on, {}, { 'pane.view': 'kanban' })
-  await $.command.run(tasksCommand())
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
-  expect((await ui.find({ key: 'view' }))?.text).toBe('Table')
-  expect(await ui.find({ key: 'card-T-003' })).toBeDefined()
-})
+for (const surface of SURFACES) {
+  test(`the key line moves the selected task up, down and to the backlog (${surface})`, async ($, on) => {
+    const { files } = fakeProject(on)
+    const file = () => files.get(`${DIR}/T-001-fix-login.md`)
+    await $.command.run(tasksCommand())
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    await ui.press({ key: 'task-T-001' })
+    await ui.press({ key: 'up' })
+    expect(file()).toContain('urgent: true')
+    await ui.press({ key: 'down' })
+    await ui.press({ key: 'down' })
+    expect(file()).toContain('sprint: 2026-10-12')
+    await ui.press({ key: 'backlog' })
+    expect(file()).toContain('sprint: backlog')
+    await ui.press({ key: 'down' })
+    expect(file()).toContain('sprint: backlog')
+  })
+}
 
 test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
   const { commands } = fakeProject(on, { __CFBundleIdentifier: 'com.jetbrains.intellij', TERMINAL_EMULATOR: 'JetBrains-JediTerm' })
   await $.command.run(tasksCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
-  await ui.press({ key: 'card-T-001' })
+  await ui.press({ key: 'task-T-001' })
   await ui.press({ key: 'open' })
   expect(commands.at(-1)).toEqual(['open', '-b', 'com.jetbrains.intellij', `${DIR}/T-001-fix-login.md`])
 })
@@ -182,7 +199,7 @@ test('/tasks config: toggles flip, the stepper steps, pickers pick, all written 
   for (const surface of SURFACES) {
     settings.length = 0
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    expect(await ui.find({ key: 'card-T-001' })).toBeUndefined()
+    expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect((await ui.find({ key: 'worktree' }))?.text).toBe('○ off')
     await ui.press({ key: 'worktree' })
     await ui.press({ key: 'keepAwake' })
@@ -200,7 +217,7 @@ test('/tasks config: toggles flip, the stepper steps, pickers pick, all written 
   }
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
   await ui.press({ key: 'board' })
-  expect(await ui.find({ key: 'card-T-001' })).toBeDefined()
+  expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
 })
 
 test('only settings changed from the default are marked', { options: { worktree: true } }, async ($, on) => {
@@ -232,7 +249,7 @@ test('the phone draws the board and settings without pickers', async ($, on) => 
   fakeProject(on)
   await $.command.run(tasksCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'mobile', ...PANE })
-  await ui.press({ key: 'card-T-001' })
+  await ui.press({ key: 'task-T-001' })
   expect(await ui.find({ key: 'done' })).toBeDefined()
   await ui.press({ key: 'config' })
   expect(await ui.find({ type: 'Text', text: 'auto' })).toBeDefined()
@@ -247,9 +264,10 @@ test('the arrow keys select: the focus ring carries the selection', async ($, on
     component: 'Pane',
     requestId: 'supermanager-tasks',
     plugin: 'supermanager',
-    element: 'card-T-002',
+    element: 'task-T-002',
     origin: { kind: 'person' },
   })
   expect(moved.deny).toBeUndefined()
-  expect((await ui.find({ key: 'card-T-002' }))?.text).toContain('›')
+  expect(await ui.find({ key: 'backlog' })).toBeDefined()
+  expect(await ui.findAll({ type: 'Text', text: /^›$/ })).toHaveLength(1)
 })

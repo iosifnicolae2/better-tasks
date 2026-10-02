@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, Header, columnOf, columnsOf } from './board'
-import type { BoardActions, ColumnId, View } from './board'
+import { Board, Header, sectionsOf } from './board'
+import type { BoardActions } from './board'
 import { ConfigPage } from './configpage'
 import type { ConfigValue } from './configpage'
 import { openCommand } from './editor'
@@ -14,7 +14,7 @@ import type { Editor } from './settings'
 import { SPRINTS_FILE, goalOf, readSprints } from './sprintlog'
 import { sprintLabel, sprintStart } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
-import { listTasks, today } from './tasks'
+import { listTasks, today, whenOf } from './tasks'
 import { isActive } from './team'
 
 // The Tasks pane: /tasks opens the board, /tasks config its settings page. This file holds `$`.
@@ -22,7 +22,6 @@ import { isActive } from './team'
 const PANE = 'supermanager-tasks'
 const REFRESH_MS = 30_000
 const DOCK_COLUMNS = 76
-const VIEW_KEY = 'pane.view'
 const NATIVE_PREFIX = 'Supermanager: '
 
 /** register.tsx registers these at session start; this file answers them. */
@@ -34,7 +33,7 @@ export const PANE_COMMANDS: CommandSpec[] = [
 const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as Task[])
 const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
 const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const, '')
-const viewState = atom({ plugin: 'supermanager', key: 'view' } as const, 'table' as View)
+const menuState = atom({ plugin: 'supermanager', key: 'menu' } as const, '')
 const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as 'board' | 'config')
 
 // ---- With $ ----
@@ -69,9 +68,10 @@ async function setConfig($: EngineInterface, field: string, value: ConfigValue):
   await $.config.set({ key: `supermanager.${field}`, value })
 }
 
-async function setView($: EngineInterface, view: View): Promise<void> {
-  await update($, viewState, () => view)
-  await $.store.set(VIEW_KEY, view)
+/** A click or Enter on a task selects it and opens its menu; on the open one, closes it. */
+async function pressTask($: EngineInterface, task: Task): Promise<void> {
+  await update($, selectedState, () => task.id)
+  await update($, menuState, menu => (menu === task.id ? '' : task.id))
 }
 
 let refreshTimer: { cancel: () => void } | undefined
@@ -80,8 +80,6 @@ async function openPane($: EngineInterface, page: 'board' | 'config'): Promise<v
   const files = filesOf($)
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
-  const stored = await $.store.get(VIEW_KEY)
-  if (stored === 'table' || stored === 'kanban') await update($, viewState, () => stored)
   await update($, pageState, () => page)
   await $.ui.open({ id: PANE, title: 'Tasks', focus: true, columns: DOCK_COLUMNS })
 }
@@ -111,11 +109,13 @@ export function registerPane(on: On, options: PluginOptions): void {
     return described.label.startsWith(NATIVE_PREFIX) ? described : { ...described, label: NATIVE_PREFIX + described.label }
   })
 
-  // Selection follows the focus ring, so the arrow keys select.
+  // Selection follows the focus ring, so the arrow keys select; another task closes the menu.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
-    const card = e.element?.match(/^card-(.+)$/)?.[1]
-    if (card !== undefined && moved.deny === undefined) await update($, selectedState, () => card)
+    const id = e.element?.match(/^task-(.+)$/)?.[1]
+    if (id === undefined || moved.deny !== undefined) return moved
+    await update($, selectedState, () => id)
+    await update($, menuState, menu => (menu === id ? menu : ''))
     return moved
   })
 
@@ -126,36 +126,33 @@ export function registerPane(on: On, options: PluginOptions): void {
     const tasks = await read($, tasksState)
     const team = (await read($, teamState)).filter(isActive)
     const selectedId = await read($, selectedState)
-    const view = await read($, viewState)
+    const menuId = await read($, menuState)
     const page = await read($, pageState)
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
     const sprintsFile = `${await $.session.root()}/${SPRINTS_FILE}`
 
-    const columns = columnsOf(tasks, day, settings.sprint, current)
+    const sections = sectionsOf(tasks, day, settings.sprint)
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
-    const shown = columns.flatMap(column => column.tasks)
-    const selectedTask = shown.find(task => task.id === selectedId)
-    const selected = selectedTask && { task: selectedTask, column: columnOf(selectedTask, day, settings.sprint) }
+    const doneCount = inSprint.filter(task => task.status === 'done').length
+    const selectedTask = sections.flatMap(section => section.tasks).find(task => task.id === selectedId)
+    const selected = selectedTask && { task: selectedTask, when: whenOf(selectedTask, day, settings.sprint) }
     const showPage = (to: 'board' | 'config') => () => void update($, pageState, () => to)
+    const closeMenu = () => update($, menuState, () => '')
 
     const actions: BoardActions = {
-      pressCard: (task, isSelected) =>
-        void (isSelected ? openFile($, settings.editor, task.file) : update($, selectedState, () => task.id)),
-      move: (task: Task, from: ColumnId, to: When) =>
-        void changeTask(files, task, from === 'done' ? { status: 'todo', when: to } : { when: to }, settings.sprint),
-      open: task => void openFile($, settings.editor, task.file),
-      start: task => void $.prompt.submit({ text: startPrompt(task) }),
-      done: task => void finishTask(files, task, {}, settings.sprint),
-      toggleView: () => void setView($, view === 'table' ? 'kanban' : 'table'),
+      pressTask: task => void pressTask($, task),
+      move: (task: Task, to: When) => void changeTask(files, task, { when: to }, settings.sprint).then(closeMenu),
+      open: task => void openFile($, settings.editor, task.file).then(closeMenu),
+      start: task => void $.prompt.submit({ text: startPrompt(task) }).then(closeMenu),
+      done: task => void finishTask(files, task, {}, settings.sprint).then(closeMenu),
       showConfig: showPage('config'),
     }
 
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Header ui={ui} label={sprintLabel(current, settings.sprint)} goal={goal}
-          done={inSprint.filter(task => task.status === 'done').length} total={inSprint.length} />
+        <Header ui={ui} label={sprintLabel(current, settings.sprint)} goal={goal} done={doneCount} total={inSprint.length} />
         {page === 'config' ? (
           <Box marginTop={1}>
             <ConfigPage ui={ui} settings={settings}
@@ -165,8 +162,8 @@ export function registerPane(on: On, options: PluginOptions): void {
               onBack={showPage('board')} />
           </Box>
         ) : (
-          <Board ui={ui} view={view} columns={columns} selected={selected} team={team}
-            limit={settings.contextLimit} actions={actions} />
+          <Board ui={ui} sections={sections} doneCount={doneCount} selected={selected} menuId={menuId}
+            team={team} limit={settings.contextLimit} actions={actions} />
         )}
       </Box>
     )
