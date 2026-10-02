@@ -1,0 +1,134 @@
+import type { ToolSpec } from 'claude-code'
+
+import type { TaskStatus, TurnFacts, When } from '../types'
+import { createDenial } from './coordinator'
+import type { Io } from './io'
+import type { Settings } from './settings'
+import { readSprints, withGoal, writeSprints } from './sprintlog'
+import { nextSprint, sprintLabel, sprintStart } from './sprints'
+import { changeTask } from './taskflow'
+import { createTask, findTask, isOpen, listTasks, taskLine, today } from './tasks'
+import { mateLine, refreshTeam } from './team'
+
+// The tools the model gets, listed as mcp__supermanager__<name>.
+
+const WHEN = { type: 'string', enum: ['now', 'this-sprint', 'next-sprint', 'backlog'] }
+const STATUS = { type: 'string', enum: ['todo', 'doing', 'done', 'cancelled'] }
+
+export const TOOLS: readonly ToolSpec[] = [
+  {
+    name: 'task_create',
+    description:
+      'Create a task file. Never starts it. Ask the user which sprint first (now / this sprint / next sprint / backlog) unless they said.',
+    inputSchema: {
+      type: 'object',
+      properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN },
+      required: ['title', 'goal', 'when'],
+    },
+  },
+  {
+    name: 'task_update',
+    description:
+      'Change a task: status, when (moves it between sprints), owner (teammate name), a dated note. ' +
+      'status "done" also logs it in docs/tasks.md (pass a summary as note, and the commits).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        status: STATUS,
+        when: WHEN,
+        owner: { type: 'string' },
+        note: { type: 'string' },
+        commits: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'task_list',
+    description: 'List open tasks, one line each. sprint: current (default, includes now), next, backlog, or all (done too).',
+    inputSchema: {
+      type: 'object',
+      properties: { sprint: { type: 'string', enum: ['current', 'next', 'backlog', 'all'] } },
+    },
+  },
+  {
+    name: 'sprint_goal',
+    description: "Set the current sprint's one-line goal.",
+    inputSchema: { type: 'object', properties: { goal: { type: 'string' } }, required: ['goal'] },
+  },
+  {
+    name: 'team_status',
+    description: 'Teammates: name, status, context fill and the tasks they own. Check it before routing work.',
+  },
+]
+
+export type ToolAnswer = { result: string } | { deny: string }
+
+type Input = {
+  id?: string
+  title?: string
+  goal?: string
+  when?: When
+  status?: TaskStatus
+  owner?: string
+  note?: string
+  commits?: string
+  sprint?: string
+}
+
+/** The call as the hook saw it: the tool's short name, its input, and who called. */
+export type ToolRun = { name: string; input: Input; facts: TurnFacts; agentId?: string }
+
+export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise<ToolAnswer> {
+  const config = settings.sprint
+  const { input } = run
+  if (run.name === 'task_create') {
+    const denial = createDenial(run.facts, run.agentId)
+    if (denial) return { deny: denial }
+    const when = input.when ?? 'backlog'
+    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when }, config)
+    return { result: `Created ${task.id} (${when}): ${task.file}. Not started.` }
+  }
+  if (run.name === 'task_update') {
+    const task = await findTask(io, input.id ?? '')
+    if (!task) return { deny: `No task ${input.id}.` }
+    const changed = await changeTask(io, task, input, config)
+    return { result: taskLine(changed, await today(io), config) }
+  }
+  if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
+  if (run.name === 'sprint_goal') return { result: await setGoal(io, input.goal ?? '', settings) }
+  if (run.name === 'team_status') return { result: await teamStatus(io) }
+  return { deny: `Unknown tool ${run.name}.` }
+}
+
+async function taskList(io: Io, which: string, settings: Settings): Promise<string> {
+  const config = settings.sprint
+  const day = await today(io)
+  const current = sprintStart(day, config)
+  const picks: Record<string, (sprint: string) => boolean> = {
+    current: sprint => sprint === current,
+    next: sprint => sprint === nextSprint(current, config),
+    backlog: sprint => sprint === 'backlog',
+  }
+  const pick = picks[which] ?? (() => true)
+  const tasks = (await listTasks(io)).filter(task => pick(task.sprint) && (which === 'all' || isOpen(task)))
+  return tasks.length === 0 ? 'No tasks.' : tasks.map(task => taskLine(task, day, config)).join('\n')
+}
+
+async function setGoal(io: Io, goal: string, settings: Settings): Promise<string> {
+  const start = sprintStart(await today(io), settings.sprint)
+  const label = sprintLabel(start, settings.sprint)
+  await writeSprints(io, withGoal(await readSprints(io), start, label, goal))
+  return `${label} goal: ${goal}`
+}
+
+async function teamStatus(io: Io): Promise<string> {
+  const team = await refreshTeam(io)
+  const tasks = (await listTasks(io)).filter(isOpen)
+  const lines = team.map(mate => {
+    const owned = tasks.filter(task => task.owner === mate.name).map(task => task.id)
+    return `${mateLine(mate)}${owned.length ? ` · ${owned.join(', ')}` : ''}`
+  })
+  return lines.length ? lines.join('\n') : 'No teammates.'
+}

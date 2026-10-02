@@ -1,12 +1,9 @@
-import { update } from 'claude-code'
-import type { EngineInterface } from 'claude-code'
-
 import type { Task } from '../types'
+import type { Files } from './io'
 import { goalOf, readSprints, withReview, writeSprints } from './sprintlog'
-import { sprintLabel, sprintStart } from './sprints'
+import { sprintLabel } from './sprints'
 import type { SprintConfig } from './sprints'
-import { noticeState } from './state'
-import { isOpen, listTasks, saveTask, today } from './tasks'
+import { isOpen, listTasks, saveTask } from './tasks'
 
 // The sprint boundary: unfinished work rolls into the new sprint, the old one gets a review.
 
@@ -21,35 +18,25 @@ export function shippedIn(tasks: readonly Task[], sprint: string): Task[] {
   return tasks.filter(task => task.status === 'done' && task.sprint === sprint)
 }
 
-async function storeKey($: EngineInterface): Promise<string> {
-  return `sprint:${await $.session.root()}`
-}
+export type RollOver = { toast: string; notice: string }
 
-/** Checks whether a new sprint began since last seen; rolls over when it did. */
-export async function checkSprint($: EngineInterface, config: SprintConfig): Promise<void> {
-  const key = await storeKey($)
-  const current = sprintStart(await today($), config)
-  const seen = (await $.store.get(key)) as string | undefined
-  if (seen !== undefined && seen < current) await rollOver($, seen, current, config)
-  if (seen !== current) await $.store.set(key, current)
-}
-
-export async function rollOver($: EngineInterface, old: string, current: string, config: SprintConfig): Promise<void> {
-  const tasks = await listTasks($)
+/** Moves unfinished work into `current` and writes the review of `old`. */
+export async function rollOver(files: Files, old: string, current: string, config: SprintConfig): Promise<RollOver> {
+  const tasks = await listTasks(files)
   const moved = rolledOver(tasks, current)
   const shipped = shippedIn(tasks, old)
-  for (const task of moved) await saveTask($, task)
+  for (const task of moved) await saveTask(files, task)
 
   const oldLabel = sprintLabel(old, config)
-  await writeSprints($, withReview(await readSprints($), old, oldLabel, { shipped, rolled: moved }))
+  const sprints = withReview(await readSprints(files), old, oldLabel, { shipped, rolled: moved })
+  await writeSprints(files, sprints)
 
   const label = sprintLabel(current, config)
   const summary = `${oldLabel} shipped ${shipped.length}, rolled over ${moved.length}.`
-  $.ui.toast(`${label} started. ${summary}`)
-  const goal = goalOf(await readSprints($), current)
-  await update($, noticeState, () =>
-    `${label} just started. ${summary} ` +
-    (goal ? `Its goal is "${goal}". ` : 'Ask the user for its goal (then call sprint_goal). ') +
-    'Ask which backlog tasks to pull in. Start nothing on your own.',
-  )
+  const goal = goalOf(sprints, current)
+  const ask = goal ? `Its goal is "${goal}". ` : 'Ask the user for its goal (then call sprint_goal). '
+  return {
+    toast: `${label} started. ${summary}`,
+    notice: `${label} just started. ${summary} ${ask}Ask which backlog tasks to pull in. Start nothing on your own.`,
+  }
 }

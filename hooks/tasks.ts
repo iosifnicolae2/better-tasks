@@ -1,10 +1,7 @@
-import { update } from 'claude-code'
-import type { EngineInterface } from 'claude-code'
-
 import type { Task, TaskStatus, When } from '../types'
+import type { Files } from './io'
 import { dayOf, nextSprint, sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
-import { tasksState } from './state'
 
 export const TASKS_DIR = '.claude/manager/tasks'
 
@@ -92,46 +89,45 @@ export function taskLine(task: Task, today: string, config: SprintConfig): strin
   return parts.join(' · ')
 }
 
-// ---- With $: the task files of the session's project ----
+// ---- With files: the task files of the session's project ----
 
-export async function tasksDir($: EngineInterface): Promise<string> {
-  return `${await $.session.root()}/${TASKS_DIR}`
+export async function tasksDir(files: Files): Promise<string> {
+  return `${await files.root()}/${TASKS_DIR}`
 }
 
-export async function today($: EngineInterface): Promise<string> {
-  return dayOf(await $.clock.now())
+export async function today(files: Files): Promise<string> {
+  return dayOf(await files.now())
 }
+
+const byId = (a: Task, b: Task) => a.id.localeCompare(b.id, undefined, { numeric: true })
 
 /** Reads every task file and publishes the list to the pane. */
-export async function listTasks($: EngineInterface): Promise<Task[]> {
-  const dir = await tasksDir($)
-  const entries = await $.fs.list(dir).catch(() => [])
+export async function listTasks(files: Files): Promise<Task[]> {
+  const dir = await tasksDir(files)
+  const entries = await files.list(dir).catch(() => [])
   const names = entries.filter(entry => entry.kind === 'file' && /^T-\d+.*\.md$/.test(entry.name))
   const tasks = await Promise.all(
-    names.map(async entry => parseTask(await $.fs.read(`${dir}/${entry.name}`), `${dir}/${entry.name}`)),
+    names.map(async entry => parseTask(await files.read(`${dir}/${entry.name}`), `${dir}/${entry.name}`)),
   )
-  tasks.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
-  await update($, tasksState, () => tasks)
+  tasks.sort(byId)
+  await files.publishTasks(tasks)
   return tasks
 }
 
-export async function findTask($: EngineInterface, id: string): Promise<Task | undefined> {
-  return (await listTasks($)).find(task => task.id.toLowerCase() === id.trim().toLowerCase())
+export async function findTask(files: Files, id: string): Promise<Task | undefined> {
+  return (await listTasks(files)).find(task => task.id.toLowerCase() === id.trim().toLowerCase())
 }
 
-export async function saveTask($: EngineInterface, task: Task): Promise<void> {
-  await $.fs.write(task.file, formatTask(task))
-  await update($, tasksState, tasks => {
-    const others = (tasks ?? []).filter(one => one.id !== task.id)
-    return [...others, task].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
-  })
+/** Writes the task file; the fs.write hook publishes the fresh list. */
+export async function saveTask(files: Files, task: Task): Promise<void> {
+  await files.write(task.file, formatTask(task))
 }
 
 export type NewTask = { title: string; goal: string; when: When }
 
-export async function createTask($: EngineInterface, input: NewTask, config: SprintConfig): Promise<Task> {
-  const day = await today($)
-  const id = nextId(await listTasks($))
+export async function createTask(files: Files, input: NewTask, config: SprintConfig): Promise<Task> {
+  const day = await today(files)
+  const id = nextId(await listTasks(files))
   const task: Task = {
     id,
     title: input.title.trim(),
@@ -140,9 +136,9 @@ export async function createTask($: EngineInterface, input: NewTask, config: Spr
     owner: '',
     rolled: 0,
     created: day,
-    file: `${await tasksDir($)}/${id}-${slugOf(input.title)}.md`,
+    file: `${await tasksDir(files)}/${id}-${slugOf(input.title)}.md`,
     body: bodyOf(input.goal),
   }
-  await saveTask($, task)
+  await saveTask(files, task)
   return task
 }

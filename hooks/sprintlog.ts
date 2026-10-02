@@ -1,6 +1,5 @@
-import type { EngineInterface } from 'claude-code'
-
 import type { Task } from '../types'
+import type { Files } from './io'
 
 // sprints.md: one "## <start> · <label>" section per sprint, its goal and review.
 
@@ -47,14 +46,14 @@ export function withReview(text: string, start: string, label: string, review: R
   return withSection(text, start, label, section => `${section.trimEnd()}\n${block}`)
 }
 
-async function sprintsPath($: EngineInterface): Promise<string> {
-  return `${await $.session.root()}/${SPRINTS_FILE}`
+async function sprintsPath(files: Files): Promise<string> {
+  return `${await files.root()}/${SPRINTS_FILE}`
 }
 
-export async function readSprints($: EngineInterface): Promise<string> {
-  return $.fs.read(await sprintsPath($)).catch(() => '')
+export async function readSprints(files: Files): Promise<string> {
+  return files.read(await sprintsPath(files)).catch(() => '')
 }
 
-export async function writeSprints($: EngineInterface, text: string): Promise<void> {
-  await $.fs.write(await sprintsPath($), text)
+export async function writeSprints(files: Files, text: string): Promise<void> {
+  await files.write(await sprintsPath(files), text)
 }

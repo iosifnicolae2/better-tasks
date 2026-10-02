@@ -36,6 +36,8 @@ declare module 'claude-code' {
       tokens: Record<string, number>
       notice: string
       turn: TurnFacts
+      /** The Tasks pane's selected task id. */
+      selected: string
     }
   }
 }

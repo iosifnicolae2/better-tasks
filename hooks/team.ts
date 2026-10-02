@@ -1,11 +1,9 @@
-import { read, update } from 'claude-code'
-import type { EngineInterface, ModelUsage, On } from 'claude-code'
+import type { AgentInfo, ModelUsage } from 'claude-code'
 
 import type { Teammate } from '../types'
-import type { Settings } from './settings'
-import { teamState, tokensState } from './state'
+import type { Io } from './io'
 
-// Teammates: who they are, how full their context is, and the guard that keeps work off full ones.
+// Teammates: who they are, how full their context is, and when they are too full for new work.
 
 const ENDED = ['completed', 'failed', 'killed']
 
@@ -14,16 +12,15 @@ export const contextTokens = (usage: ModelUsage) =>
 
 export const isActive = (mate: Teammate) => !ENDED.includes(mate.status)
 
+export const isFull = (mate: Teammate, limit: number) => mate.percent !== undefined && mate.percent > limit
+
 export function percentOf(tokens: number | undefined, window: number): number | undefined {
   return tokens === undefined || window <= 0 ? undefined : Math.round((tokens / window) * 100)
 }
 
-/** Reads the session's named agents and publishes them with their context fill. */
-export async function refreshTeam($: EngineInterface): Promise<Teammate[]> {
-  const agents = await $.agent.list()
-  const tokens = await read($, tokensState)
-  const { window } = (await $.session.usage()).context
-  const team = agents
+/** The named agents of the session, with their context fill. */
+export function teamOf(agents: readonly AgentInfo[], tokens: Record<string, number>, window: number): Teammate[] {
+  return agents
     .filter(agent => agent.name !== undefined || agent.type === 'teammate')
     .map(agent => ({
       id: agent.id,
@@ -31,13 +28,25 @@ export async function refreshTeam($: EngineInterface): Promise<Teammate[]> {
       status: agent.status,
       percent: percentOf(tokens[agent.id], window),
     }))
-  await update($, teamState, () => team)
+}
+
+export async function refreshTeam(io: Io): Promise<Teammate[]> {
+  const team = teamOf(await io.agents(), await io.tokens(), await io.window())
+  await io.publishTeam(team)
   return team
 }
 
+/** The teammate a SendMessage `to` names (a name, "name [ref]" or an agent id). */
 export function findMate(team: readonly Teammate[], to: string): Teammate | undefined {
   const name = to.replace(/\s*\[.*\]$/, '').trim()
   return team.find(mate => mate.name === name || mate.id === name)
+}
+
+/** Why a message to `to` is refused, or undefined when it may go. */
+export function sendDenial(team: readonly Teammate[], to: string, message: unknown, limit: number): string | undefined {
+  if (typeof message !== 'string' || message.trimStart().startsWith('HANDOFF:')) return undefined
+  const mate = findMate(team, to)
+  return mate && isFull(mate, limit) ? handoffAdvice(mate, limit) : undefined
 }
 
 export function handoffAdvice(mate: Teammate, limit: number): string {
@@ -51,25 +60,4 @@ export function handoffAdvice(mate: Teammate, limit: number): string {
 export function mateLine(mate: Teammate): string {
   const fill = mate.percent === undefined ? 'context ?' : `context ${mate.percent} %`
   return `${mate.name} · ${mate.status} · ${fill}`
-}
-
-export function registerTeam(on: On, settings: Settings): void {
-  on('turn.step', async function* ($, e, next) {
-    const result = yield* next(e)
-    const agentId = e.agentId
-    if (agentId !== undefined && result.usage) {
-      const tokens = contextTokens(result.usage)
-      await update($, tokensState, all => ({ ...all, [agentId]: tokens }))
-      await refreshTeam($)
-    }
-    return result
-  })
-
-  on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {
-    const isPlainWork = typeof e.message === 'string' && !e.message.trimStart().startsWith('HANDOFF:')
-    if (!isPlainWork) return next(e)
-    const mate = findMate(await refreshTeam($), String(e.to))
-    const isFull = mate?.percent !== undefined && mate.percent > settings.contextLimit
-    return mate && isFull ? { deny: handoffAdvice(mate, settings.contextLimit) } : next(e)
-  })
 }

@@ -1,0 +1,76 @@
+import type { Task, TaskStatus, When } from '../types'
+import type { Files } from './io'
+import { sprintStart } from './sprints'
+import type { SprintConfig } from './sprints'
+import { placeOf, saveTask, today, withNote } from './tasks'
+
+// What happens to a task: changed, started, finished (finished ones are logged in docs/tasks.md).
+
+export const LOG_FILE = 'docs/tasks.md'
+
+const LOG_HEADER =
+  '# Finished tasks\n' +
+  'One row per finished task; grep it, don\'t read it: `grep -i <word> docs/tasks.md`.\n\n' +
+  'date | teammate | task | summary | commits | session\n' +
+  '--- | --- | --- | --- | --- | ---\n'
+
+export type TaskChange = {
+  status?: TaskStatus
+  when?: When
+  owner?: string
+  note?: string
+  commits?: string
+}
+
+const cell = (text: string) => text.replace(/\s*\n\s*/g, ' ').replace(/\|/g, '/').trim()
+
+export function logRow(task: Task, day: string, session: string, change: TaskChange): string {
+  const owner = task.owner || 'main'
+  const cells = [
+    day,
+    owner,
+    `${task.id} ${task.title}`,
+    change.note ?? task.title,
+    change.commits ?? '',
+    `session ${session} teammate ${owner}`,
+  ]
+  return `${cells.map(cell).join(' | ')}\n`
+}
+
+/** Applies a change to a task; `done` also moves it into the current sprint and logs it. */
+export async function changeTask(
+  files: Files,
+  task: Task,
+  change: TaskChange,
+  config: SprintConfig,
+): Promise<Task> {
+  const day = await today(files)
+  let next: Task = { ...task }
+  if (change.when) next = { ...next, ...placeOf(change.when, day, config) }
+  if (change.owner !== undefined) next.owner = change.owner.trim()
+  if (change.status) next.status = change.status
+  if (change.note) next.body = withNote(next.body, day, change.note)
+  if (change.status === 'done') next = { ...next, urgent: false, sprint: sprintStart(day, config) }
+  await saveTask(files, next)
+  if (change.status === 'done' && task.status !== 'done') await logDone(files, next, day, change)
+  return next
+}
+
+async function logDone(files: Files, task: Task, day: string, change: TaskChange): Promise<void> {
+  const path = `${await files.root()}/${LOG_FILE}`
+  const text = await files.read(path).catch(() => LOG_HEADER)
+  const row = logRow(task, day, await files.sessionId(), change)
+  await files.write(path, `${text.endsWith('\n') ? text : `${text}\n`}${row}`)
+}
+
+export function finishTask(files: Files, task: Task, change: TaskChange, config: SprintConfig): Promise<Task> {
+  return changeTask(files, task, { ...change, status: 'done' }, config)
+}
+
+/** What to tell the coordinator to start a task now. */
+export function startPrompt(task: Task): string {
+  return (
+    `Start ${task.id} "${task.title}" now. Route it to the teammate that owns this area ` +
+    `(check team_status) or spawn one, and give it the task file ${task.file}.`
+  )
+}
