@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, Header, sectionsOf, stepId } from './board'
-import type { BoardActions } from './board'
+import { Board, Header, sectionsOf, shifted, stepId } from './board'
+import type { BoardActions, Section } from './board'
 import { ConfigPage } from './configpage'
 import { SessionView, linesOf } from './sessionview'
 import type { ConfigValue } from './configpage'
@@ -14,8 +14,9 @@ import { settingsOf } from './settings'
 import type { Editor } from './settings'
 import { SPRINTS_FILE, goalOf, readSprints } from './sprintlog'
 import { sprintLabel, sprintStart } from './sprints'
+import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
-import { listTasks, today, whenOf } from './tasks'
+import { listTasks, placeOf, saveTask, today, whenOf } from './tasks'
 import { isActive } from './team'
 
 // The Supermanager pane: /supermanager opens the board, /supermanager config its settings page. This file holds `$`.
@@ -23,7 +24,8 @@ import { isActive } from './team'
 
 const PANE = 'supermanager-sprint'
 const REFRESH_MS = 30_000
-const DOCK_COLUMNS = 76
+const FOCUS_RETRY_MS = 150
+const PANE_OPEN = { id: PANE, title: 'Sprint', focus: true, columns: 76 } as const
 const NATIVE_PREFIX = 'Supermanager: '
 
 type Page = 'board' | 'config' | 'session'
@@ -37,7 +39,6 @@ export const PANE_COMMANDS: CommandSpec[] = [
 const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as Task[])
 const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
 const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const, '')
-const menuState = atom({ plugin: 'supermanager', key: 'menu' } as const, '')
 const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as Page)
 const viewingState = atom({ plugin: 'supermanager', key: 'viewing' } as const, '')
 
@@ -73,11 +74,6 @@ async function setConfig($: EngineInterface, field: string, value: ConfigValue):
   await $.config.set({ key: `supermanager.${field}`, value })
 }
 
-/** A click or Enter on a task selects it and opens its menu; on the open one, closes it. */
-async function pressTask($: EngineInterface, task: Task): Promise<void> {
-  await update($, selectedState, () => task.id)
-  await update($, menuState, menu => (menu === task.id ? '' : task.id))
-}
 
 /** The teammate page: a live look at its session, with how to switch Claude Code's own view to it. */
 async function viewSession($: EngineInterface, agentId: string): Promise<void> {
@@ -85,13 +81,29 @@ async function viewSession($: EngineInterface, agentId: string): Promise<void> {
   await update($, pageState, () => 'session')
 }
 
-/** j/k: selects the task, closes the menu and moves the focus ring onto it. */
+/** Selects the task and keeps the focus ring on it (best effort: only while the pane holds the keys). */
 async function selectTask($: EngineInterface, id: string | undefined): Promise<void> {
   if (id === undefined) return
   await update($, selectedState, () => id)
-  await update($, menuState, () => '')
-  // Best effort: the ring only moves while the pane holds the keys.
   await $.ui.focus({ requestId: PANE, key: `task-${id}` }).catch(() => undefined)
+}
+
+/**
+ * ⌥↑/⌥↓: one place up or down, across into the next section at an edge. Every task of the
+ * section it lands in is renumbered, so the order in the files is the order on screen.
+ */
+async function shiftTask(files: Files, sections: Section[], task: Task, step: -1 | 1, config: SprintConfig): Promise<void> {
+  const moved = shifted(sections, task.id, step)
+  if (moved === undefined) return
+  const day = await today(files)
+  const all = sections.flatMap(section => section.tasks)
+  for (const [order, id] of moved.ids.entries()) {
+    const one = all.find(candidate => candidate.id === id)
+    if (one === undefined) continue
+    const place = id === task.id ? placeOf(moved.when, day, config) : {}
+    const next = { ...one, ...place, order }
+    if (next.order !== one.order || next.sprint !== one.sprint || next.urgent !== one.urgent) await saveTask(files, next)
+  }
 }
 
 let refreshTimer: { cancel: () => void } | undefined
@@ -101,7 +113,10 @@ async function openPane($: EngineInterface, page: Page): Promise<void> {
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
   await update($, pageState, () => page)
-  await $.ui.open({ id: PANE, title: 'Sprint', focus: true, columns: DOCK_COLUMNS })
+  await $.ui.open(PANE_OPEN)
+  // The pane only takes the keys while the prompt holds them over an empty composer, which the
+  // command's own run may not leave in time; ask once more right after it.
+  $.clock.after(FOCUS_RETRY_MS, () => void $.ui.open(PANE_OPEN))
 }
 
 function dockTip(presentation: CommandPresentation): string {
@@ -120,7 +135,7 @@ export function registerPane(on: On, options: PluginOptions): void {
   on('command.run', { command: 'supermanager' }, async ($, e) => {
     const page = e.args.trim() === 'config' ? 'config' : 'board'
     await openPane($, page)
-    return { text: `Sprint board opened.${dockTip(e.presentation)}` }
+    return { text: `Sprint board opened. If its keys do nothing, ctrl+x tab gives it the keyboard.${dockTip(e.presentation)}` }
   })
 
   // In Claude Code's own /config menu our rows read "Supermanager: …", so they are easy to find.
@@ -136,13 +151,11 @@ export function registerPane(on: On, options: PluginOptions): void {
     return next(e)
   })
 
-  // Selection follows the focus ring, so the arrow keys select; another task closes the menu.
+  // Selection follows the focus ring, so the arrow keys select.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const moved = await next(e)
     const id = e.element?.match(/^task-(.+)$/)?.[1]
-    if (id === undefined || moved.deny !== undefined) return moved
-    await update($, selectedState, () => id)
-    await update($, menuState, menu => (menu === id ? menu : ''))
+    if (id !== undefined && moved.deny === undefined) await update($, selectedState, () => id)
     return moved
   })
 
@@ -166,7 +179,6 @@ export function registerPane(on: On, options: PluginOptions): void {
     }
 
     const selectedId = await read($, selectedState)
-    const menuId = await read($, menuState)
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
@@ -176,22 +188,26 @@ export function registerPane(on: On, options: PluginOptions): void {
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
     const doneCount = inSprint.filter(task => task.status === 'done').length
     const order = sections.flatMap(section => section.tasks.map(task => task.id))
-    const selectedTask = sections.flatMap(section => section.tasks).find(task => task.id === selectedId)
+    const shown = sections.flatMap(section => section.tasks)
+    // Always a selection while there are tasks, so the detail area and ⌥↑/⌥↓ work from the start.
+    const selectedTask = shown.find(task => task.id === selectedId) ?? shown[0]
     const selected = selectedTask && {
       task: selectedTask,
       when: whenOf(selectedTask, day, settings.sprint),
       mate: team.find(one => one.name === selectedTask.owner),
     }
-    const closeMenu = () => update($, menuState, () => '')
+    const keepFocus = (id: string | undefined) => () => selectTask($, id)
+    const nextAfter = (id: string) => order[order.indexOf(id) + 1] ?? order[order.indexOf(id) - 1]
 
     const actions: BoardActions = {
-      pressTask: task => void pressTask($, task),
+      pressTask: (task, isSelected) => void (isSelected ? openFile($, settings.editor, task.file) : selectTask($, task.id)),
       selectStep: step => void selectTask($, stepId(order, selectedTask?.id, step)),
-      move: (task: Task, to: When) => void changeTask(files, task, { when: to }, settings.sprint).then(closeMenu),
-      open: task => void openFile($, settings.editor, task.file).then(closeMenu),
-      start: task => void $.prompt.submit({ text: startPrompt(task) }).then(closeMenu),
-      done: task => void finishTask(files, task, {}, settings.sprint).then(closeMenu),
-      view: mate => void viewSession($, mate.id).then(closeMenu),
+      shift: (task, step) => void shiftTask(files, sections, task, step, settings.sprint).then(keepFocus(task.id)),
+      move: (task: Task, to: When) => void changeTask(files, task, { when: to }, settings.sprint).then(keepFocus(task.id)),
+      open: task => void openFile($, settings.editor, task.file),
+      start: task => void $.prompt.submit({ text: startPrompt(task) }),
+      done: task => void finishTask(files, task, {}, settings.sprint).then(keepFocus(nextAfter(task.id))),
+      view: mate => void viewSession($, mate.id),
       showConfig: showPage('config'),
     }
 
@@ -207,8 +223,8 @@ export function registerPane(on: On, options: PluginOptions): void {
               onBack={showPage('board')} />
           </Box>
         ) : (
-          <Board ui={ui} sections={sections} doneCount={doneCount} selected={selected} menuId={menuId}
-            team={team} limit={settings.contextLimit} actions={actions} />
+          <Board ui={ui} sections={sections} doneCount={doneCount} selected={selected} team={team}
+            limit={settings.contextLimit} hasKeys={e.props.isFocused} actions={actions} />
         )}
       </Box>
     )
