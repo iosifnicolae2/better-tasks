@@ -68,7 +68,7 @@ In `/config` (rows `supermanager.*`) or the pane's config row.
 
 | setting | default | what |
 | --- | --- | --- |
-| `editor` | `default` | opens task files: `default` (macOS `open`), `code`, `idea`, `cursor`, `zed` |
+| `editor` | `auto` | opens task files: `auto` (IntelliJ in a JetBrains terminal, VS Code in VS Code, else default), `default` (macOS `open`), `code`, `idea`, `cursor`, `zed` |
 | `worktree` | off | each named teammate works in its own git worktree |
 | `contextLimit` | 50 | % of context above which a teammate gets no new work |
 | `keepAwake` | on | holds `caffeinate` while any teammate runs |

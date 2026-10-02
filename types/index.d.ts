@@ -38,6 +38,10 @@ declare module 'claude-code' {
       turn: TurnFacts
       /** The Tasks pane's selected task id. */
       selected: string
+      /** The Tasks pane's board layout. */
+      view: 'table' | 'kanban'
+      /** The Tasks pane's page. */
+      page: 'board' | 'config'
     }
   }
 }
