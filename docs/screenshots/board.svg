@@ -331,10 +331,8 @@
 <text x="763.6" y="543.25" fill="rgb(255,255,255)" textLength="67.2" xml:space="preserve">: Open  </text>
 <text x="830.8" y="543.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">d</text>
 <text x="839.2" y="543.25" fill="rgb(255,255,255)" textLength="134.4" xml:space="preserve">: Mark as done  </text>
-<text x="973.6" y="543.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">v</text>
-<text x="982.0" y="543.25" fill="rgb(255,255,255)" textLength="134.4" xml:space="preserve">: View session  </text>
-<text x="1116.4" y="543.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">m</text>
-<text x="1124.8" y="543.25" fill="rgb(255,255,255)" textLength="126.0" xml:space="preserve">: Move         </text>
+<text x="973.6" y="543.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">m</text>
+<text x="982.0" y="543.25" fill="rgb(255,255,255)" textLength="268.8" xml:space="preserve">: Move                          </text>
 <text x="1250.8" y="543.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <rect x="58.0" y="548" width="9" height="19" fill="rgb(255,255,255)"/>
 <text x="24.4" y="562.25" fill="rgb(136,136,136)" textLength="8.4" xml:space="preserve">│</text>

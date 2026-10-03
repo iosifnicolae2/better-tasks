@@ -75,14 +75,6 @@ async function demo($: Engine, on: On): Promise<void> {
   on('ui.focus', () => ({}))
   on('ui.log', () => ({ value: undefined }))
   on('tool.call', { tool: 'Edit' }, () => ({ result: 'edited' }))
-  on('session.messages', () => ({
-    value: [
-      { role: 'user' as const, text: 'T-007: login loops after a password reset. Task file: .claude/tasks/T-007.md', toolUses: [] },
-      { role: 'assistant' as const, text: 'The reset flow keeps the old session cookie; reading the middleware.', toolUses: [{ tool_use_id: 'u1', tool: 'Read', input: { file_path: '/demo/src/session.ts' } }] },
-      { role: 'assistant' as const, text: '', toolUses: [{ tool_use_id: 'u2', tool: 'Bash', input: { command: 'npm test -- auth' } }] },
-      { role: 'assistant' as const, text: 'Reproduced: the redirect sees a stale cookie. Clearing it on reset.', toolUses: [{ tool_use_id: 'u3', tool: 'Edit', input: { file_path: '/demo/src/auth.ts' } }] },
-    ],
-  }))
   on('turn.step', async function* ($, e) {
     const usage = { input_tokens: 630, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'm' }
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
@@ -131,11 +123,4 @@ test('screenshot: settings', async ($, on) => {
   await ui.press({ key: 'config' })
   await arrowTo($, 'cfg-contextLimit')
   await shoot('settings', ui, 'cfg-contextLimit')
-})
-
-test('screenshot: a teammate session', async ($, on) => {
-  await demo($, on)
-  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
-  await ui.press({ key: 'view' })
-  await shoot('session', ui)
 })

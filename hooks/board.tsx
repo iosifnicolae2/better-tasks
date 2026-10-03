@@ -129,8 +129,6 @@ export type BoardActions = {
   start: (task: Task) => void
   done: (task: Task) => void
   reopen: (task: Task) => void
-  /** Shows the session of the teammate working on the task. */
-  view: (mate: Teammate) => void
   /** Move: the task follows ↑↓ until Enter. */
   startMoving: (task: Task) => void
   toggleClosed: () => void
@@ -416,7 +414,6 @@ function ActionLines({ ui, selected, when, hasKeys, actions }: ActionProps) {
         <Button key="open" plain hotkey="o" label="Open" onPress={() => actions.open(task)} />
         {task.status === 'todo' && <Button key="start" plain hotkey="s" label="Start" onPress={() => actions.start(task)} />}
         <Button key="done" plain hotkey="d" label="Mark as done" onPress={() => actions.done(task)} />
-        {mate && <Button key="view" plain hotkey="v" label="View session" onPress={() => actions.view(mate)} />}
         <Button key="move" plain hotkey="m" label="Move" onPress={() => actions.startMoving(task)} />
       </DetailLine>
       <DetailLine ui={ui}>

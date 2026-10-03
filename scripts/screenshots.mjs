@@ -199,16 +199,6 @@ const SCENES = {
     gap(),
   ],
   settings: [you('/better-tasks config'), result('Sprint board opened.'), gap(), ...ASKED],
-  session: [
-    you('how is auth doing on T-007?'),
-    gap(),
-    tool('better-tasks - team_status (MCP)', ''),
-    result('auth · running · context 63% · editing auth.ts'),
-    gap(),
-    says('auth reproduced the loop (a stale cookie after the reset) and is fixing'),
-    says('auth.ts now. It’s at 63 %, over the 50 % limit: new work goes elsewhere.'),
-    gap(),
-  ],
 }
 
 function sceneLine(pieces, width) {

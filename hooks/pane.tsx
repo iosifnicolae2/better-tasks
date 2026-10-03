@@ -5,7 +5,6 @@ import type { Task, Teammate, When } from '../types'
 import { Board, sectionsOf, shortDates, shifted } from './board'
 import type { BoardActions, Section, SprintFacts } from './board'
 import { ConfigPage } from './configpage'
-import { SessionView, linesOf } from './sessionview'
 import type { ConfigValue, ProjectFacts } from './configpage'
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
@@ -35,7 +34,7 @@ const CLOSED_KEY = 'pane.closedOpen'
 const CONFIG_ROW_KEY = 'pane.configRow'
 const NATIVE_PREFIX = 'Better Tasks: '
 
-type Page = 'board' | 'config' | 'session'
+type Page = 'board' | 'config'
 
 /** register.tsx registers these at session start; this file answers them. */
 export const PANE_COMMANDS: CommandSpec[] = [
@@ -47,7 +46,6 @@ const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as
 const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
 const selectedState = atom({ plugin: 'better-tasks', key: 'selected' } as const, '')
 const pageState = atom({ plugin: 'better-tasks', key: 'page' } as const, 'board' as Page)
-const viewingState = atom({ plugin: 'better-tasks', key: 'viewing' } as const, '')
 const movingState = atom({ plugin: 'better-tasks', key: 'moving' } as const, '')
 const actingState = atom({ plugin: 'better-tasks', key: 'acting' } as const, '')
 
@@ -87,11 +85,6 @@ async function setConfig($: EngineInterface, field: string, value: ConfigValue):
 }
 
 
-/** The teammate page: a live look at its session, with how to switch Claude Code's own view to it. */
-async function viewSession($: EngineInterface, agentId: string): Promise<void> {
-  await update($, viewingState, () => agentId)
-  await update($, pageState, () => 'session')
-}
 
 /**
  * Enter on the selected task: the keys go to its actions. Only the task's row and the actions take
@@ -356,19 +349,10 @@ export function registerPane(on: On, options: PluginOptions): void {
     const files = filesOf($, options)
     const settings = await settingsFrom(files)
     const tasks = await read($, tasksState)
-    const viewing = await read($, viewingState)
     const everyone = await read($, teamState)
     const team = everyone.filter(isActive)
     const page = await read($, pageState)
     const showPage = (to: Page) => () => void update($, pageState, () => to)
-
-    if (page === 'session') {
-      const mate = everyone.find(one => one.id === viewing)
-      const task = tasks.find(one => mate !== undefined && one.owner === mate.name && one.status === 'doing')
-      const found = mate && (await $.session.messages({ agentId: mate.id }))
-      const lines = found === undefined || 'deny' in found ? 'Its session cannot be read from here.' : linesOf(found)
-      return <SessionView ui={ui} mate={mate} task={task} lines={lines} limit={settings.contextLimit} onBack={showPage('board')} />
-    }
 
     const selectedId = await read($, selectedState)
     const movingId = await read($, movingState)
@@ -416,7 +400,6 @@ export function registerPane(on: On, options: PluginOptions): void {
       start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task) })).then(keepFocus(task.id)),
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
-      view: mate => void leave().then(() => viewSession($, mate.id)),
       toggleClosed: () => void toggleClosed($),
       showConfig: () => void leave().then(showPage('config')),
     }
