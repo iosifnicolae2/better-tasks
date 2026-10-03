@@ -27,6 +27,8 @@ const PANE = 'supermanager-sprint'
 const REFRESH_MS = 30_000
 const FOCUS_RETRY_MS = 150
 const PANE_OPEN = { id: PANE, title: 'Sprint', focus: true, columns: 76 } as const
+/** $.store key: the board was open when this project's last session ended. */
+const OPEN_KEY = 'pane.open'
 const NATIVE_PREFIX = 'Supermanager: '
 
 type Page = 'board' | 'config' | 'session'
@@ -170,6 +172,23 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
   }
 }
 
+async function rememberOpen($: EngineInterface, isOpen: boolean): Promise<void> {
+  const root = await $.session.root()
+  const open = ((await $.store.get(OPEN_KEY)) ?? {}) as Record<string, boolean>
+  await $.store.set(OPEN_KEY, { ...open, [root]: isOpen })
+}
+
+/** At start: the board comes back if it was open when this project's last session ended. */
+async function reopenIfOpenBefore($: EngineInterface, options: PluginOptions): Promise<void> {
+  const open = ((await $.store.get(OPEN_KEY)) ?? {}) as Record<string, boolean>
+  if (open[await $.session.root()] !== true) return
+  const files = filesOf($, options)
+  await listTasks(files)
+  refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
+  // Opened unasked: no focus, so the prompt keeps the keys.
+  await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
+}
+
 let refreshTimer: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
@@ -177,6 +196,7 @@ async function openPane($: EngineInterface, options: PluginOptions, page: Page):
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
   await update($, pageState, () => page)
+  await rememberOpen($, true)
   await $.ui.open(PANE_OPEN)
   // The pane only takes the keys while the prompt holds them over an empty composer, which the
   // command's own run may not leave in time; ask once more right after it.
@@ -208,10 +228,18 @@ export function registerPane(on: On, options: PluginOptions): void {
   })
 
   // A closed pane needs no refresh; the spinners stop with their rows.
+  // The register's own session.start runs for every session; this one, with a matcher, only reopens.
+  on('session.start', { isInteractive: true }, async ($, e, next) => {
+    const started = await next(e)
+    await reopenIfOpenBefore($, options)
+    return started
+  })
+
   on('ui.close', { id: PANE }, async ($, e, next) => {
     refreshTimer?.cancel()
     refreshTimer = undefined
     await update($, movingState, () => '')
+    if (e.origin.kind !== 'unload') await rememberOpen($, false)
     return next(e)
   })
 
