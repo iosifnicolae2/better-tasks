@@ -291,9 +291,9 @@ test('every session start shows the tips once, with the live sprint line', async
   await clock.advance(0)
   expect(host.notices).toEqual([
     'better-tasks · Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 1 open',
-    '/better-tasks  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop',
-    '"fix the login redirect" → a task, started now · "… next sprint" or "… backlog" → planned, not started',
-    '/away  screens off, Mac keeps working',
+    '/better-tasks: the board · ↑↓: select  ⏎: actions  f: search  c: settings',
+    '"fix the login redirect": a task, started now · "… next sprint" or "… backlog": planned, not started',
+    '/away: screens off, Mac keeps working',
   ])
 })
 

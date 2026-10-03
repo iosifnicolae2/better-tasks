@@ -64,9 +64,9 @@ const TASK_TEMPLATE = `## Goal
 ## Notes
 `
 
-const TIPS = `/better-tasks  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop
-"fix the login redirect" → a task, started now · "… next sprint" or "… backlog" → planned, not started
-/away  screens off, Mac keeps working`
+const TIPS = `/better-tasks: the board · ↑↓: select  ⏎: actions  f: search  c: settings
+"fix the login redirect": a task, started now · "… next sprint" or "… backlog": planned, not started
+/away: screens off, Mac keeps working`
 
 export const SHIPPED: Record<TextName, string> = {
   coordinator: COORDINATOR,
