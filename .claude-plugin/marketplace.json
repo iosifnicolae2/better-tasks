@@ -1,0 +1,14 @@
+{
+  "name": "supermanager",
+  "description": "supermanager: a Claude Code mod that runs agent teammates in weekly sprints.",
+  "owner": {
+    "name": "Iosif Nicolae"
+  },
+  "plugins": [
+    {
+      "name": "supermanager",
+      "source": "./",
+      "description": "Turns the main session into a coordinator of agent teammates, with weekly sprints, task files and a sprint board."
+    }
+  ]
+}
