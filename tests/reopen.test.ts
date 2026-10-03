@@ -61,3 +61,13 @@ test('opening the board remembers it for this project', async ($, on) => {
   expect(opens).toHaveLength(2)
   expect(opens[1]?.focus).toBeUndefined()
 })
+
+test('/supermanager on a board that reopened on its own asks for the keys, without a second pane', async ($, on) => {
+  const { opens } = fakeEngine(on, { 'pane.open': { [ROOT]: true } })
+  await $.session.start(SESSION)
+  expect(opens[0]?.focus).toBeUndefined()
+  const run = { command: 'supermanager', args: '', origin: { kind: 'composer' as const }, presentation: { isFullscreen: true, columns: 160 } }
+  await $.command.run(run)
+  expect(opens.slice(1)).toEqual([expect.objectContaining({ id: PANE_ID, focus: true })])
+  expect(new Set(opens.map(open => open.id))).toEqual(new Set([PANE_ID]))
+})

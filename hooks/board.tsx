@@ -182,7 +182,7 @@ export function Board(props: BoardProps) {
       <Box flexDirection="column" height={rows} overflow="hidden">
         {window}
       </Box>
-      <Detail ui={ui} selected={selected} limit={limit} actions={actions} />
+      <Detail ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
       <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />
     </Box>
   )
@@ -305,7 +305,7 @@ function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast
     )
   return (
     <Box flexDirection="row" columnGap={1} height={1} overflow="hidden"
-      backgroundColor={isSelected ? 'userMessageBackground' : undefined}>
+      backgroundColor={isSelected && hasKeys ? 'userMessageBackground' : undefined}>
       <Text color={isMoving ? 'claude' : hasKeys ? 'suggestion' : 'subtle'}>{isMoving ? '↕' : isSelected ? '▌' : ' '}</Text>
       <StatusIcon ui={ui} task={task} canSpin={canSpin} />
       {isMoving && isFirst && <Button key="slot-up" plain label="▲" onPress={() => undefined} />}
@@ -329,7 +329,7 @@ function StatusIcon({ ui, task, canSpin }: { ui: Ui; task: Task; canSpin: boolea
   return <Text color="claude">✻</Text>
 }
 
-type DetailProps = { ui: Ui; selected?: Selected; limit: number; actions: BoardActions }
+type DetailProps = { ui: Ui; selected?: Selected; limit: number; hasKeys: boolean; actions: BoardActions }
 
 /** One line of the detail area: exactly one row high whatever it holds. */
 function DetailLine({ ui, children }: { ui: Ui; children?: JSX.Children }) {
@@ -345,12 +345,12 @@ function DetailLine({ ui, children }: { ui: Ui; children?: JSX.Children }) {
  * The selected task's box, pinned under the list, always four lines: what it is, who works on it,
  * what can be done, how to move it. Its content changes; its height never does.
  */
-function Detail({ ui, selected, limit, actions }: DetailProps) {
+function Detail({ ui, selected, limit, hasKeys, actions }: DetailProps) {
   const { Box, Text } = ui
   return (
     <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor="subtle" paddingX={1}>
       {selected ? (
-        <DetailOf ui={ui} selected={selected} limit={limit} actions={actions} />
+        <DetailOf ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
       ) : (
         <>
           <DetailLine ui={ui}><Text color="subtle">No task selected</Text></DetailLine>
@@ -363,7 +363,7 @@ function Detail({ ui, selected, limit, actions }: DetailProps) {
   )
 }
 
-function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, 'selected'>> & Omit<DetailProps, 'selected'>) {
+function DetailOf({ ui, selected, limit, hasKeys, actions }: Required<Pick<DetailProps, 'selected'>> & Omit<DetailProps, 'selected'>) {
   const { Text } = ui
   const { task, when, mate } = selected
   const place = when ? `${ICONS[when]} ${TITLES[when]}` : task.status === 'cancelled' ? '✗ Cancelled' : '✓ Closed'
@@ -381,7 +381,7 @@ function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, '
           <Text color="subtle">{statusWords(task)}</Text>
         )}
       </DetailLine>
-      {selected.isMoving ? <MovingLines ui={ui} /> : when ? <ActionLines ui={ui} selected={selected} when={when} actions={actions} /> : <ClosedLines ui={ui} task={task} actions={actions} />}
+      {selected.isMoving ? <MovingLines ui={ui} /> : when ? <ActionLines ui={ui} selected={selected} when={when} hasKeys={hasKeys} actions={actions} /> : <ClosedLines ui={ui} task={task} actions={actions} />}
     </>
   )
 }
@@ -403,10 +403,10 @@ function MovingLines({ ui }: { ui: Ui }) {
   )
 }
 
-type ActionProps = { ui: Ui; selected: Selected; when: When; actions: BoardActions }
+type ActionProps = { ui: Ui; selected: Selected; when: When; hasKeys: boolean; actions: BoardActions }
 
 /** The actions, in reading order so ←/→ walk them: Open … Move, then ⌥↑ ⌥↓ and the backlog toggle. */
-function ActionLines({ ui, selected, when, actions }: ActionProps) {
+function ActionLines({ ui, selected, when, hasKeys, actions }: ActionProps) {
   const { Button, Text } = ui
   const { task, mate } = selected
   const toggle = backlogToggle(when)
@@ -420,8 +420,17 @@ function ActionLines({ ui, selected, when, actions }: ActionProps) {
         <Button key="move" plain hotkey="m" label="Move" onPress={() => actions.startMoving(task)} />
       </DetailLine>
       <DetailLine ui={ui}>
-        <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
-        <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
+        {/* Chord buttons fire even from the prompt, so they exist only while the board holds the keys. */}
+        {hasKeys ? (
+          <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
+        ) : (
+          <Text color="subtle">⌥↑</Text>
+        )}
+        {hasKeys ? (
+          <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
+        ) : (
+          <Text color="subtle">⌥↓</Text>
+        )}
         <Text color="subtle">move up/down</Text>
         <Button key="toggle" plain dimColor hotkey="b" label={TITLES[toggle]} onPress={() => actions.move(task, toggle)} />
       </DetailLine>
@@ -455,7 +464,7 @@ function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
   const words = selected?.isMoving ? '↑↓ move · ⏎ stop' : selected?.isActing ? '←→ choose · ⏎ run · ↑ back to the list' : '↑↓ select · ⏎ actions'
   return (
     <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
-      {hasKeys ? <Text color={isLocked ? 'claude' : 'subtle'}>{words}</Text> : <Text color="suggestion">ctrl+x tab to use the keys here</Text>}
+      {hasKeys ? <Text color={isLocked ? 'claude' : 'subtle'}>{words}</Text> : <Text color="suggestion">The keys are with the prompt · click or ctrl+x tab to use the board</Text>}
       {!isLocked && <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />}
     </Box>
   )

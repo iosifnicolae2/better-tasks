@@ -199,7 +199,8 @@ async function reopenIfOpenBefore($: EngineInterface, options: PluginOptions): P
   const files = filesOf($, options)
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
-  // Opened unasked: no focus, so the prompt keeps the keys.
+  // Opened unasked and without focus, on purpose: a person who starts typing a prompt right away
+  // would otherwise send their letters to the board, where s, d and b start, finish or move tasks.
   await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
 }
 
@@ -230,6 +231,7 @@ async function openPane($: EngineInterface, options: PluginOptions, page: Page):
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
   await update($, pageState, () => page)
+  await leaveModes($)
   await rememberOpen($, true)
   await $.ui.open(PANE_OPEN)
   // The pane only takes the keys while the prompt holds them over an empty composer, which the

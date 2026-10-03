@@ -300,6 +300,17 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /^T-002 {2}Dark mode$/ })).toBeDefined()
   })
 
+  test(`a board without the keys looks it and cannot act on a chord from the prompt (${surface})`, async ($, on) => {
+    fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
+    expect(await ui.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeDefined()
+    expect(await ui.find({ key: 'up' })).toBeUndefined()
+    expect(await ui.find({ key: 'down' })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: '⌥↑' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /↑↓ select/ })).toBeUndefined()
+  })
+
   test(`an arrow past the board's ends never takes the ring off the board (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
@@ -353,10 +364,10 @@ for (const surface of SURFACES) {
     fakeProject(on)
     await $.command.run(sprintCommand())
     const unfocused = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
-    expect(await unfocused.find({ type: 'Text', text: 'ctrl+x tab to use the keys here' })).toBeDefined()
+    expect(await unfocused.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeDefined()
     await unfocused.unmount()
     const focused = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    expect(await focused.find({ type: 'Text', text: 'ctrl+x tab to use the keys here' })).toBeUndefined()
+    expect(await focused.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeUndefined()
   })
 }
 
