@@ -178,7 +178,7 @@ const CREATED = [
 ]
 
 /** What the person is typing in Claude Code's prompt box, per picture. */
-const TYPED = { board: '/better-tasks', actions: '/better-tasks' }
+const TYPED = { board: 'create a task for next sprint to speed up the search', actions: '/better-tasks' }
 
 const SCENES = {
   board: CREATED,
