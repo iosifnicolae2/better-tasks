@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, Header, sectionsOf, shifted, stepId } from './board'
+import { Board, sectionsOf, shortDates, shifted } from './board'
 import type { BoardActions, Section, SprintFacts } from './board'
 import { ConfigPage } from './configpage'
 import { SessionView, linesOf } from './sessionview'
@@ -13,10 +13,10 @@ import type { Files } from './io'
 import { CONFIG_FILE, projectSettings, readOverrides, settingsFrom } from './settings'
 import type { Editor } from './settings'
 import { goalOf, readSprints } from './sprintlog'
-import { datesLabel, daysLeft, daysLeftLabel, sprintLabel, sprintNumber, sprintStart, weekLabel } from './sprints'
+import { daysLeft, daysLeftLabel, nextSprint, sprintEnd, sprintLabel, sprintStart, weekLabel } from './sprints'
 import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
-import { listTasks, placeOf, saveTask, today, whenOf } from './tasks'
+import { isOpen, listTasks, placeOf, saveTask, today, whenOf } from './tasks'
 import { isActive } from './team'
 import { initProject, overridePath, starterFiles } from './texts'
 
@@ -29,6 +29,8 @@ const FOCUS_RETRY_MS = 150
 const PANE_OPEN = { id: PANE, title: 'Sprint', focus: true, columns: 76 } as const
 /** $.store key: the board was open when this project's last session ended. */
 const OPEN_KEY = 'pane.open'
+/** $.store key: the Closed section is expanded. */
+const CLOSED_KEY = 'pane.closedOpen'
 const NATIVE_PREFIX = 'Supermanager: '
 
 type Page = 'board' | 'config' | 'session'
@@ -45,6 +47,7 @@ const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const,
 const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as Page)
 const viewingState = atom({ plugin: 'supermanager', key: 'viewing' } as const, '')
 const movingState = atom({ plugin: 'supermanager', key: 'moving' } as const, '')
+const actingState = atom({ plugin: 'supermanager', key: 'acting' } as const, '')
 
 // ---- With $ ----
 
@@ -88,13 +91,24 @@ async function viewSession($: EngineInterface, agentId: string): Promise<void> {
   await update($, pageState, () => 'session')
 }
 
-/** Enter on the selected task: the keys go to its actions in the detail box. */
-async function toActions($: EngineInterface): Promise<void> {
+/**
+ * Enter on the selected task: the keys go to its actions. Only the task's row and the actions take
+ * the ring then, so ←/→ walk the actions and ↑ from the first one comes back to the row.
+ */
+async function toActions($: EngineInterface, id: string): Promise<void> {
+  await update($, actingState, () => id)
   await $.ui.focus({ requestId: PANE, key: 'open' }).catch(() => undefined)
+}
+
+/** Back to the list: the actions no longer hold the keys. */
+async function leaveModes($: EngineInterface): Promise<void> {
+  await update($, actingState, () => '')
+  await update($, movingState, () => '')
 }
 
 /** Move: the task is marked moving and the ring goes back to its row, where ↑↓ now carry it. */
 async function startMoving($: EngineInterface, id: string): Promise<void> {
+  await update($, actingState, () => '')
   await update($, movingState, () => id)
   await selectTask($, id)
 }
@@ -189,13 +203,24 @@ async function reopenIfOpenBefore($: EngineInterface, options: PluginOptions): P
   await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
 }
 
-function sprintFacts(day: string, start: string, config: SprintConfig): SprintFacts {
-  return {
-    name: `Sprint ${sprintNumber(start, config)} · ${weekLabel(start, config)}`,
-    dates: datesLabel(start, config),
-    left: daysLeftLabel(day, start, config),
-    isLastDay: daysLeft(day, start, config) <= 1,
-  }
+/** "Week 40 · Sep 28–Oct 4", the days left added for the sprint running now. */
+function sprintDetails(start: string, config: SprintConfig, day?: string): string {
+  const base = `${weekLabel(start, config)} · ${shortDates(start, sprintEnd(start, config))}`
+  return day === undefined ? base : `${base} · ${daysLeftLabel(day, start, config)}`
+}
+
+async function isClosedOpen($: EngineInterface): Promise<boolean> {
+  return (await $.store.get(CLOSED_KEY)) === true
+}
+
+async function toggleClosed($: EngineInterface): Promise<void> {
+  await $.store.set(CLOSED_KEY, !(await isClosedOpen($)))
+  $.ui.invalidate('ui.render')
+}
+
+/** Closed tasks, the most recent sprint first. */
+function closedOf(tasks: readonly Task[]): Task[] {
+  return tasks.filter(task => !isOpen(task)).sort((a, b) => b.sprint.localeCompare(a.sprint) || b.id.localeCompare(a.id, undefined, { numeric: true }))
 }
 
 let refreshTimer: { cancel: () => void } | undefined
@@ -247,13 +272,13 @@ export function registerPane(on: On, options: PluginOptions): void {
   on('ui.close', { id: PANE }, async ($, e, next) => {
     refreshTimer?.cancel()
     refreshTimer = undefined
-    await update($, movingState, () => '')
+    await leaveModes($)
     if (e.origin.kind !== 'unload') await rememberOpen($, false)
     return next(e)
   })
 
-  // Selection follows the focus ring, so the arrow keys select.
   // Selection follows the ring. While a task moves, the person's ↑↓ carry it instead: the ring stays.
+  // While its actions hold the keys, the ring coming back to the task's row leaves them.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
     const movingId = await read($, movingState)
     if (movingId !== '' && e.origin.kind === 'person' && e.element !== `task-${movingId}`) {
@@ -262,7 +287,9 @@ export function registerPane(on: On, options: PluginOptions): void {
     }
     const moved = await next(e)
     const id = e.element?.match(/^task-(.+)$/)?.[1]
-    if (id !== undefined && moved.deny === undefined) await update($, selectedState, () => id)
+    if (id === undefined || moved.deny !== undefined) return moved
+    if (e.origin.kind === 'person') await update($, actingState, () => '')
+    await update($, selectedState, () => id)
     return moved
   })
 
@@ -288,63 +315,72 @@ export function registerPane(on: On, options: PluginOptions): void {
 
     const selectedId = await read($, selectedState)
     const movingId = await read($, movingState)
+    const actingId = await read($, actingState)
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
     const sprintsFile = `${await $.session.root()}/${settings.paths.sprints}`
 
     const sections = sectionsOf(tasks, day, settings.sprint)
+    const closedOpen = await isClosedOpen($)
+    const closed = closedOf(tasks)
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
     const doneCount = inSprint.filter(task => task.status === 'done').length
-    const order = sections.flatMap(section => section.tasks.map(task => task.id))
-    const shown = sections.flatMap(section => section.tasks)
-    // Always a selection while there are tasks, so the detail area and ⌥↑/⌥↓ work from the start.
+    const open = sections.flatMap(section => section.tasks)
+    const shown = closedOpen ? [...open, ...closed] : open
+    const order = shown.map(task => task.id)
+    // Always a selection while there are tasks, so the box and ⌥↑/⌥↓ work from the start.
     const selectedTask = shown.find(task => task.id === selectedId) ?? shown[0]
     const selected = selectedTask && {
       task: selectedTask,
-      when: whenOf(selectedTask, day, settings.sprint),
+      when: isOpen(selectedTask) ? whenOf(selectedTask, day, settings.sprint) : undefined,
       mate: team.find(one => one.name === selectedTask.owner),
       isMoving: selectedTask.id === movingId,
+      isActing: selectedTask.id === actingId,
+    }
+    const sprints: Partial<Record<When, SprintFacts>> = {
+      'this-sprint': { details: sprintDetails(current, settings.sprint, day), isLastDay: daysLeft(day, current, settings.sprint) <= 1, done: doneCount, total: inSprint.length, goal },
+      'next-sprint': { details: sprintDetails(nextSprint(current, settings.sprint), settings.sprint) },
     }
     const keepFocus = (id: string | undefined) => () => selectTask($, id)
     const nextAfter = (id: string) => order[order.indexOf(id) + 1] ?? order[order.indexOf(id) - 1]
-
-    const drop = () => update($, movingState, () => '')
+    const leave = () => leaveModes($)
     const shift = (task: Task, step: -1 | 1) => shiftTask(files, sections, task, step, settings.sprint).then(keepFocus(task.id))
-    const movingTask = shown.find(task => task.id === movingId)
 
-    // Enter or a click: on the picked-up task drops it, on the selected one picks it up, else selects.
-    // Every other action drops it first; each step is already saved, so dropping undoes nothing.
+    // Enter or a click: on the moving task stops it, on the selected one hands the keys to its
+    // actions, on another selects it. Every action leaves those modes first.
     const actions: BoardActions = {
       pressTask: (task, isSelected) =>
-        void (task.id === movingId ? drop().then(keepFocus(task.id)) : isSelected ? toActions($) : drop().then(() => selectTask($, task.id))),
+        void (task.id === movingId ? leave().then(keepFocus(task.id)) : isSelected ? toActions($, task.id) : leave().then(() => selectTask($, task.id))),
       startMoving: task => void startMoving($, task.id),
-      selectStep: step => void (movingTask ? shift(movingTask, step) : selectTask($, stepId(order, selectedTask?.id, step))),
       shift: (task, step) => void shift(task, step),
-      move: (task: Task, to: When) => void drop().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
-      open: task => void drop().then(() => openFile($, settings.editor, task.file)),
-      start: task => void drop().then(() => $.prompt.submit({ text: startPrompt(task) })),
-      done: task => void drop().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
-      view: mate => void drop().then(() => viewSession($, mate.id)),
-      showConfig: () => void drop().then(showPage('config')),
+      move: (task: Task, to: When) => void leave().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
+      open: task => void leave().then(() => openFile($, settings.editor, task.file)).then(keepFocus(task.id)),
+      start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task) })).then(keepFocus(task.id)),
+      done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
+      reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
+      view: mate => void leave().then(() => viewSession($, mate.id)),
+      toggleClosed: () => void toggleClosed($),
+      showConfig: () => void leave().then(showPage('config')),
     }
 
+    if (page === 'config') {
+      return (
+        <Box flexDirection="column" paddingX={1}>
+          <ConfigPage ui={ui} settings={settings} sprintPreview={sprintLabel(current, settings.sprint)}
+            {...await projectFacts($, files, settings.editor)}
+            onChange={(field, value) => void setConfig($, field, value)}
+            onOpenNative={() => void $.command.run({ command: 'config' })}
+            onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
+            onBack={showPage('board')} />
+        </Box>
+      )
+    }
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Header ui={ui} sprint={sprintFacts(day, current, settings.sprint)} goal={goal} done={doneCount} total={inSprint.length} />
-        {page === 'config' ? (
-          <Box marginTop={1}>
-            <ConfigPage ui={ui} settings={settings} sprintPreview={sprintLabel(current, settings.sprint)}
-              {...await projectFacts($, files, settings.editor)}
-              onChange={(field, value) => void setConfig($, field, value)}
-              onOpenNative={() => void $.command.run({ command: 'config' })}
-              onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
-              onBack={showPage('board')} />
-          </Box>
-        ) : (
-          <Board ui={ui} sections={sections} doneCount={doneCount} selected={selected} team={team}
-            limit={settings.contextLimit} hasKeys={e.props.isFocused} actions={actions} />
-        )}
+        <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
+          team={team} limit={settings.contextLimit} hasKeys={e.props.isFocused} bodyRows={e.props.scroll.bodyRows}
+          canSpin={e.surface === 'terminal' || e.surface === 'desktop'} actions={actions} />
       </Box>
     )
   })

@@ -152,7 +152,7 @@ export function ConfigPage({ ui, settings, sprintPreview, fromProject, project, 
         <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
       ))}
       <Box paddingLeft={2} height={1} overflow="hidden">
-        <Text color="suggestion" wrap="truncate-end">Now: {sprintPreview}</Text>
+        <Text color="suggestion" wrap="truncate-end">This sprint: {sprintPreview}</Text>
       </Box>
       <Text dimColor>• changed from the default · saved at once</Text>
       <ProjectSection ui={ui} fromProject={fromProject} project={project} />
