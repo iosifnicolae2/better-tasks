@@ -54,7 +54,7 @@ async function demo($: Engine, on: On): Promise<void> {
   files.set(`${ROOT}/.claude/tasks/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the new login flow\n')
   mock.clock(on, { now: WEDNESDAY })
   mock.store(on)
-  mock.env(on, { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' })
+  mock.env(on, { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1', CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: '1h' })
   on('settings.read', () => ({ value: { env: { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' } } }))
   on('session.root', () => ({ value: ROOT }))
   on('session.id', () => ({ value: 'demo' }))
@@ -76,7 +76,7 @@ async function demo($: Engine, on: On): Promise<void> {
   on('ui.log', () => ({ value: undefined }))
   on('tool.call', { tool: 'Edit' }, () => ({ result: 'edited' }))
   on('turn.step', async function* ($, e) {
-    const usage = { input_tokens: 630, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'm' }
+    const usage = { input_tokens: 330, output_tokens: 1, cache_read_input_tokens: 200, cache_creation_input_tokens: 100, model: "m" }
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
   })
   await $.command.run({ command: 'better-tasks', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
