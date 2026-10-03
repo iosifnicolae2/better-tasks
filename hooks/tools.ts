@@ -20,7 +20,8 @@ export const TOOLS: readonly ToolSpec[] = [
   {
     name: 'task_create',
     description:
-      'Create a task file. Never starts it. Ask the user which sprint first (now / this sprint / next sprint / backlog) unless they said.',
+      'Create a task file. Never starts it. Ask the user which sprint first (start now = currently working on / this sprint / ' +
+      'next sprint / backlog) unless they said. when: now = currently working on.',
     inputSchema: {
       type: 'object',
       properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN },
@@ -47,7 +48,7 @@ export const TOOLS: readonly ToolSpec[] = [
   },
   {
     name: 'task_list',
-    description: 'List open tasks, one line each. sprint: current (default, includes now), next, backlog, or all (done too).',
+    description: 'List open tasks, one line each. sprint: current (default, includes currently working on), next, backlog, or all (done too).',
     inputSchema: {
       type: 'object',
       properties: { sprint: { type: 'string', enum: ['current', 'next', 'backlog', 'all'] } },

@@ -41,7 +41,7 @@ export function withRules(
 /** Why the main session may not create a task yet, or undefined when it may. */
 export function createDenial(facts: TurnFacts, agentId: string | undefined): string | undefined {
   if (agentId !== undefined || facts.asked || facts.namedTime) return undefined
-  return 'Ask the user when first: AskUserQuestion with Now / This sprint / Next sprint / Backlog, then call task_create again.'
+  return 'Ask the user when first: AskUserQuestion with "Start now (currently working on)" / This sprint / Next sprint / Backlog, then call task_create again.'
 }
 
 /** What the coordinator reads beside each user prompt: sprint, due work, notice, teammates. */
@@ -66,10 +66,10 @@ function waitingLines(tasks: readonly Task[]): string[] {
   const waiting = tasks.filter(task => task.urgent && task.status === 'todo')
   if (waiting.length === 0) return []
   const list = waiting.map(task => `${task.id} ${task.title}`).join('; ')
-  return [`Due now, not started: ${list}. Remind the user and ask whether to start.`]
+  return [`Currently working on, not started yet: ${list}. Remind the user and ask whether to start.`]
 }
 
-/** The footer label: "Sprint 41 · 1/4 done", plus " · 1 due" when a now-task waits. Teammates are Claude Code's to show. */
+/** The footer label: "Sprint 41 · 1/4 done", plus " · 1 due" when a currently-working-on task waits. Teammates are Claude Code's to show. */
 export function footerText(tasks: readonly Task[], start: string, config: SprintConfig): string {
   const sprint = tasks.filter(task => task.sprint === start)
   const done = sprint.filter(task => task.status === 'done').length

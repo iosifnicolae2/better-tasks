@@ -7,7 +7,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 
 ## Quick guide
 
-- **Create a task:** "create a task to fix the login redirect" → it asks *Now / This sprint / Next sprint / Backlog*. Nothing starts on its own.
+- **Create a task:** "create a task to fix the login redirect" → it asks *Start now (currently working on) / This sprint / Next sprint / Backlog*. Nothing starts on its own.
 - **Sprint goal:** "set the sprint goal: ship login". New sprint → it asks for the next goal and which backlog tasks to pull in.
 - **Board:** `/supermanager` (right sidebar). `↑↓`/`j k` select · `enter` the task's actions (Open, Start, Mark as done, View session, Move) · `m` Move: then `↑↓` move the task (reorder in its section, cross sections at the edges, saved as you go), `enter` stops · `⌥↑`/`⌥↓` move up/down directly · `b` backlog ↔ this sprint · `o` open · `s` start · `d` mark as done · `v` teammate session · `c` settings · `ctrl+x tab` gives the pane the keys.
 - **Start work:** "start T-003" or **Start** → the coordinator gives it to the teammate that owns the area, or spawns one named by the area.
@@ -24,7 +24,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 - **Coordinator.** The main session routes every message to the teammate that already owns
   that area, or creates a task and spawns a teammate named by its area. It does not do the work itself.
 - **Tasks ask "when?".** Creating a task never starts it. The coordinator asks
-  *Now / This sprint / Next sprint / Backlog* unless you already said. "Now" starts at once.
+  *Start now (currently working on) / This sprint / Next sprint / Backlog* unless you already said. "Start now" puts it under **Currently working on** and starts it at once.
 - **Sprints** (YC / Linear style): fixed 1- to 4-week sprints (weekly by default), shown as `Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 3 days left`; one sprint goal,
   backlog → sprint, unfinished work rolls over, a short review of what shipped.
 - **Context-aware routing.** It tracks each teammate's context fill. A teammate above the

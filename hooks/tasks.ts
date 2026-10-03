@@ -102,9 +102,17 @@ export function withNote(body: string, day: string, note: string): string {
   return `${body.slice(0, next).trimEnd()}\n${line}${body.slice(next)}`
 }
 
+/** How a section is named to the user; `now` is "Currently working on". */
+export const WHEN_LABELS: Record<When, string> = {
+  now: 'currently working on',
+  'this-sprint': 'this sprint',
+  'next-sprint': 'next sprint',
+  backlog: 'backlog',
+}
+
 /** One line per task, for the model. */
 export function taskLine(task: Task, today: string, config: SprintConfig): string {
-  const parts = [`${task.id} [${task.status}] ${task.title}`, whenOf(task, today, config)]
+  const parts = [`${task.id} [${task.status}] ${task.title}`, WHEN_LABELS[whenOf(task, today, config)]]
   if (task.owner) parts.push(`owner ${task.owner}`)
   if (task.rolled > 0) parts.push(`rolled ${task.rolled}x`)
   return parts.join(' · ')
