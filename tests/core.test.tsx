@@ -181,29 +181,6 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
-test('SendMessage to a teammate over the context limit is refused with handoff advice', async ($, on) => {
-  mock.clock(on, { now: MONDAY_OCT_5 })
-  mock.store(on)
-  fakeHost(on, [mate('a1', 'auth'), mate('a2', 'billing')])
-  const fill: Record<string, number> = { a1: 0.63 * WINDOW, a2: 0.2 * WINDOW }
-  on('turn.step', async function* ($, e) {
-    const tokens = fill[e.agentId ?? ''] ?? 0
-    const usage = { input_tokens: 0, output_tokens: 1, cache_read_input_tokens: tokens, cache_creation_input_tokens: 0, model: 'm' }
-    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
-  })
-  await $.session.start(SESSION)
-  for (const agentId of ['a1', 'a2']) {
-    for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'm', messageCount: 1, agentId })) void chunk
-  }
-
-  const full = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'also fix billing' })
-  expect(full.deny ?? full.text).toContain('auth is at 63 % context')
-  const handoff = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's2', to: 'auth', message: 'HANDOFF: write your notes' })
-  expect(handoff.result).toBe('sent')
-  const fresh = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's3', to: 'billing', message: 'go' })
-  expect(fresh.result).toBe('sent')
-})
-
 test('with worktree on, a named teammate is spawned in a worktree', { options: { worktree: true } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
@@ -537,7 +514,7 @@ test('no 1-hour cache when longCache is off', { options: { longCache: false } },
   expect(host.env.has('CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL')).toBe(false)
 })
 
-test('a teammate whose cache went cold gets no new work: a fresh one reads its transcript', async ($, on) => {
+test('a cold cache is a signal, not a block: a successor gets its predecessor\'s transcript', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on, [mate('a1', 'auth')], { [`${TRANSCRIPTS}/agent-a1-auth.jsonl`]: '{}' })
@@ -550,18 +527,17 @@ test('a teammate whose cache went cold gets no new work: a fresh one reads its t
 
   await clock.advance(14 * 60_000)
   expect(await status()).toBe('auth · idle · context 10 % · cache warm 41m')
-  const warm = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'also fix the logout' })
-  expect(warm.result).toBe('sent')
 
   await clock.advance(42 * 60_000)
   expect(await status()).toBe('auth · idle · context 10 % · cache cold')
-  const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's2', to: 'auth', message: 'and the signup' })
-  expect(cold.deny ?? cold.text).toContain("auth's prompt cache is cold")
-  expect(cold.deny ?? cold.text).toContain(`${TRANSCRIPTS}/agent-a1-auth.jsonl`)
+  const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'and the signup' })
+  expect(cold.result).toBe('sent')
   const entered = await $.prompt.submit(prompt('hi'))
-  expect(entered.context?.at(-1)).toContain('Teammate auth · idle · context 10 % · cache cold · NO NEW WORK (cache cold: fresh teammate)')
-  const shutdown = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's3', to: 'auth', message: { type: 'shutdown_request' } } as never)
-  expect(shutdown.result).toBe('sent')
+  expect(entered.context?.at(-1)).toContain('Teammate auth · idle · context 10 % · cache cold')
+
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Finish T-001.', name: 'auth-2' })
+  expect(host.spawned.at(-1)).toMatch(/^Finish T-001\.\n\nauth's transcript, to search: .*agent-a1-auth\.jsonl\n\n# You are a better-tasks teammate/)
+  expect(host.spawned.at(-1)).toContain(`${TRANSCRIPTS}/agent-a1-auth.jsonl`)
 })
 
 test('with the 5-minute cache a teammate is cold after 4 minutes', { options: { longCache: false } }, async ($, on) => {
@@ -571,11 +547,11 @@ test('with the 5-minute cache a teammate is cold after 4 minutes', { options: { 
   stepsFor(on, { a1: 20_000 })
   await $.session.start(SESSION)
   await step($, 'a1')
+  const status = async () => String((await $.tool.call({ tool: 'mcp__better-tasks__team_status', tool_use_id: 'ts' })).result)
   await clock.advance(3 * 60_000)
-  expect((await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'go' })).result).toBe('sent')
+  expect(await status()).toContain('cache warm')
   await clock.advance(60_000)
-  const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's2', to: 'auth', message: 'go' })
-  expect(cold.deny ?? cold.text).toContain('cache is cold')
+  expect(await status()).toContain('cache cold')
 })
 
 test('every named teammate is spawned with the teammate rules; a scout is not', async ($, on) => {
@@ -604,7 +580,7 @@ test('a message about an existing task: the note goes on it, and the owner is na
   expect(entered.context?.at(-1)).toContain('Open tasks (match the message against these):\n- T-003 Login redirect · this sprint · auth')
 
   const noted = await $.tool.call({ tool: 'mcp__better-tasks__task_note', tool_use_id: 'n1', id: 'T-003', note: 'Still loops on Safari.' } as never)
-  expect(String(noted.result)).toBe('Noted on T-003 Login redirect.\nOwner auth (cache warm 55m, 10 %): forward the note with SendMessage.')
+  expect(String(noted.result)).toBe('Noted on T-003 Login redirect.\nOwner auth (cache warm 55m, 10 %): forward the note with SendMessage, or to a fresh teammate by the routing rules.')
   expect(host.files.get(`${TASKS}/T-003-login-redirect.md`)).toContain('## Notes\n- 2026-10-05: Still loops on Safari.\n')
   expect([...host.files.keys()].filter(path => path.startsWith(`${TASKS}/T-`))).toEqual([`${TASKS}/T-003-login-redirect.md`])
 

@@ -48,7 +48,7 @@ export function statusPrompt(idleMinutes: number): string {
     '   - finished: ask the user to review it (the short accept question);\n' +
     '   - waiting for the user: ask one short AskUserQuestion, only if it truly blocks;\n' +
     '   - stuck (no activity for long, an error, going in circles): nudge or unblock it with SendMessage;\n' +
-    '   - cache cold or over the limit: a fresh teammate, by the routing rules;\n' +
+    '   - owner busy or worked a lot (high context, cold cache): a fresh teammate, by the routing rules;\n' +
     '   - nothing running and the user said go: start the next this-sprint task.\n' +
     '3. Then tell the user in 3–5 short lines: what moved, what is blocked and on whom, what is next. Nothing new since the last report: one line.'
   )

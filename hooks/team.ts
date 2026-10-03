@@ -5,7 +5,7 @@ import { warmthOf } from './cache'
 import type { CacheTtl } from './cache'
 import type { Io } from './io'
 
-// Teammates: who they are, how full their context is, whether their prompt cache is warm, and when they take no new work.
+// Teammates: who they are, how full their context is, whether their prompt cache is warm, and whom a successor takes over from.
 
 const ENDED = ['completed', 'failed', 'killed']
 
@@ -60,40 +60,14 @@ export function findMate(team: readonly Teammate[], to: string): Teammate | unde
   return team.find(mate => mate.name === name || mate.id === name)
 }
 
-export type Block = 'cold' | 'full'
-
-/** Why a teammate takes no new work: its cache went cold, or its context is over the limit. */
-export function blockOf(mate: Teammate, limit: number): Block | undefined {
-  if (mate.cache === 'cold') return 'cold'
-  return isFull(mate, limit) ? 'full' : undefined
+/** The teammate a successor ("login-2") takes over from: the newest other one of its area. */
+export function predecessorOf(team: readonly Teammate[], name: string): Teammate | undefined {
+  const area = areaOf(name)
+  if (area === name) return undefined
+  return team.findLast(mate => mate.name !== name && areaOf(mate.name) === area)
 }
 
-/** The teammate a plain message to `to` must not reach, and why. HANDOFF: notes and protocol messages always pass. */
-export function sendBlock(
-  team: readonly Teammate[],
-  to: string,
-  message: unknown,
-  limit: number,
-): { mate: Teammate; block: Block } | undefined {
-  if (typeof message !== 'string' || message.trimStart().startsWith('HANDOFF:')) return undefined
-  const mate = findMate(team, to)
-  const block = mate && blockOf(mate, limit)
-  return mate && block ? { mate, block } : undefined
-}
-
-/** What the coordinator does instead: a fresh teammate for the area, pointed at the old one's transcript. */
-export function blockAdvice(mate: Teammate, block: Block, limit: number, transcript: string): string {
-  const fresh =
-    `Spawn a fresh teammate for the same area (e.g. "${mate.name}-2") with the task file and its predecessor's ` +
-    `transcript to search for what it needs: ${transcript}. It picks up and finishes the task. Stop ${mate.name} once the new one confirms.`
-  if (block === 'cold') {
-    return `${mate.name}'s prompt cache is cold, so a message would pay to load its whole context again. Don't send it new work. ${fresh}`
-  }
-  return (
-    `${mate.name} is at ${mate.percent} % context (limit ${limit} %). Don't give it new work. ` +
-    `First ask it for a handoff note in its task file (a message starting with "HANDOFF:"). ${fresh}`
-  )
-}
+const areaOf = (name: string) => name.replace(/-\d+$/, '')
 
 /** "idle" for a running teammate between turns, "working" during one. */
 export function stateOf(mate: Teammate): string {

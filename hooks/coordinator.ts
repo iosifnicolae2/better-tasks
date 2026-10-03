@@ -1,13 +1,13 @@
 import type { PromptComposeSection, PromptComposeTrait, PromptOrigin } from 'claude-code'
 
-import type { Task, Teammate, TurnFacts } from '../types'
+import type { Task, TurnFacts } from '../types'
 import type { Io } from './io'
 import type { Settings } from './settings'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintNumber, sprintStart, sprintTitle } from './sprints'
 import type { SprintConfig } from './sprints'
 import { isOpen, listTasks, today, WHEN_LABELS, whenOf } from './tasks'
-import { blockOf, isActive, mateLine, refreshTeam } from './team'
+import { isActive, mateLine, refreshTeam } from './team'
 
 // The main session as coordinator: its rules and a small context block per prompt.
 
@@ -49,16 +49,9 @@ export async function contextBlock(io: Io, settings: Settings, notice: string): 
     ...waitingLines(tasks),
     ...openTaskLines(all, day, config),
     notice,
-    ...team.map(mate => `Teammate ${mateLine(mate)}${noNewWork(mate, settings.contextLimit)}`),
+    ...team.map(mate => `Teammate ${mateLine(mate)}`),
   ]
   return lines.filter(Boolean).join('\n')
-}
-
-const NO_NEW_WORK = { cold: ' · NO NEW WORK (cache cold: fresh teammate)', full: ' · NO NEW WORK (over the context limit)' }
-
-function noNewWork(mate: Teammate, limit: number): string {
-  const block = blockOf(mate, limit)
-  return block ? NO_NEW_WORK[block] : ''
 }
 
 const OTHERS_SHOWN = 10

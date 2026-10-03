@@ -15,7 +15,7 @@ import { projectSettings, readOverrides } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
-import { blockAdvice, contextTokens, isActive, refreshTeam, sendBlock } from './team'
+import { contextTokens, isActive, predecessorOf, refreshTeam } from './team'
 import { projectText } from './texts'
 import { spawnTask, withSummary } from './spawn'
 import { fingerprintOf, NO_CHECK, statusDecision, statusPrompt } from './status'
@@ -105,18 +105,10 @@ export const register: Register = (on, options) => {
     const task = spawnTask(await listTasks(ioOf($)), e.prompt, e.name, settings.tasks.prefix)
     const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
     const teammate = await projectText(ioOf($), 'teammate')
-    const prompt = teammate ? `${named.prompt}\n\n${teammate}` : named.prompt
+    const handover = await handoverOf($, e.name)
+    const prompt = [named.prompt, handover, teammate].filter(Boolean).join('\n\n')
     const isWorktree = settings.worktree && !e.isolation
     return next({ ...e, description: named.description, prompt, ...(isWorktree ? { isolation: 'worktree' as const } : {}) })
-  })
-
-  on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {
-    if (!(await teamsOn($))) return next(e)
-    const team = await refreshTeam(ioOf($))
-    const limit = (await settingsNow($)).contextLimit
-    const blocked = sendBlock(team, String(e.to), e.message, limit)
-    if (!blocked) return next(e)
-    return { deny: blockAdvice(blocked.mate, blocked.block, limit, await transcriptOf($, blocked.mate.id)) }
   })
 
   on('tool.call', async ($, e, next) => {
@@ -200,6 +192,12 @@ async function useLongCache($: EngineInterface): Promise<void> {
   if ((await $.env.get('CLAUDE_CODE_PROMPT_CACHE_TTL')) === undefined && chosen.promptCacheTtl === undefined) {
     await $.env.set('CLAUDE_CODE_PROMPT_CACHE_TTL', '1h')
   }
+}
+
+/** For a successor ("login-2"): where its predecessor's transcript is. */
+async function handoverOf($: EngineInterface, name: string): Promise<string> {
+  const predecessor = predecessorOf(await refreshTeam(ioOf($)), name)
+  return predecessor ? `${predecessor.name}'s transcript, to search: ${await transcriptOf($, predecessor.id)}` : ''
 }
 
 /** Where a teammate's transcript is: ~/.claude/projects/<project>/<session>/subagents/, the file named for its id. */

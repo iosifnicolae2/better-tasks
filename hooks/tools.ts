@@ -7,7 +7,7 @@ import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
 import { createTask, findTask, isOpen, listTasks, taskLine, today, WHEN_LABELS, whenOf } from './tasks'
-import { blockOf, cacheText, findMate, mateLine, refreshTeam } from './team'
+import { cacheText, findMate, mateLine, refreshTeam } from './team'
 import { searchTasks } from './search'
 import { initProject } from './texts'
 
@@ -128,13 +128,13 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     if (!task) return { deny: `No task ${input.id}.` }
     const changed = await changeTask(io, task, input, config)
     const line = taskLine(changed, await today(io), config)
-    return { result: input.note ? `${line}\n${await ownerHint(io, changed, settings)}` : line }
+    return { result: input.note ? `${line}\n${await ownerHint(io, changed)}` : line }
   }
   if (run.name === 'task_note') {
     const task = await findTask(io, input.id ?? '')
     if (!task) return { deny: `No task ${input.id}. Create it with task_create, or check the id with task_list.` }
     const noted = await changeTask(io, task, { note: input.note ?? '' }, config)
-    return { result: `Noted on ${noted.id} ${noted.title}.\n${await ownerHint(io, noted, settings)}` }
+    return { result: `Noted on ${noted.id} ${noted.title}.\n${await ownerHint(io, noted)}` }
   }
   if (run.name === 'task_search') return { result: await taskSearch(io, input.query ?? '', input.limit, settings) }
   if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
@@ -182,17 +182,12 @@ async function projectInit(io: Io): Promise<string> {
 }
 
 /** Who should hear about a note on `task`, and how. */
-async function ownerHint(io: Io, task: Task, settings: Settings): Promise<string> {
+async function ownerHint(io: Io, task: Task): Promise<string> {
   if (!task.owner) return 'No owner yet: nobody to tell.'
   const mate = findMate(await refreshTeam(io), task.owner)
   if (!mate) return `Owner ${task.owner} is not running: tell it with SendMessage (it resumes) or route the task anew.`
-  const block = blockOf(mate, settings.contextLimit)
-  if (block) {
-    const why = block === 'cold' ? 'its cache is cold' : `it is over ${settings.contextLimit} % context`
-    return `Owner ${mate.name} takes no new work (${why}): give the note to a fresh teammate for the area, with the task file and ${mate.name}'s transcript.`
-  }
   const facts = [cacheText(mate), mate.percent === undefined ? undefined : `${mate.percent} %`].filter(Boolean).join(', ')
-  return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: forward the note with SendMessage.`
+  return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: forward the note with SendMessage, or to a fresh teammate by the routing rules.`
 }
 
 async function taskSearch(io: Io, query: string, limit: number | undefined, settings: Settings): Promise<string> {
