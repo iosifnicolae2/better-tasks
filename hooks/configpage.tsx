@@ -61,6 +61,16 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'team',
+    field: 'longCache',
+    label: '1-hour prompt cache',
+    describe: 'Teammates and the manager keep their prompt cache for an hour, so a teammate stays cheap to resume.',
+    options: ON_OFF,
+    value: settings => (settings.longCache ? 'on' : 'off'),
+    initial: 'on',
+    stored: isOn,
+  },
+  {
+    group: 'team',
     field: 'keepAwake',
     label: 'Keep the Mac awake',
     describe: 'Holds caffeinate while any teammate runs.',

@@ -202,59 +202,61 @@
 <text x="24.4" y="144.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
 <text x="66.4" y="144.25" fill="rgb(153,153,153)" textLength="226.8" xml:space="preserve">Which sprint? → This sprint</text>
 <text x="721.6" y="144.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="144.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Keep the Mac awake          </text>
+<text x="746.8" y="144.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> 1-hour prompt cache         </text>
 <text x="990.4" y="144.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">on</text>
 <text x="721.6" y="163.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
+<text x="746.8" y="163.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Keep the Mac awake          </text>
+<text x="990.4" y="163.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">on</text>
 <text x="24.4" y="182.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
 <text x="41.2" y="182.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - task_create (MCP)</text>
 <text x="310.0" y="182.25" fill="rgb(255,255,255)" textLength="302.4" xml:space="preserve">(title: "Fix the login redirect", …)</text>
 <text x="721.6" y="182.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="738.4" y="182.25" fill="rgb(80,80,80)" font-weight="bold" textLength="50.4" xml:space="preserve">Sprint</text>
 <text x="24.4" y="201.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
 <text x="66.4" y="201.25" fill="rgb(153,153,153)" textLength="445.2" xml:space="preserve">Created T-001 in This sprint · .claude/tasks/T-001.md</text>
 <text x="721.6" y="201.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="201.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint length               </text>
-<text x="990.4" y="201.25" fill="rgb(80,80,80)" textLength="50.4" xml:space="preserve">1 week</text>
+<text x="738.4" y="201.25" fill="rgb(80,80,80)" font-weight="bold" textLength="50.4" xml:space="preserve">Sprint</text>
 <text x="721.6" y="220.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="220.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint starts on            </text>
-<text x="990.4" y="220.25" fill="rgb(80,80,80)" textLength="50.4" xml:space="preserve">monday</text>
+<text x="746.8" y="220.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint length               </text>
+<text x="990.4" y="220.25" fill="rgb(80,80,80)" textLength="50.4" xml:space="preserve">1 week</text>
 <text x="24.4" y="239.25" fill="rgb(255,255,255)" textLength="537.6" xml:space="preserve">⏺ Created T-001 in This sprint. It waits there until you say go.</text>
 <text x="721.6" y="239.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="772.0" y="239.25" fill="rgb(80,80,80)" textLength="369.6" xml:space="preserve">Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11</text>
+<text x="746.8" y="239.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint starts on            </text>
+<text x="990.4" y="239.25" fill="rgb(80,80,80)" textLength="50.4" xml:space="preserve">monday</text>
 <text x="721.6" y="258.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="258.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint goals &amp; reviews      </text>
-<text x="990.4" y="258.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">open</text>
+<text x="772.0" y="258.25" fill="rgb(80,80,80)" textLength="369.6" xml:space="preserve">Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11</text>
 <text x="721.6" y="277.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
+<text x="746.8" y="277.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint goals &amp; reviews      </text>
+<text x="990.4" y="277.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">open</text>
 <text x="721.6" y="296.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="738.4" y="296.25" fill="rgb(80,80,80)" font-weight="bold" textLength="100.8" xml:space="preserve">This project</text>
 <text x="721.6" y="315.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="315.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> config.json                 </text>
-<text x="990.4" y="315.25" fill="rgb(80,80,80)" textLength="109.2" xml:space="preserve">none · create</text>
+<text x="738.4" y="315.25" fill="rgb(80,80,80)" font-weight="bold" textLength="100.8" xml:space="preserve">This project</text>
 <text x="721.6" y="334.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="334.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> coordinator.md              </text>
-<text x="990.4" y="334.25" fill="rgb(80,80,80)" textLength="134.4" xml:space="preserve">default · create</text>
+<text x="746.8" y="334.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> config.json                 </text>
+<text x="990.4" y="334.25" fill="rgb(80,80,80)" textLength="109.2" xml:space="preserve">none · create</text>
 <text x="721.6" y="353.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="353.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> teammate.md                 </text>
+<text x="746.8" y="353.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> coordinator.md              </text>
 <text x="990.4" y="353.25" fill="rgb(80,80,80)" textLength="134.4" xml:space="preserve">default · create</text>
 <text x="721.6" y="372.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="372.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> task-template.md            </text>
+<text x="746.8" y="372.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> teammate.md                 </text>
 <text x="990.4" y="372.25" fill="rgb(80,80,80)" textLength="134.4" xml:space="preserve">default · create</text>
 <text x="721.6" y="391.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="746.8" y="391.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> All Claude Code settings    </text>
-<text x="990.4" y="391.25" fill="rgb(80,80,80)" textLength="58.8" xml:space="preserve">/config</text>
+<text x="746.8" y="391.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> task-template.md            </text>
+<text x="990.4" y="391.25" fill="rgb(80,80,80)" textLength="134.4" xml:space="preserve">default · create</text>
 <text x="721.6" y="410.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
+<text x="746.8" y="410.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> All Claude Code settings    </text>
+<text x="990.4" y="410.25" fill="rgb(80,80,80)" textLength="58.8" xml:space="preserve">/config</text>
 <text x="721.6" y="429.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="738.4" y="429.25" fill="rgb(80,80,80)" textLength="520.8" xml:space="preserve">Context limit: No new work goes to a teammate whose context is</text>
 <text x="24.4" y="448.25" fill="rgb(136,136,136)" textLength="688.8" xml:space="preserve">╭────────────────────────────────────────────────────────────────────────────────╮</text>
 <text x="721.6" y="448.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="738.4" y="448.25" fill="rgb(80,80,80)" textLength="168.0" xml:space="preserve">↑↓ choose · ⏎ change</text>
-<text x="923.2" y="448.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">b</text>
-<text x="931.6" y="448.25" fill="rgb(255,255,255)" opacity="0.55" textLength="58.8" xml:space="preserve">: board</text>
+<text x="738.4" y="448.25" fill="rgb(80,80,80)" textLength="520.8" xml:space="preserve">Context limit: No new work goes to a teammate whose context is</text>
 <rect x="58.0" y="453" width="9" height="19" fill="rgb(255,255,255)"/>
 <text x="24.4" y="467.25" fill="rgb(136,136,136)" textLength="8.4" xml:space="preserve">│</text>
 <text x="41.2" y="467.25" fill="rgb(255,255,255)" textLength="8.4" xml:space="preserve">&gt;</text>
 <text x="704.8" y="467.25" fill="rgb(136,136,136)" textLength="8.4" xml:space="preserve">│</text>
 <text x="721.6" y="467.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
+<text x="738.4" y="467.25" fill="rgb(80,80,80)" textLength="168.0" xml:space="preserve">↑↓ choose · ⏎ change</text>
+<text x="923.2" y="467.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">b</text>
+<text x="931.6" y="467.25" fill="rgb(255,255,255)" opacity="0.55" textLength="58.8" xml:space="preserve">: board</text>
 <text x="24.4" y="486.25" fill="rgb(136,136,136)" textLength="688.8" xml:space="preserve">╰────────────────────────────────────────────────────────────────────────────────╯</text>
 <text x="721.6" y="486.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="24.4" y="505.25" fill="rgb(177,185,249)" textLength="344.4" xml:space="preserve">  ⏵⏵ accept edits on (shift+tab to cycle)</text>

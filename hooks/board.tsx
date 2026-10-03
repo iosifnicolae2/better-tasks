@@ -3,7 +3,7 @@ import type { ElementTable } from 'claude-code'
 import type { Task, Teammate, When } from '../types'
 import type { SprintConfig } from './sprints'
 import { stateWord } from './activity'
-import { isFull } from './team'
+import { cacheText, isFull } from './team'
 import { isOpen, whenOf } from './tasks'
 
 // The board page of the Sprint pane: the task list (sections, then the collapsed closed tasks) in a
@@ -312,6 +312,7 @@ function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast
       {isMoving && <Text color="claude">moving</Text>}
       {!isMoving && !isClosed && task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
       {!isMoving && !isClosed && owner?.percent !== undefined && <Text color={isOverLimit ? 'warning' : 'subtle'}>{percentText(owner)}</Text>}
+      {!isMoving && !isClosed && owner?.cache === 'cold' && <Text color="warning">cold</Text>}
       {!isMoving && !isClosed && task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
     </Box>
   )
@@ -478,6 +479,7 @@ export function MateFacts({ ui, mate, limit }: { ui: Ui; mate: Teammate; limit: 
       <Text color={isWaiting ? 'warning' : state === 'working' ? 'claude' : state === 'done' ? 'success' : 'subtle'}>{state}</Text>
       {mate.activity ? <Text color="subtle"> · {mate.activity}</Text> : ''}
       {mate.percent !== undefined ? <Text color={isOverLimit ? 'warning' : 'subtle'}> · {percentText(mate)}</Text> : ''}
+      {cacheText(mate) ? <Text color={mate.cache === 'cold' ? 'warning' : 'subtle'}> · {cacheText(mate)}</Text> : ''}
     </Text>
   )
 }

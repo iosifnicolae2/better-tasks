@@ -408,13 +408,14 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-contextLimit', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-contextLimit', 'cfg-longCache', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
       ['better-tasks.editor', 'default'],
       ['better-tasks.worktree', true],
       ['better-tasks.contextLimit', 60],
+      ['better-tasks.longCache', false],
       ['better-tasks.keepAwake', false],
       ['better-tasks.sprintWeeks', '2'],
       ['better-tasks.sprintStart', 'tuesday'],
@@ -510,9 +511,10 @@ async function withTeammate($: Engine, on: On) {
   const { files } = fakeProject(on)
   files.set(`${DIR}/T-001-fix-login.md`, taskFile('T-001', 'Fix login', '2026-10-05', 'doing', 'auth'))
   on('agent.list', () => ({ value: [AUTH] }))
+  on('settings.read', () => ({ value: {} }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000, percent: 10 }, rateLimits: [] } }))
   on('turn.step', async function* ($, e) {
-    const usage = { input_tokens: 630, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'm' }
+    const usage = { input_tokens: 330, output_tokens: 1, cache_read_input_tokens: 200, cache_creation_input_tokens: 100, model: 'm' }
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
   })
   await $.command.run(sprintCommand())
@@ -526,6 +528,8 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /^⎿$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'idle' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /63%/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: / · cache warm \d+m$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^cold$/ })).toBeUndefined()
     expect(await ui.find({ key: 'view' })).toBeUndefined()
   })
 }
