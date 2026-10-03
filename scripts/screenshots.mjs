@@ -160,34 +160,26 @@ const tool = (name, args) => [['⏺ ', 'success'], [name, 'text', { bold: true }
 const result = text => [['  ⎿  ', 'subtle'], [text, 'inactive']]
 const gap = () => []
 
-const ASKED = [
-  you('create a task to fix the login redirect'),
+// Tasks start now by default: created, then routed to the teammate that owns the area.
+const CREATED = [
+  you('the login loops after a password reset, fix it'),
   gap(),
-  tool('User answered Claude’s questions', ''),
-  result('Which sprint? → This sprint'),
-  gap(),
-  tool('better-tasks - task_create (MCP)', 'title: "Fix the login redirect", …'),
-  result('Created T-001 in This sprint · .claude/tasks/T-001.md'),
-  gap(),
-  says('Created T-001 in This sprint. It waits there until you say go.'),
-  gap(),
-]
-const STARTED = [
-  you('start T-007 now, the login loop is hurting users'),
+  tool('better-tasks - task_create (MCP)', 'title: "Login loops after password reset", …'),
+  result('Created T-007 (currently working on): .claude/tasks/T-007.md. Route it now.'),
   gap(),
   tool('better-tasks - team_status (MCP)', ''),
-  result('auth · running · context 41% · idle'),
+  result('auth · idle · context 41 % · cache warm 52m'),
   gap(),
-  tool('SendMessage', 'to: "auth", message: "Start T-007 …"'),
+  tool('SendMessage', 'to: "auth", message: "Login loops after password reset · T-007 …"'),
   result('Sent'),
   gap(),
-  says('auth owns login and has room (41 %), so T-007 went to it.'),
+  says('T-007 is with auth: it owns login, its cache is warm and it has room.'),
   gap(),
 ]
 
 const SCENES = {
-  board: [...ASKED, ...STARTED],
-  actions: [...STARTED, you('/better-tasks'), result('Sprint board opened.')],
+  board: CREATED,
+  actions: [...CREATED, you('/better-tasks'), result('Sprint board opened.')],
   moving: [
     you('what’s left in this sprint?'),
     gap(),
@@ -198,7 +190,7 @@ const SCENES = {
     says('matters more for the launch, so I moved T-004 above T-001.'),
     gap(),
   ],
-  settings: [you('/better-tasks config'), result('Sprint board opened.'), gap(), ...ASKED],
+  settings: [...CREATED, you('/better-tasks config'), result('Sprint board opened.')],
 }
 
 function sceneLine(pieces, width) {
