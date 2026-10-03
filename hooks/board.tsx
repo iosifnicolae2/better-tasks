@@ -72,31 +72,9 @@ function marksOf(count: number, rows: number, start: number): { above: boolean; 
 /** The list as the board last drew it: each line's task id (none on a heading or blank), its window, the selection. */
 export type DrawnList = { taskIds: readonly (string | undefined)[]; start: number; rows: number; selectedId: string }
 
-/**
- * The wheel: the window moves `by` lines, kept inside the list. A selection it scrolls out of view
- * moves to the nearest task still in view, so the focus ring never rests on a hidden row; the window
- * stops short of a stretch with no task in it.
- */
-export function wheeled(list: DrawnList, by: number): { start: number; selectedId: string } {
-  for (let target = list.start + by; target !== list.start; target -= Math.sign(by)) {
-    const landed = landing(list, target)
-    if (landed !== undefined) return landed
-  }
-  return { start: list.start, selectedId: list.selectedId }
-}
-
-/** The window at `target` and the task selected there; none when it shows no task. */
-function landing(list: DrawnList, target: number): { start: number; selectedId: string } | undefined {
-  const count = list.taskIds.length
-  const { start, end } = windowFrom(count, list.rows, target)
-  const marks = marksOf(count, list.rows, start)
-  const first = start + (marks.above ? 1 : 0)
-  const last = end - 1 - (marks.below ? 1 : 0)
-  const at = list.taskIds.indexOf(list.selectedId)
-  if (at >= first && at <= last) return { start, selectedId: list.selectedId }
-  const inView = list.taskIds.slice(first, last + 1).filter(id => id !== undefined)
-  const nearest = at < first ? inView[0] : inView.at(-1)
-  return nearest === undefined ? undefined : { start, selectedId: nearest }
+/** The wheel: where the window starts after moving `by` lines, kept inside the list. The selection stays. */
+export function wheeled(list: DrawnList, by: number): number {
+  return windowFrom(list.taskIds.length, list.rows, list.start + by).start
 }
 
 /** The section one step up (-1) or down (+1), if any. */

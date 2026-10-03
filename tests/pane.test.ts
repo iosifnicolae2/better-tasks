@@ -159,17 +159,15 @@ test('search ranges cut a line into lit and plain parts', () => {
   expect(partsOf('plain', [])).toEqual([{ text: 'plain', isMatch: false }])
 })
 
-test('the wheel moves the window inside the list, the selection following into view', () => {
+test('the wheel moves the window edge to edge, headings and empty sections too', () => {
   expect(windowFrom(5, 10, 3)).toEqual({ start: 0, end: 5 })
   expect(windowFrom(30, 10, 25)).toEqual({ start: 20, end: 30 })
   // The board of fakeProject: headings, blanks and "empty" lines around T-001, T-004 and T-002.
   const taskIds = [, , , , , 'T-001', 'T-004', , , , , , 'T-002', , ,]
-  const list = (start: number, selectedId: string) => ({ taskIds: [...taskIds], start, rows: 6, selectedId })
-  expect(wheeled(list(2, 'T-001'), 1)).toEqual({ start: 3, selectedId: 'T-001' })
-  expect(wheeled(list(2, 'T-001'), 3)).toEqual({ start: 5, selectedId: 'T-004' })
-  expect(wheeled(list(5, 'T-004'), 10)).toEqual({ start: 9, selectedId: 'T-002' })
-  // At the top only headings would show: the window stops where a task still does.
-  expect(wheeled(list(9, 'T-002'), -100)).toEqual({ start: 1, selectedId: 'T-001' })
+  const list = (start: number) => ({ taskIds: [...taskIds], start, rows: 6, selectedId: 'T-001' })
+  expect(wheeled(list(2), 3)).toBe(5)
+  expect(wheeled(list(5), 100)).toBe(9)
+  expect(wheeled(list(9), -100)).toBe(0)
 })
 
 type Node = { type?: string; props?: { key?: string }; children?: unknown[] }
@@ -546,7 +544,7 @@ test('the arrow keys select: the focus ring carries the selection', async ($, on
   expect(await ui.findAll({ type: 'Text', text: /^▌$/ })).toHaveLength(1)
 })
 
-test('the wheel scrolls the list and the selection follows; the arrows bring the window back', async ($, on) => {
+test('the wheel scrolls only the list; the selection stays, and the arrows bring the window back', async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand())
   const short = { ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 15 } } }
@@ -555,16 +553,24 @@ test('the wheel scrolls the list and the selection follows; the arrows bring the
     $.ui.scroll({ component: 'Pane', requestId: 'better-tasks-sprint', offset: 0, by, bodyRows: 15, contentRows: 15, origin: { kind: 'person' } })
   expect(await ui.find({ type: 'Text', text: /⋯ 3 more above/ })).toBeDefined()
 
+  const selectedInBox = () => ui.find({ type: 'Text', text: 'T-001  Fix login' })
   expect((await wheel(3)).deny).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /⋯ 6 more above/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'T-004  Rate limit' })).toBeDefined()
+  expect(await selectedInBox()).toBeDefined()
 
   await wheel(10)
   expect(await ui.find({ type: 'Text', text: /more below/ })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: 'T-002  Dark mode' })).toBeDefined()
+  expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
+  expect(await selectedInBox()).toBeDefined()
 
-  await arrowTo($, 'task-T-001')
-  expect(await ui.find({ type: 'Text', text: /⋯ 3 more above/ })).toBeDefined()
+  // Up to the very top, where only headings and "empty" show.
+  await wheel(-100)
+  expect(await ui.find({ type: 'Text', text: /more above/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: 'Currently working on' })).toBeDefined()
+  expect(await selectedInBox()).toBeDefined()
+
+  await arrowTo($, 'task-T-004')
+  expect(await ui.find({ type: 'Text', text: /⋯ 4 more above/ })).toBeDefined()
 })
 
 test('while a task moves, the wheel leaves the list alone', async ($, on) => {

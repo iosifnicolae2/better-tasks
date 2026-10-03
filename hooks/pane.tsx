@@ -277,12 +277,11 @@ let refreshTimer: { cancel: () => void } | undefined
 
 /**
  * The wheel over the board scrolls its list, which the board windows itself, so the engine's own
- * window stays put. The selection follows into view; the keys bring the window back to it.
+ * window stays put. Only the view moves: the selection and the ring stay, even out of view, and
+ * the keys bring the window back to them.
  */
 async function scrollList($: EngineInterface, list: DrawnList, by: number): Promise<void> {
-  const moved = wheeled(list, by)
-  await update($, listScrollState, () => moved)
-  if (moved.selectedId !== list.selectedId) await selectTask($, moved.selectedId)
+  await update($, listScrollState, () => ({ start: wheeled(list, by), selectedId: list.selectedId }))
 }
 
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
