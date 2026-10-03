@@ -52,16 +52,6 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'team',
-    field: 'contextLimit',
-    label: 'Context limit',
-    describe: 'No new work goes to a teammate whose context is fuller than this.',
-    options: ['30%', '40%', '50%', '60%', '70%'],
-    value: settings => `${settings.contextLimit}%`,
-    initial: '50%',
-    stored: value => Number.parseInt(value, 10),
-  },
-  {
-    group: 'team',
     field: 'longCache',
     label: '1-hour prompt cache',
     describe: 'Teammates and the manager keep their prompt cache for an hour, so a teammate stays cheap to resume.',

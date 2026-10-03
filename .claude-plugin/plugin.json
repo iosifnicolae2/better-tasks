@@ -28,12 +28,6 @@
       "description": "Each named teammate works in its own git worktree.",
       "default": false
     },
-    "contextLimit": {
-      "type": "number",
-      "title": "Context limit (%)",
-      "description": "No new work goes to a teammate whose context is fuller than this.",
-      "default": 50
-    },
     "longCache": {
       "type": "boolean",
       "title": "1-hour prompt cache",

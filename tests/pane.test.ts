@@ -485,13 +485,12 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-contextLimit', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
       ['better-tasks.editor', 'default'],
       ['better-tasks.worktree', true],
-      ['better-tasks.contextLimit', 60],
       ['better-tasks.longCache', false],
       ['better-tasks.statusEvery', 20],
       ['better-tasks.keepAwake', false],
@@ -507,8 +506,8 @@ for (const surface of SURFACES) {
     fakeProject(on)
     await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
-    await arrowTo($, 'cfg-contextLimit')
-    expect(await ui.find({ type: 'Text', text: /^Context limit: No new work goes to a teammate/ })).toBeDefined()
+    await arrowTo($, 'cfg-worktree')
+    expect(await ui.find({ type: 'Text', text: /^Worktree per teammate: Each named teammate works/ })).toBeDefined()
     await arrowTo($, 'file-teammate.md')
     expect(await ui.find({ type: 'Text', text: /^teammate\.md: .*creates it/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '↑↓: choose' })).toBeDefined()
@@ -671,7 +670,7 @@ test("the pane follows the project's config.json, and its settings page says whi
 for (const surface of SURFACES) {
   test(`"This project" rows open or create the project's files and show config.json's problems (${surface})`, async ($, on) => {
     const { files, commands } = fakeProject(on)
-    files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ contextLimit: 40, colour: 'blue' }))
+    files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ statusEvery: 40, colour: 'blue' }))
     await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await ui.find({ type: 'Text', text: '1 value · open' })).toBeDefined()

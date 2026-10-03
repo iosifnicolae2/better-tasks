@@ -14,8 +14,6 @@ export const contextTokens = (usage: ModelUsage) =>
 
 export const isActive = (mate: Teammate) => !ENDED.includes(mate.status)
 
-export const isFull = (mate: Teammate, limit: number) => mate.percent !== undefined && mate.percent > limit
-
 export function percentOf(tokens: number | undefined, window: number): number | undefined {
   return tokens === undefined || window <= 0 ? undefined : Math.round((tokens / window) * 100)
 }

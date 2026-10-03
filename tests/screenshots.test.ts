@@ -121,6 +121,6 @@ test('screenshot: settings', async ($, on) => {
   await demo($, on)
   const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'config' })
-  await arrowTo($, 'cfg-contextLimit')
-  await shoot('settings', ui, 'cfg-contextLimit')
+  await arrowTo($, 'cfg-longCache')
+  await shoot('settings', ui, 'cfg-longCache')
 })

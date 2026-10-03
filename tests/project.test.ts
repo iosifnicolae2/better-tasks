@@ -25,10 +25,10 @@ describe('task numbering', () => {
 describe('config.json', () => {
   test('known keys apply; unknown keys and wrong types are skipped with a reason', () => {
     const { values, problems } = parseOverrides(
-      JSON.stringify({ '//': 'a note', taskPrefix: 'X-', colour: 'red', contextLimit: 'high', sprintWeeks: 2 }),
+      JSON.stringify({ '//': 'a note', taskPrefix: 'X-', colour: 'red', statusEvery: 'often', sprintWeeks: 2 }),
     )
     expect(values).toEqual({ taskPrefix: 'X-', sprintWeeks: 2 })
-    expect(problems).toEqual(['unknown key "colour"', '"contextLimit" must be a number'])
+    expect(problems).toEqual(['unknown key "colour"', '"statusEvery" must be a number'])
     expect(settingsOf(values).sprint.weeks).toBe(2)
   })
 
@@ -40,8 +40,8 @@ describe('config.json', () => {
   })
 
   test('the project wins over the plugin options, which win over the defaults', () => {
-    const settings = settingsOf({ ...{ editor: 'code', contextLimit: 70 }, ...{ contextLimit: 40 } })
-    expect([settings.editor, settings.contextLimit, settings.tasks.prefix]).toEqual(['code', 40, 'T-'])
+    const settings = settingsOf({ ...{ editor: 'code', statusEvery: 30 }, ...{ statusEvery: 15 } })
+    expect([settings.editor, settings.statusEvery, settings.tasks.prefix]).toEqual(['code', 15, 'T-'])
   })
 })
 

@@ -475,7 +475,7 @@ export function registerPane(on: On, options: PluginOptions): void {
     return (
       <Box flexDirection="column" paddingX={1}>
         <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
-          team={team} limit={settings.contextLimit} hasKeys={e.props.isFocused} bodyRows={e.props.scroll.bodyRows}
+          team={team} hasKeys={e.props.isFocused} bodyRows={e.props.scroll.bodyRows}
           scrollStart={listScroll.selectedId === selectedTask?.id ? listScroll.start : undefined} onDrawn={list => { drawnList = list }}
           canSpin={e.surface === 'terminal' || e.surface === 'desktop'} search={search} hits={hits} actions={actions} />
       </Box>

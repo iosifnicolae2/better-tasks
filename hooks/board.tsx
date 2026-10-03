@@ -3,7 +3,7 @@ import type { ElementTable } from 'claude-code'
 import type { Task, Teammate, When } from '../types'
 import type { SprintConfig } from './sprints'
 import { stateWord } from './activity'
-import { cacheText, isFull } from './team'
+import { cacheText } from './team'
 import { isOpen, whenOf } from './tasks'
 
 // The board page of the Sprint pane: the task list (sections, then the collapsed closed tasks) in a
@@ -191,7 +191,6 @@ export type BoardProps = {
   isClosedOpen: boolean
   selected?: Selected
   team: Teammate[]
-  limit: number
   /** Whether the pane holds the keyboard; the selection is bright only then. */
   hasKeys: boolean
   /** The pane body's height; the list gets what the bottom box leaves. Unknown: no window. */
@@ -211,7 +210,7 @@ export type BoardProps = {
 type Line = { node: JSX.Element; taskId?: string }
 
 export function Board(props: BoardProps) {
-  const { ui, selected, bodyRows, scrollStart, hasKeys, limit, actions } = props
+  const { ui, selected, bodyRows, scrollStart, hasKeys, actions } = props
   const { Box, Text } = ui
   const lines = props.hits ? resultLines(props, props.hits) : listLines(props)
   // At any pane height the list takes exactly what the box and the key line leave, so they sit at the bottom.
@@ -234,7 +233,7 @@ export function Board(props: BoardProps) {
       <Box flexDirection="column" height={rows} overflow="hidden">
         {window}
       </Box>
-      <Detail ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
+      <Detail ui={ui} selected={selected} hasKeys={hasKeys} actions={actions} />
       {isSearching ? <Box height={1} /> : <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />}
     </Box>
   )
@@ -321,7 +320,7 @@ function Lit({ ui, text, ranges, indent = '', isDim }: LitProps) {
 }
 
 /** Every line of the list, one row each: the four sections, then the closed tasks. */
-function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team, limit, hasKeys, canSpin, actions }: BoardProps): Line[] {
+function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team, hasKeys, canSpin, actions }: BoardProps): Line[] {
   const { Text } = ui
   const ids = sections.flatMap(section => section.tasks.map(task => task.id))
   const roles = selected?.isMoving ? rowRoles(ids, selected.task.id) : undefined
@@ -332,7 +331,7 @@ function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team
     node: (
       <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id} hasKeys={hasKeys} role={role} canSpin={canSpin}
         isFirst={ids[0] === task.id} isLast={ids.at(-1) === task.id}
-        owner={team.find(one => one.name === task.owner)} limit={limit} actions={actions} />
+        owner={team.find(one => one.name === task.owner)} actions={actions} />
     ),
   })
   const stillUnlessSelected = (task: Task): RowRole | undefined =>
@@ -410,7 +409,6 @@ type RowProps = {
   isFirst: boolean
   isLast: boolean
   owner?: Teammate
-  limit: number
   actions: BoardActions
 }
 
@@ -419,9 +417,8 @@ type RowProps = {
  * While a task moves, the title is a button only on it and its two neighbours (the slots ↑ and ↓
  * land on); the moving row with no row above or below gets a ▲ or ▼ slot of its own instead.
  */
-function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast, owner, limit, actions }: RowProps) {
+function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast, owner, actions }: RowProps) {
   const { Box, Button, Text } = ui
-  const isOverLimit = owner !== undefined && isFull(owner, limit)
   const isMoving = role === 'moving'
   const isClosed = !isOpen(task)
   const label = `${task.id}  ${task.title}`
@@ -445,7 +442,7 @@ function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast
       {isMoving && isLast && <Button key="slot-down" plain label="▼" onPress={() => undefined} />}
       {isMoving && <Text color="claude">moving</Text>}
       {!isMoving && !isClosed && task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
-      {!isMoving && !isClosed && owner?.percent !== undefined && <Text color={isOverLimit ? 'warning' : 'subtle'}>{percentText(owner)}</Text>}
+      {!isMoving && !isClosed && owner?.percent !== undefined && <Text color="subtle">{percentText(owner)}</Text>}
       {!isMoving && !isClosed && owner?.cache === 'cold' && <Text color="warning">cold</Text>}
       {!isMoving && !isClosed && task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
     </Box>
@@ -462,7 +459,7 @@ function StatusIcon({ ui, task, canSpin }: { ui: Ui; task: Task; canSpin: boolea
   return <Text color="claude">✻</Text>
 }
 
-type DetailProps = { ui: Ui; selected?: Selected; limit: number; hasKeys: boolean; actions: BoardActions }
+type DetailProps = { ui: Ui; selected?: Selected; hasKeys: boolean; actions: BoardActions }
 
 /** One line of the detail area: exactly one row high whatever it holds. */
 function DetailLine({ ui, children }: { ui: Ui; children?: JSX.Children }) {
@@ -478,12 +475,12 @@ function DetailLine({ ui, children }: { ui: Ui; children?: JSX.Children }) {
  * The selected task's box, pinned under the list, always four lines: what it is, who works on it,
  * what can be done, how to move it. Its content changes; its height never does.
  */
-function Detail({ ui, selected, limit, hasKeys, actions }: DetailProps) {
+function Detail({ ui, selected, hasKeys, actions }: DetailProps) {
   const { Box, Text } = ui
   return (
     <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor="subtle" paddingX={1}>
       {selected ? (
-        <DetailOf ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
+        <DetailOf ui={ui} selected={selected} hasKeys={hasKeys} actions={actions} />
       ) : (
         <>
           <DetailLine ui={ui}><Text color="subtle">No task selected</Text></DetailLine>
@@ -496,7 +493,7 @@ function Detail({ ui, selected, limit, hasKeys, actions }: DetailProps) {
   )
 }
 
-function DetailOf({ ui, selected, limit, hasKeys, actions }: Required<Pick<DetailProps, 'selected'>> & Omit<DetailProps, 'selected'>) {
+function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps, 'selected'>> & Omit<DetailProps, 'selected'>) {
   const { Text } = ui
   const { task, when, mate } = selected
   const place = when ? `${ICONS[when]} ${TITLES[when]}` : task.status === 'cancelled' ? '✗ Cancelled' : '✓ Closed'
@@ -509,7 +506,7 @@ function DetailOf({ ui, selected, limit, hasKeys, actions }: Required<Pick<Detai
       <DetailLine ui={ui}>
         <Text color="subtle">⎿</Text>
         {mate ? (
-          <Text wrap="truncate-end"><Text>{mate.name} </Text><MateFacts ui={ui} mate={mate} limit={limit} /></Text>
+          <Text wrap="truncate-end"><Text>{mate.name} </Text><MateFacts ui={ui} mate={mate} /></Text>
         ) : (
           <Text color="subtle">{statusWords(task)}</Text>
         )}
@@ -633,16 +630,15 @@ function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
 }
 
 /** "working · editing auth.ts · 63%": the state coloured by meaning, the rest quiet. */
-export function MateFacts({ ui, mate, limit }: { ui: Ui; mate: Teammate; limit: number }) {
+export function MateFacts({ ui, mate }: { ui: Ui; mate: Teammate }) {
   const { Text } = ui
   const state = mate.status === 'running' && !mate.activity ? 'idle' : stateWord(mate.status)
-  const isOverLimit = isFull(mate, limit)
   const isWaiting = mate.activity === 'waiting for your answer'
   return (
     <Text wrap="truncate-end">
       <Text color={isWaiting ? 'warning' : state === 'working' ? 'claude' : state === 'done' ? 'success' : 'subtle'}>{state}</Text>
       {mate.activity ? <Text color="subtle"> · {mate.activity}</Text> : ''}
-      {mate.percent !== undefined ? <Text color={isOverLimit ? 'warning' : 'subtle'}> · {percentText(mate)}</Text> : ''}
+      {mate.percent !== undefined ? <Text color="subtle"> · {percentText(mate)}</Text> : ''}
       {cacheText(mate) ? <Text color={mate.cache === 'cold' ? 'warning' : 'subtle'}> · {cacheText(mate)}</Text> : ''}
     </Text>
   )
