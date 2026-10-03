@@ -24,6 +24,7 @@ type Host = {
   spawned: string[]
   descriptions: string[]
   env: Map<string, string>
+  composer: string
 }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
 
@@ -35,7 +36,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], env: new Map() }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -45,6 +46,7 @@ function fakeHost(
     return { value: undefined }
   })
   on('settings.read', () => ({ value: { env: teams.settingsEnv } }))
+  on('prompt.read', () => ({ value: { text: host.composer, cursor: 0 } }))
   on('ui.log', ($, e) => {
     host.notices.push(e.text)
     return { value: undefined }
@@ -705,4 +707,63 @@ test('task_search finds closed and older tasks, one compact line each', async ($
   )
   const none = await $.tool.call({ tool: 'mcp__better-tasks__task_search', tool_use_id: 's2', query: 'banana' } as never)
   expect(String(none.result)).toBe('No task matches "banana".')
+})
+
+const statusPrompts = (host: Host) => host.pluginPrompts.filter(text => text.startsWith('better-tasks status check'))
+const ACTIVE = `---\nid: T-001\ntitle: Fix login\nsprint: 2026-10-05\nstatus: doing\nowner: login\n---\n## Goal\nNo loop.\n\n## Notes\n`
+
+test('after 10 quiet minutes with work open, the coordinator is asked for a status check', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  await $.session.start(SESSION)
+  await clock.advance(9 * 60_000)
+  expect(statusPrompts(host)).toEqual([])
+  await clock.advance(60_000)
+  expect(statusPrompts(host)).toHaveLength(1)
+  expect(statusPrompts(host)[0]).toContain('better-tasks status check: no activity for 10 min. Move the work forward.\n1. Call team_status.')
+})
+
+test('no status check with nothing open, while a turn runs, or with text in the composer', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  await $.session.start(SESSION)
+  await clock.advance(15 * 60_000)
+  expect(statusPrompts(host)).toEqual([])
+
+  host.files.set(`${TASKS}/T-001-fix-login.md`, ACTIVE)
+  await $.turn.start({ text: 'working', turnId: 't1' })
+  await clock.advance(30 * 60_000)
+  expect(statusPrompts(host)).toEqual([])
+})
+
+test('text in the composer holds the status check back', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  host.composer = 'half a thou'
+  await $.session.start(SESSION)
+  await clock.advance(20 * 60_000)
+  expect(statusPrompts(host)).toEqual([])
+  host.composer = ''
+  await clock.advance(60_000)
+  expect(statusPrompts(host)).toHaveLength(1)
+})
+
+test('nothing changed: no repeat, the wait grows; a change brings the next check', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  await $.session.start(SESSION)
+  await clock.advance(10 * 60_000)
+  expect(statusPrompts(host)).toHaveLength(1)
+  await clock.advance(40 * 60_000) // quiet checks at 20, 30 and 50 min
+  expect(statusPrompts(host)).toHaveLength(1)
+  host.files.set(`${TASKS}/T-001-fix-login.md`, `${ACTIVE}- 2026-10-05: blocked on the API key\n`)
+  await clock.advance(39 * 60_000) // the next check is due 40 min after the last one
+  expect(statusPrompts(host)).toHaveLength(1)
+  await clock.advance(60_000)
+  expect(statusPrompts(host)).toHaveLength(2)
 })

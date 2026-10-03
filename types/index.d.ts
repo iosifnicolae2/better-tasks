@@ -41,6 +41,20 @@ export type CacheStep = { at: number; read: number; created: number }
 
 export type Activity = { text: string; at: number }
 
+/** The periodic status check's record. */
+export type StatusCheck = {
+  /** The last user prompt or main-session turn, in ms. */
+  activeAt: number
+  /** The last check, fired or skipped, in ms. */
+  checkedAt: number
+  /** What the work looked like at the last fired check. */
+  fingerprint: string
+  /** Checks skipped in a row because nothing changed. */
+  quiet: number
+  /** A main-session turn is running. */
+  busy: boolean
+}
+
 export type TurnFacts = {
   asked: boolean
   /** A task was created or noted this turn. */
@@ -65,6 +79,8 @@ declare module 'claude-code' {
       turn: TurnFacts
       /** The board's search box: shown or not, and its text. */
       search: { isOpen: boolean; query: string }
+      /** The periodic status check. */
+      statusCheck: StatusCheck
       /** The footer label: sprint progress. */
       footer: string
       /** The Tasks pane's selected task id. */

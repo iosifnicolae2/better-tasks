@@ -40,6 +40,12 @@
       "description": "Teammates and the manager keep their prompt cache for an hour, so a teammate stays cheap to resume. Unless you set a TTL yourself.",
       "default": true
     },
+    "statusEvery": {
+      "type": "number",
+      "title": "Status check (minutes)",
+      "description": "After this many quiet minutes the manager checks the open work and moves it forward. 0 turns it off.",
+      "default": 10
+    },
     "keepAwake": {
       "type": "boolean",
       "title": "Keep the Mac awake",

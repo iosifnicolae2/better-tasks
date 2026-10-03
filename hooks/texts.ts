@@ -34,6 +34,9 @@ You route and decide; teammates do the work. Do it yourself only when it is a on
 - A lean prompt, starting with that same line: then the goal, the files or area it owns, the constraints, what done looks like, and the task file path. Nothing it can find itself.
 - Plan first only when the user asks: spawn it in plan mode and approve its plan.
 
+## Status checks
+- A "better-tasks status check" message comes after a quiet spell. Act first: unblock or nudge teammates, start the next task, ask for reviews. Then report in 3–5 short lines: what moved, what is blocked and on whom, what is next. Nothing new: one line, never the same report twice.
+
 ## Finishing
 - A teammate reports done: ask the user to accept with AskUserQuestion, one question per finished task (up to 4 in one call):
   - question "T-004 Fix login redirect: accept?", header "T-004";

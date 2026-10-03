@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
-import type { Activity, CacheStep, Task, Teammate, TurnFacts } from '../types'
+import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from '../types'
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
@@ -14,10 +14,11 @@ import { hasPointer, pointerPrompt, RESTART_TEXT, SETUP_PROMPT, teamsState, wait
 import { projectSettings, readOverrides } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
-import { listTasks, saveTask, today } from './tasks'
-import { blockAdvice, contextTokens, refreshTeam, sendBlock } from './team'
+import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
+import { blockAdvice, contextTokens, isActive, refreshTeam, sendBlock } from './team'
 import { projectText } from './texts'
 import { spawnTask, withSummary } from './spawn'
+import { fingerprintOf, NO_CHECK, statusDecision, statusPrompt } from './status'
 import { startupTips } from './tips'
 import { runTool, TOOLS } from './tools'
 
@@ -36,6 +37,7 @@ const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as T
 const tokensState = atom({ plugin: 'better-tasks', key: 'tokens' } as const, {} as Record<string, number>)
 const activityState = atom({ plugin: 'better-tasks', key: 'activity' } as const, {} as Record<string, Activity>)
 const cacheStepsState = atom({ plugin: 'better-tasks', key: 'cacheSteps' } as const, {} as Record<string, CacheStep>)
+const statusState = atom({ plugin: 'better-tasks', key: 'statusCheck' } as const, NO_CHECK as StatusCheck)
 const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
 const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, filed: false, question: false, prompted: false } as TurnFacts)
@@ -53,6 +55,8 @@ export const register: Register = (on, options) => {
     if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
     if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
+    const startedAt = await $.clock.now()
+    await update($, statusState, () => ({ ...NO_CHECK, activeAt: startedAt }))
     await tick($).catch(error => logFailure($, 'the first refresh', error))
     $.clock.every(60_000, () => tick($))
     const tips = await startupTips(ioOf($), await settingsNow($)).catch(() => [])
@@ -72,7 +76,11 @@ export const register: Register = (on, options) => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    const isOwnCheck = e.origin.kind === 'plugin' && e.origin.name === 'better-tasks'
+    if (isOwnCheck) return next({ ...e, context: [...(e.context ?? []), await contextBlock(ioOf($), await settingsNow($), '')] })
     if (!isPerson(e.origin)) return next(e)
+    const now = await $.clock.now()
+    await update($, statusState, check => ({ ...check, activeAt: now, quiet: 0 }))
     const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
     if (state !== 'on') return next({ ...e, context: [...(e.context ?? []), waitingLine(state)] })
     const reminder = unfiledLine(await read($, turnState))
@@ -122,8 +130,18 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  on('turn.start', async ($, e, next) => {
+    const now = await $.clock.now()
+    await update($, statusState, check => ({ ...check, busy: true, activeAt: now }))
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
     const agentId = e.agentId
+    if (agentId === undefined) {
+      const now = await $.clock.now()
+      await update($, statusState, check => ({ ...check, busy: false, activeAt: now }))
+    }
     if (agentId !== undefined) {
       await update($, activityState, ({ [agentId]: _ended, ...rest }) => rest)
       await refreshTeam(ioOf($))
@@ -287,6 +305,27 @@ async function tick($: EngineInterface): Promise<void> {
   await realign($, settings)
   await refreshTeam(ioOf($))
   await showStatus($, settings)
+  await checkStatus($, settings).catch(error => logFailure($, 'the status check', error))
+}
+
+/** After a quiet spell with open work, one prompt asks the coordinator to move it forward (see status.ts). */
+async function checkStatus($: EngineInterface, settings: Settings): Promise<void> {
+  const now = await $.clock.now()
+  const day = await today(ioOf($))
+  const isNear = (task: Task) => isOpen(task) && ['now', 'this-sprint'].includes(whenOf(task, day, settings.sprint))
+  const tasks = (await read($, tasksState)).filter(isNear)
+  const team = (await read($, teamState)).filter(isActive)
+  const check = await read($, statusState)
+  const { fire, check: next } = statusDecision({
+    now,
+    every: settings.statusEvery,
+    check,
+    hasWork: tasks.length > 0 || team.length > 0,
+    composerText: (await $.prompt.read().catch(() => ({ text: '' }))).text,
+    fingerprint: fingerprintOf(tasks, team),
+  })
+  await update($, statusState, () => next)
+  if (fire) void $.prompt.submit({ text: statusPrompt(Math.round((now - check.activeAt) / 60_000)) }).catch(() => undefined)
 }
 
 /** Keeps every task on a sprint boundary when the sprint length or start day changes. */
