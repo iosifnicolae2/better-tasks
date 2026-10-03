@@ -1,7 +1,7 @@
 import type { Task } from '../types'
 import type { Files } from './io'
 import { goalOf, readSprints, withReview, writeSprints } from './sprintlog'
-import { sprintLabel } from './sprints'
+import { sprintLabel, sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
 import { isOpen, listTasks, saveTask } from './tasks'
 
@@ -12,6 +12,19 @@ export function rolledOver(tasks: readonly Task[], current: string): Task[] {
   return tasks
     .filter(task => isOpen(task) && task.sprint !== 'backlog' && task.sprint < current)
     .map(task => ({ ...task, sprint: current, rolled: task.rolled + 1 }))
+}
+
+/**
+ * Tasks whose sprint is no boundary under `config` (its length or start day changed), put on one:
+ * the sprint holding their date, or `current` for open work that would land in the past.
+ */
+export function realigned(tasks: readonly Task[], current: string, config: SprintConfig): Task[] {
+  return tasks.flatMap(task => {
+    if (task.sprint === 'backlog') return []
+    const aligned = sprintStart(task.sprint, config)
+    const sprint = isOpen(task) && aligned < current ? current : aligned
+    return sprint === task.sprint ? [] : [{ ...task, sprint }]
+  })
 }
 
 export function shippedIn(tasks: readonly Task[], sprint: string): Task[] {

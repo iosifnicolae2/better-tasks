@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import type { Task } from '../types'
-import { rolledOver, shippedIn } from '../hooks/boundary'
+import { realigned, rolledOver, shippedIn } from '../hooks/boundary'
 import { goalOf, withGoal, withReview } from '../hooks/sprintlog'
 import { logRow } from '../hooks/taskflow'
 import { bodyOf, edgeOrder, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withNote } from '../hooks/tasks'
@@ -94,6 +94,23 @@ describe('sprint boundary', () => {
       ['T-004', CURRENT, 2],
     ])
     expect(shippedIn(tasks, '2026-09-28').map(one => one.id)).toEqual(['T-002'])
+  })
+
+  test('a length or start-day change puts every task back on a boundary', () => {
+    const twoWeeks = { weeks: 2, startDay: 1 } as const // the current two-week sprint: Sep 28 – Oct 11
+    const tasks = [
+      task({ id: 'T-001', sprint: '2026-10-05' }), // was this week's sprint: now inside the current one
+      task({ id: 'T-002', sprint: '2026-10-12' }), // next sprint, still a boundary: stays
+      task({ id: 'T-003', sprint: '2026-09-21', status: 'done' }), // history: the sprint holding its date
+      task({ id: 'T-004', sprint: '2026-09-21' }), // open in a past sprint: the current one
+      task({ id: 'T-005', sprint: 'backlog' }),
+    ]
+    expect(realigned(tasks, '2026-09-28', twoWeeks).map(one => [one.id, one.sprint])).toEqual([
+      ['T-001', '2026-09-28'],
+      ['T-003', '2026-09-14'],
+      ['T-004', '2026-09-28'],
+    ])
+    expect(realigned(tasks.slice(0, 2), CURRENT, CONFIG)).toEqual([])
   })
 
   test('sprints.md keeps one goal per sprint and the review', () => {

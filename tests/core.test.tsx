@@ -130,7 +130,7 @@ test('each user prompt carries the sprint context', async ($, on) => {
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'mcp__supermanager__sprint_goal', tool_use_id: 'g1', goal: 'Ship login' })
   const entered = await $.prompt.submit(prompt('hi'))
-  expect(entered.context?.at(-1)).toContain('[supermanager] Sprint 41 · Oct 5–11 · goal: Ship login · 0/0 done')
+  expect(entered.context?.at(-1)).toContain('[supermanager] Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 0/0 done')
   expect(entered.context?.at(-1)).toContain('Teammate auth · running')
 })
 
@@ -203,7 +203,7 @@ test('a new sprint rolls unfinished work over and writes the review', async ($, 
   expect(host.files.get(`${TASKS}/T-001-open-one.md`)).toContain('sprint: 2026-10-12\nurgent: false\nstatus: todo\nowner:\nrolled: 1')
   const sprints = host.files.get(`${ROOT}/.claude/manager/sprints.md`) ?? ''
   expect(sprints).toContain('Shipped:\n- T-002 Shipped one\nRolled over:\n- T-001 Open one')
-  expect(host.toasts.at(-1)).toContain('Sprint 42 · Oct 12–18 started')
+  expect(host.toasts.at(-1)).toContain('Sprint 42 · Week 42 · Mon Oct 12 – Sun Oct 18 started')
   const entered = await $.prompt.submit(prompt('morning'))
   expect(entered.context?.at(-1)).toContain('Ask the user for its goal')
 })
@@ -263,7 +263,7 @@ test('every session start shows the tips once, with the live sprint line', async
   await $.session.start(SESSION)
   await clock.advance(0)
   expect(host.notices).toEqual([
-    'supermanager · Sprint 41 · Oct 5–11 · goal: Ship login · 1 open',
+    'supermanager · Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 1 open',
     '/supermanager  ↑↓ select · ⏎ actions · m move, ↑↓, ⏎ stop · o open · d done',
     '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
     '/away  screens off, Mac keeps working',
@@ -411,4 +411,22 @@ test('tasks keep their order: new ones at the end, now at the top, a move lands 
   expect(orderOf('T-003-hot.md')).toBe('2')
   const list = String((await $.tool.call({ tool: 'mcp__supermanager__task_list', tool_use_id: 'l1' })).result)
   expect(list.split('\n').map(line => line.split(' ')[0])).toEqual(['T-004', 'T-001', 'T-002', 'T-003'])
+})
+
+test('changing the sprint length mid-sprint keeps every task, on a boundary', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('two tasks for this sprint'))
+  await $.tool.call({ ...create, when: 'this-sprint', title: 'This week' })
+  await $.tool.call({ ...create, tool_use_id: 't2', when: 'next-sprint', title: 'Next week' })
+  expect(host.files.get(`${TASKS}/T-002-next-week.md`)).toContain('sprint: 2026-10-12')
+
+  host.files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ sprintWeeks: '2' }))
+  await clock.advance(60_000)
+  expect(host.files.get(`${TASKS}/T-001-this-week.md`)).toContain('sprint: 2026-09-28')
+  expect(host.files.get(`${TASKS}/T-002-next-week.md`)).toContain('sprint: 2026-10-12')
+  const list = String((await $.tool.call({ tool: 'mcp__supermanager__task_list', tool_use_id: 'l1', sprint: 'all' })).result)
+  expect(list).toBe('T-001 [todo] This week · this-sprint\nT-002 [todo] Next week · next-sprint')
 })

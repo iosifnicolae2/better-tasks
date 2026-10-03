@@ -48,7 +48,7 @@ export const FIELDS: Record<string, Field> = {
   worktree: { kind: 'boolean' },
   contextLimit: { kind: 'number' },
   keepAwake: { kind: 'boolean' },
-  sprintWeeks: { kind: 'string', values: ['1', '2'] },
+  sprintWeeks: { kind: 'string', values: ['1', '2', '3', '4'] },
   sprintStart: { kind: 'string', values: WEEKDAYS },
   taskPrefix: { kind: 'string' },
   taskPadding: { kind: 'number' },
@@ -83,7 +83,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     contextLimit: Number(value('contextLimit')),
     keepAwake: value('keepAwake') !== false,
     sprint: {
-      weeks: String(value('sprintWeeks')) === '2' ? 2 : 1,
+      weeks: Math.min(4, Math.max(1, Number(value('sprintWeeks')) || 1)),
       startDay: Math.max(0, WEEKDAYS.indexOf(String(value('sprintStart')))),
     },
     tasks: {

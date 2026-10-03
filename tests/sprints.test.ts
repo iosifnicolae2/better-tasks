@@ -1,6 +1,19 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { addDays, dayOf, nextSprint, sprintEnd, sprintLabel, sprintNumber, sprintStart } from '../hooks/sprints'
+import {
+  addDays,
+  datesLabel,
+  dayOf,
+  daysLeftLabel,
+  nextSprint,
+  sprintEnd,
+  sprintLabel,
+  sprintNumber,
+  sprintStart,
+  sprintTitle,
+  weekLabel,
+  weekNumber,
+} from '../hooks/sprints'
 
 const WEEKLY_MONDAY = { weeks: 1, startDay: 1 } as const
 const TWO_WEEKS_MONDAY = { weeks: 2, startDay: 1 } as const
@@ -34,15 +47,50 @@ describe('sprint dates', () => {
   })
 
   test('week numbers are ISO weeks', () => {
-    expect(sprintNumber('2026-10-05')).toBe(41)
-    expect(sprintNumber('2026-12-28')).toBe(53)
-    expect(sprintNumber('2027-01-04')).toBe(1)
+    expect(weekNumber('2026-10-05')).toBe(41)
+    expect(weekNumber('2026-12-28')).toBe(53)
+    expect(weekNumber('2027-01-04')).toBe(1)
+    expect(weekNumber('2027-01-01')).toBe(53) // a Friday: still the old year's last week
   })
 
-  test('labels', () => {
-    expect(sprintLabel('2026-10-05', WEEKLY_MONDAY)).toBe('Sprint 41 · Oct 5–11')
-    expect(sprintLabel('2026-09-28', WEEKLY_MONDAY)).toBe('Sprint 40 · Sep 28–Oct 4')
-    expect(sprintLabel('2026-10-05', TWO_WEEKS_MONDAY)).toBe('Sprint 41 · Oct 5–18')
+  test('1 to 4 weeks: length, end, week label and number', () => {
+    const cases = [
+      [1, '2026-10-05', '2026-10-11', 'Week 41', 41],
+      [2, '2026-09-28', '2026-10-11', 'Weeks 40–41', 20],
+      [3, '2026-10-05', '2026-10-25', 'Weeks 41–43', 14],
+      [4, '2026-09-28', '2026-10-25', 'Weeks 40–43', 10],
+    ] as const
+    for (const [weeks, start, end, weeksText, number] of cases) {
+      const config = { weeks, startDay: 1 }
+      expect(sprintStart('2026-10-07', config)).toBe(start)
+      expect(sprintEnd(start, config)).toBe(end)
+      expect(sprintStart(end, config)).toBe(start)
+      expect(sprintStart(addDays(end, 1), config)).toBe(addDays(end, 1))
+      expect(weekLabel(start, config)).toBe(weeksText)
+      expect(sprintNumber(start, config)).toBe(number)
+    }
+  })
+
+  test('week labels across the year boundary', () => {
+    expect(weekLabel('2026-12-28', WEEKLY_MONDAY)).toBe('Week 53')
+    expect(weekLabel('2027-01-04', WEEKLY_MONDAY)).toBe('Week 1')
+    const start = sprintStart('2026-12-30', TWO_WEEKS_MONDAY)
+    expect(weekLabel(start, TWO_WEEKS_MONDAY)).toMatch(/^Weeks (52–53|53–1)$/)
+    expect(datesLabel('2026-12-28', WEEKLY_MONDAY)).toBe('Mon Dec 28 – Sun Jan 3')
+  })
+
+  test('a Sunday start counts the week most of it lies in', () => {
+    const sunday = { weeks: 1, startDay: 0 } as const
+    expect(weekLabel('2026-10-04', sunday)).toBe('Week 41')
+    expect(datesLabel('2026-10-04', sunday)).toBe('Sun Oct 4 – Sat Oct 10')
+  })
+
+  test('labels and days left', () => {
+    expect(sprintLabel('2026-10-05', WEEKLY_MONDAY)).toBe('Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11')
+    expect(sprintLabel('2026-09-28', TWO_WEEKS_MONDAY)).toBe('Sprint 20 · Weeks 40–41 · Mon Sep 28 – Sun Oct 11')
+    expect(sprintTitle('2026-10-05', WEEKLY_MONDAY, '2026-10-09')).toBe('Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 3 days left')
+    expect(daysLeftLabel('2026-10-10', '2026-10-05', WEEKLY_MONDAY)).toBe('2 days left')
+    expect(daysLeftLabel('2026-10-11', '2026-10-05', WEEKLY_MONDAY)).toBe('last day')
   })
 
   test('dayOf reads the local calendar day', () => {

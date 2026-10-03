@@ -25,7 +25,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
   that area, or creates a task and spawns a teammate named by its area. It does not do the work itself.
 - **Tasks ask "when?".** Creating a task never starts it. The coordinator asks
   *Now / This sprint / Next sprint / Backlog* unless you already said. "Now" starts at once.
-- **Sprints** (YC / Linear style): fixed 1- or 2-week sprints, one sprint goal,
+- **Sprints** (YC / Linear style): fixed 1- to 4-week sprints (weekly by default), shown as `Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 3 days left`; one sprint goal,
   backlog → sprint, unfinished work rolls over, a short review of what shipped.
 - **Context-aware routing.** It tracks each teammate's context fill. A teammate above the
   limit (default 50 %) gets no new work: the coordinator asks it for a handoff note and starts a fresh one.
@@ -73,7 +73,7 @@ In `/config` (rows `supermanager.*`), `/supermanager config`, or per project in 
 | `worktree` | off | each named teammate works in its own git worktree |
 | `contextLimit` | 50 | % of context above which a teammate gets no new work |
 | `keepAwake` | on | holds `caffeinate` while any teammate runs |
-| `sprintWeeks` | 1 | sprint length in weeks (1 or 2) |
+| `sprintWeeks` | 1 | sprint length in weeks (1 to 4); a change re-files open tasks into the current sprint, nothing is lost |
 | `sprintStart` | monday | weekday a sprint starts |
 
 ## Customize per project

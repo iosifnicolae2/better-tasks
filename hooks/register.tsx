@@ -3,7 +3,7 @@ import type { EngineInterface, PluginOptions, Register, ToolCallInput } from 'cl
 
 import type { Activity, Task, Teammate, TurnFacts } from '../types'
 import { activityOf } from './activity'
-import { rollOver } from './boundary'
+import { realigned, rollOver } from './boundary'
 import { contextBlock, footerText, isPerson, namesTime, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
@@ -12,7 +12,7 @@ import { RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine } from './setup'
 import { projectSettings, readOverrides } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
-import { listTasks, today } from './tasks'
+import { listTasks, saveTask, today } from './tasks'
 import { contextTokens, refreshTeam, sendDenial } from './team'
 import { projectText } from './texts'
 import { startupTips } from './tips'
@@ -206,7 +206,7 @@ async function serveTool($: EngineInterface, e: ToolCallInput, name: string) {
 async function showStatus($: EngineInterface, settings: Settings): Promise<void> {
   const start = sprintStart(await today(ioOf($)), settings.sprint)
   const tasks = await read($, tasksState)
-  await update($, footerState, () => footerText(tasks, start))
+  await update($, footerState, () => footerText(tasks, start, settings.sprint))
 }
 
 /** Once a minute: a new sprint? then fresh tasks, team and status line. */
@@ -214,9 +214,16 @@ async function tick($: EngineInterface): Promise<void> {
   const settings = await settingsNow($)
   await logConfigProblems($)
   await checkSprint($, settings)
-  await listTasks(ioOf($))
+  await realign($, settings)
   await refreshTeam(ioOf($))
   await showStatus($, settings)
+}
+
+/** Keeps every task on a sprint boundary when the sprint length or start day changes. */
+async function realign($: EngineInterface, settings: Settings): Promise<void> {
+  const current = sprintStart(await today(ioOf($)), settings.sprint)
+  const tasks = await listTasks(ioOf($))
+  for (const task of realigned(tasks, current, settings.sprint)) await saveTask(ioOf($), task)
 }
 
 async function checkSprint($: EngineInterface, settings: Settings): Promise<void> {

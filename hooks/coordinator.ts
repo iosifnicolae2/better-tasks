@@ -4,7 +4,8 @@ import type { Task, TurnFacts } from '../types'
 import type { Io } from './io'
 import type { Settings } from './settings'
 import { goalOf, readSprints } from './sprintlog'
-import { sprintLabel, sprintNumber, sprintStart } from './sprints'
+import { sprintNumber, sprintStart, sprintTitle } from './sprints'
+import type { SprintConfig } from './sprints'
 import { isOpen, listTasks, today } from './tasks'
 import { isActive, isFull, mateLine, refreshTeam } from './team'
 
@@ -46,13 +47,14 @@ export function createDenial(facts: TurnFacts, agentId: string | undefined): str
 /** What the coordinator reads beside each user prompt: sprint, due work, notice, teammates. */
 export async function contextBlock(io: Io, settings: Settings, notice: string): Promise<string> {
   const config = settings.sprint
-  const start = sprintStart(await today(io), config)
+  const day = await today(io)
+  const start = sprintStart(day, config)
   const tasks = (await listTasks(io)).filter(task => task.sprint === start)
   const team = (await refreshTeam(io)).filter(isActive)
   const goal = goalOf(await readSprints(io), start)
   const done = tasks.filter(task => task.status === 'done').length
   const lines = [
-    `[supermanager] ${sprintLabel(start, config)} · goal: ${goal || 'not set'} · ${done}/${tasks.length} done`,
+    `[supermanager] ${sprintTitle(start, config, day)} · goal: ${goal || 'not set'} · ${done}/${tasks.length} done`,
     ...waitingLines(tasks),
     notice,
     ...team.map(mate => `Teammate ${mateLine(mate)}${isFull(mate, settings.contextLimit) ? ' · FULL, no new work' : ''}`),
@@ -68,9 +70,9 @@ function waitingLines(tasks: readonly Task[]): string[] {
 }
 
 /** The footer label: "Sprint 41 · 1/4 done", plus " · 1 due" when a now-task waits. Teammates are Claude Code's to show. */
-export function footerText(tasks: readonly Task[], start: string): string {
+export function footerText(tasks: readonly Task[], start: string, config: SprintConfig): string {
   const sprint = tasks.filter(task => task.sprint === start)
   const done = sprint.filter(task => task.status === 'done').length
   const due = sprint.filter(task => task.urgent && isOpen(task)).length
-  return `Sprint ${sprintNumber(start)} · ${done}/${sprint.length} done${due > 0 ? ` · ${due} due` : ''}`
+  return `Sprint ${sprintNumber(start, config)} · ${done}/${sprint.length} done${due > 0 ? ` · ${due} due` : ''}`
 }

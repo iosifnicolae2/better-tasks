@@ -1,7 +1,7 @@
 import type { Io } from './io'
 import type { Settings } from './settings'
 import { goalOf, readSprints } from './sprintlog'
-import { sprintLabel, sprintStart } from './sprints'
+import { sprintStart, sprintTitle } from './sprints'
 import { isOpen, listTasks, today } from './tasks'
 import { projectText } from './texts'
 
@@ -14,8 +14,9 @@ export function tipsLines(label: string, goal: string, open: number, tips: strin
 }
 
 export async function startupTips(io: Io, settings: Settings): Promise<string[]> {
-  const start = sprintStart(await today(io), settings.sprint)
+  const day = await today(io)
+  const start = sprintStart(day, settings.sprint)
   const open = (await listTasks(io)).filter(task => task.sprint === start && isOpen(task)).length
   const goal = goalOf(await readSprints(io), start)
-  return tipsLines(sprintLabel(start, settings.sprint), goal, open, await projectText(io, 'tips'))
+  return tipsLines(sprintTitle(start, settings.sprint, day), goal, open, await projectText(io, 'tips'))
 }

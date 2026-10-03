@@ -44,10 +44,12 @@
     "sprintWeeks": {
       "type": "string",
       "title": "Sprint length (weeks)",
-      "description": "How many weeks one sprint lasts.",
+      "description": "How many weeks one sprint lasts (1 to 4).",
       "options": [
         "1",
-        "2"
+        "2",
+        "3",
+        "4"
       ],
       "default": "1"
     },
