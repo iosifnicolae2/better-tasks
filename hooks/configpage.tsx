@@ -71,6 +71,16 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'team',
+    field: 'statusEvery',
+    label: 'Status check',
+    describe: 'After this many quiet minutes the manager checks the open work and moves it forward. off: never.',
+    options: ['off', 'every 10 min', 'every 20 min', 'every 30 min', 'every 60 min'],
+    value: settings => (settings.statusEvery > 0 ? `every ${settings.statusEvery} min` : 'off'),
+    initial: 'every 10 min',
+    stored: value => (value === 'off' ? 0 : Number.parseInt(value.replace('every ', ''), 10)),
+  },
+  {
+    group: 'team',
     field: 'keepAwake',
     label: 'Keep the Mac awake',
     describe: 'Holds caffeinate while any teammate runs.',

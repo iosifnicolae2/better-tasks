@@ -452,7 +452,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-contextLimit', 'cfg-longCache', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-contextLimit', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
@@ -460,6 +460,7 @@ for (const surface of SURFACES) {
       ['better-tasks.worktree', true],
       ['better-tasks.contextLimit', 60],
       ['better-tasks.longCache', false],
+      ['better-tasks.statusEvery', 20],
       ['better-tasks.keepAwake', false],
       ['better-tasks.sprintWeeks', '2'],
       ['better-tasks.sprintStart', 'tuesday'],
