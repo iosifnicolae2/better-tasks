@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { backlogToggle, filledCells, neighbour, partsOf, rowRoles, sectionsOf, shifted, shortDates, windowOf } from '../hooks/board'
+import { backlogToggle, filledCells, neighbour, partsOf, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -157,6 +157,19 @@ test('search ranges cut a line into lit and plain parts', () => {
     { text: ' redirect', isMatch: false },
   ])
   expect(partsOf('plain', [])).toEqual([{ text: 'plain', isMatch: false }])
+})
+
+test('the wheel moves the window inside the list, the selection following into view', () => {
+  expect(windowFrom(5, 10, 3)).toEqual({ start: 0, end: 5 })
+  expect(windowFrom(30, 10, 25)).toEqual({ start: 20, end: 30 })
+  // The board of fakeProject: headings, blanks and "empty" lines around T-001, T-004 and T-002.
+  const taskIds = [, , , , , 'T-001', 'T-004', , , , , , 'T-002', , ,]
+  const list = (start: number, selectedId: string) => ({ taskIds: [...taskIds], start, rows: 6, selectedId })
+  expect(wheeled(list(2, 'T-001'), 1)).toEqual({ start: 3, selectedId: 'T-001' })
+  expect(wheeled(list(2, 'T-001'), 3)).toEqual({ start: 5, selectedId: 'T-004' })
+  expect(wheeled(list(5, 'T-004'), 10)).toEqual({ start: 9, selectedId: 'T-002' })
+  // At the top only headings would show: the window stops where a task still does.
+  expect(wheeled(list(9, 'T-002'), -100)).toEqual({ start: 1, selectedId: 'T-001' })
 })
 
 type Node = { type?: string; props?: { key?: string }; children?: unknown[] }
@@ -531,6 +544,38 @@ test('the arrow keys select: the focus ring carries the selection', async ($, on
   expect(moved.deny).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: 'T-002  Dark mode' })).toBeDefined()
   expect(await ui.findAll({ type: 'Text', text: /^▌$/ })).toHaveLength(1)
+})
+
+test('the wheel scrolls the list and the selection follows; the arrows bring the window back', async ($, on) => {
+  fakeProject(on)
+  await $.command.run(sprintCommand())
+  const short = { ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 15 } } }
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...short })
+  const wheel = (by: number) =>
+    $.ui.scroll({ component: 'Pane', requestId: 'better-tasks-sprint', offset: 0, by, bodyRows: 15, contentRows: 15, origin: { kind: 'person' } })
+  expect(await ui.find({ type: 'Text', text: /⋯ 3 more above/ })).toBeDefined()
+
+  expect((await wheel(3)).deny).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /⋯ 6 more above/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'T-004  Rate limit' })).toBeDefined()
+
+  await wheel(10)
+  expect(await ui.find({ type: 'Text', text: /more below/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: 'T-002  Dark mode' })).toBeDefined()
+
+  await arrowTo($, 'task-T-001')
+  expect(await ui.find({ type: 'Text', text: /⋯ 3 more above/ })).toBeDefined()
+})
+
+test('while a task moves, the wheel leaves the list alone', async ($, on) => {
+  fakeProject(on)
+  await $.command.run(sprintCommand())
+  const short = { ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 15 } } }
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...short })
+  await ui.press({ key: 'move' })
+  const before = await listShape(ui)
+  await $.ui.scroll({ component: 'Pane', requestId: 'better-tasks-sprint', offset: 0, by: 3, bodyRows: 15, contentRows: 15, origin: { kind: 'person' } })
+  expect(await listShape(ui)).toBe(before)
 })
 
 test('a task being worked on spins; the phone shows a still ✻', async ($, on) => {

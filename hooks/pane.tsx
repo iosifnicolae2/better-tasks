@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, ICONS, TITLES, sectionsOf, shortDates, shifted } from './board'
-import type { BoardActions, Hit, SearchState, Section, SprintFacts } from './board'
+import { Board, ICONS, TITLES, sectionsOf, shortDates, shifted, wheeled } from './board'
+import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } from './board'
 import { searchTasks } from './search'
 import { ConfigPage } from './configpage'
 import type { ConfigValue, ProjectFacts } from './configpage'
@@ -50,6 +50,10 @@ const pageState = atom({ plugin: 'better-tasks', key: 'page' } as const, 'board'
 const movingState = atom({ plugin: 'better-tasks', key: 'moving' } as const, '')
 const actingState = atom({ plugin: 'better-tasks', key: 'acting' } as const, '')
 const searchState = atom({ plugin: 'better-tasks', key: 'search' } as const, { isOpen: false, query: '' } as SearchState)
+const listScrollState = atom({ plugin: 'better-tasks', key: 'listScroll' } as const, { start: 0, selectedId: '' })
+
+/** The board's list as last drawn; the wheel moves its window from there. */
+let drawnList: DrawnList | undefined
 
 // ---- With $ ----
 
@@ -271,6 +275,16 @@ async function closeSearch($: EngineInterface): Promise<void> {
 
 let refreshTimer: { cancel: () => void } | undefined
 
+/**
+ * The wheel over the board scrolls its list, which the board windows itself, so the engine's own
+ * window stays put. The selection follows into view; the keys bring the window back to it.
+ */
+async function scrollList($: EngineInterface, list: DrawnList, by: number): Promise<void> {
+  const moved = wheeled(list, by)
+  await update($, listScrollState, () => moved)
+  if (moved.selectedId !== list.selectedId) await selectTask($, moved.selectedId)
+}
+
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
   const files = filesOf($, options)
   await listTasks(files)
@@ -327,6 +341,7 @@ export function registerPane(on: On, options: PluginOptions): void {
   on('ui.close', { id: PANE }, async ($, e, next) => {
     refreshTimer?.cancel()
     refreshTimer = undefined
+    drawnList = undefined
     await leaveModes($)
     if (e.origin.kind !== 'unload') await rememberOpen($, false)
     return next(e)
@@ -357,6 +372,13 @@ export function registerPane(on: On, options: PluginOptions): void {
     return moved
   })
 
+  // While a task moves or its actions hold the keys, the wheel leaves the list as it is.
+  on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    if (drawnList === undefined || (await read($, pageState)) !== 'board') return next(e)
+    if ((await read($, movingState)) === '' && (await read($, actingState)) === '') await scrollList($, drawnList, e.by)
+    return {}
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box } = ui
@@ -383,6 +405,7 @@ export function registerPane(on: On, options: PluginOptions): void {
     const doneCount = inSprint.filter(task => task.status === 'done').length
     const open = sections.flatMap(section => section.tasks)
     const search = await read($, searchState)
+    const listScroll = await read($, listScrollState)
     const whereOf = (task: Task) => {
       if (!isOpen(task)) return task.status === 'cancelled' ? '✗ cancelled' : '✓ closed'
       const when = whenOf(task, day, settings.sprint)
@@ -454,6 +477,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       <Box flexDirection="column" paddingX={1}>
         <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
           team={team} limit={settings.contextLimit} hasKeys={e.props.isFocused} bodyRows={e.props.scroll.bodyRows}
+          scrollStart={listScroll.selectedId === selectedTask?.id ? listScroll.start : undefined} onDrawn={list => { drawnList = list }}
           canSpin={e.surface === 'terminal' || e.surface === 'desktop'} search={search} hits={hits} actions={actions} />
       </Box>
     )

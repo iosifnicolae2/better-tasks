@@ -77,6 +77,8 @@ declare module 'claude-code' {
       cacheSteps: Record<string, CacheStep>
       notice: string
       turn: TurnFacts
+      /** Where the wheel left the board's list window; it holds while that task stays selected. */
+      listScroll: { start: number; selectedId: string }
       /** The board's search box: shown or not, and its text. */
       search: { isOpen: boolean; query: string }
       /** The periodic status check. */

@@ -54,9 +54,49 @@ export function shortDates(start: string, end: string): string {
  * list when it fits, else a window that keeps the focused line away from the edges.
  */
 export function windowOf(count: number, rows: number, focus: number): { start: number; end: number } {
-  if (count <= rows) return { start: 0, end: count }
-  const start = Math.min(Math.max(0, focus - Math.floor(rows / 2)), count - rows)
-  return { start, end: start + rows }
+  return windowFrom(count, rows, focus - Math.floor(rows / 2))
+}
+
+/** A window of `rows` from line `start`, kept inside the list: the whole list when it fits. */
+export function windowFrom(count: number, rows: number, start: number): { start: number; end: number } {
+  const from = Math.min(Math.max(0, start), Math.max(0, count - rows))
+  return { start: from, end: Math.min(count, from + rows) }
+}
+
+/** Whether a window at `start` shows a "⋯ more" mark on its first line (above) and its last (below). */
+function marksOf(count: number, rows: number, start: number): { above: boolean; below: boolean } {
+  const hasRoom = Math.min(rows, count) >= 3
+  return { above: hasRoom && start > 0, below: hasRoom && start + rows < count }
+}
+
+/** The list as the board last drew it: each line's task id (none on a heading or blank), its window, the selection. */
+export type DrawnList = { taskIds: readonly (string | undefined)[]; start: number; rows: number; selectedId: string }
+
+/**
+ * The wheel: the window moves `by` lines, kept inside the list. A selection it scrolls out of view
+ * moves to the nearest task still in view, so the focus ring never rests on a hidden row; the window
+ * stops short of a stretch with no task in it.
+ */
+export function wheeled(list: DrawnList, by: number): { start: number; selectedId: string } {
+  for (let target = list.start + by; target !== list.start; target -= Math.sign(by)) {
+    const landed = landing(list, target)
+    if (landed !== undefined) return landed
+  }
+  return { start: list.start, selectedId: list.selectedId }
+}
+
+/** The window at `target` and the task selected there; none when it shows no task. */
+function landing(list: DrawnList, target: number): { start: number; selectedId: string } | undefined {
+  const count = list.taskIds.length
+  const { start, end } = windowFrom(count, list.rows, target)
+  const marks = marksOf(count, list.rows, start)
+  const first = start + (marks.above ? 1 : 0)
+  const last = end - 1 - (marks.below ? 1 : 0)
+  const at = list.taskIds.indexOf(list.selectedId)
+  if (at >= first && at <= last) return { start, selectedId: list.selectedId }
+  const inView = list.taskIds.slice(first, last + 1).filter(id => id !== undefined)
+  const nearest = at < first ? inView[0] : inView.at(-1)
+  return nearest === undefined ? undefined : { start, selectedId: nearest }
 }
 
 /** The section one step up (-1) or down (+1), if any. */
@@ -177,6 +217,10 @@ export type BoardProps = {
   hasKeys: boolean
   /** The pane body's height; the list gets what the bottom box leaves. Unknown: no window. */
   bodyRows?: number
+  /** Where the wheel left the list's window; none: the window follows the selection. */
+  scrollStart?: number
+  /** Told what the list window shows each time it is drawn, for the wheel to move it from there. */
+  onDrawn?: (list: DrawnList) => void
   /** Whether the surface runs Client modules (terminal, desktop) for the spinner. */
   canSpin: boolean
   search: SearchState
@@ -188,20 +232,22 @@ export type BoardProps = {
 type Line = { node: JSX.Element; taskId?: string }
 
 export function Board(props: BoardProps) {
-  const { ui, selected, bodyRows, hasKeys, limit, actions } = props
+  const { ui, selected, bodyRows, scrollStart, hasKeys, limit, actions } = props
   const { Box, Text } = ui
   const lines = props.hits ? resultLines(props, props.hits) : listLines(props)
   // At any pane height the list takes exactly what the search line and the box leave, so the box
   // sits at the bottom and the search line at the top.
   const rows = bodyRows === undefined ? undefined : Math.max(1, bodyRows - BOTTOM_ROWS - 1)
   const focus = Math.max(0, lines.findIndex(line => line.taskId !== undefined && line.taskId === selected?.task.id))
-  const shown = rows === undefined ? { start: 0, end: lines.length } : windowOf(lines.length, rows, focus)
-  const above = shown.start
-  const below = lines.length - shown.end
+  const shown =
+    rows === undefined ? { start: 0, end: lines.length }
+    : scrollStart === undefined ? windowOf(lines.length, rows, focus)
+    : windowFrom(lines.length, rows, scrollStart)
+  if (rows !== undefined) props.onDrawn?.({ taskIds: lines.map(line => line.taskId), start: shown.start, rows, selectedId: selected?.task.id ?? '' })
+  const marks = marksOf(lines.length, rows ?? lines.length, shown.start)
   const window = lines.slice(shown.start, shown.end).map(line => line.node)
-  const hasRoomForMarks = window.length >= 3
-  if (hasRoomForMarks && above > 0) window[0] = <Text color="subtle">  ⋯ {above + 1} more above</Text>
-  if (hasRoomForMarks && below > 0) window[window.length - 1] = <Text color="subtle">  ⋯ {below + 1} more below</Text>
+  if (marks.above) window[0] = <Text color="subtle">  ⋯ {shown.start + 1} more above</Text>
+  if (marks.below) window[window.length - 1] = <Text color="subtle">  ⋯ {lines.length - shown.end + 1} more below</Text>
   return (
     <Box flexDirection="column">
       <SearchLine ui={ui} search={props.search} isLocked={selected?.isMoving === true || selected?.isActing === true} actions={actions} />
