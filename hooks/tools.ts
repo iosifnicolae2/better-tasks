@@ -6,8 +6,9 @@ import type { Settings } from './settings'
 import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
-import { createTask, findTask, isOpen, listTasks, taskLine, today, WHEN_LABELS } from './tasks'
+import { createTask, findTask, isOpen, listTasks, taskLine, today, WHEN_LABELS, whenOf } from './tasks'
 import { blockOf, cacheText, findMate, mateLine, refreshTeam } from './team'
+import { searchTasks } from './search'
 import { initProject } from './texts'
 
 // The tools the model gets, listed as mcp__better-tasks__<name>.
@@ -59,6 +60,17 @@ export const TOOLS: readonly ToolSpec[] = [
     },
   },
   {
+    name: 'task_search',
+    description:
+      'Full-text search over all tasks, closed ones too: id, title, goal and notes. All words must match; title matches ' +
+      'rank first. Use it to find the task a message refers to when "Open tasks" in your context does not show it.',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string' }, limit: { type: 'number' } },
+      required: ['query'],
+    },
+  },
+  {
     name: 'task_list',
     description: 'List open tasks, one line each. sprint: current (default, includes currently working on), next, backlog, or all (done too).',
     inputSchema: {
@@ -95,6 +107,8 @@ type Input = {
   note?: string
   commits?: string
   sprint?: string
+  query?: string
+  limit?: number
 }
 
 /** The call as the hook saw it: the tool's short name, its input, and who called. */
@@ -122,6 +136,7 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     const noted = await changeTask(io, task, { note: input.note ?? '' }, config)
     return { result: `Noted on ${noted.id} ${noted.title}.\n${await ownerHint(io, noted, settings)}` }
   }
+  if (run.name === 'task_search') return { result: await taskSearch(io, input.query ?? '', input.limit, settings) }
   if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
   if (run.name === 'sprint_goal') return { result: await setGoal(io, input.goal ?? '', settings) }
   if (run.name === 'team_status') return { result: await teamStatus(io) }
@@ -178,4 +193,17 @@ async function ownerHint(io: Io, task: Task, settings: Settings): Promise<string
   }
   const facts = [cacheText(mate), mate.percent === undefined ? undefined : `${mate.percent} %`].filter(Boolean).join(', ')
   return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: forward the note with SendMessage.`
+}
+
+async function taskSearch(io: Io, query: string, limit: number | undefined, settings: Settings): Promise<string> {
+  const day = await today(io)
+  const hits = searchTasks(await listTasks(io), query, limit ?? 10)
+  if (hits.length === 0) return `No task matches "${query}".`
+  return hits
+    .map(({ task, snippet }) => {
+      const place = isOpen(task) ? WHEN_LABELS[whenOf(task, day, settings.sprint)] : task.status
+      const owner = task.owner ? ` · ${task.owner}` : ''
+      return `${task.id} ${task.title} · ${place}${owner}${snippet ? `: ${snippet}` : ''}`
+    })
+    .join('\n')
 }

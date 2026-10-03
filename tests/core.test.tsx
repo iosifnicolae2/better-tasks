@@ -689,3 +689,20 @@ test('a teammate spawned for a task reads as its title and id in the agent list'
   expect(host.descriptions.at(-1)).toBe('Speed up CI')
   expect(host.spawned.at(-1)).toMatch(/^Make CI faster\.\n\n# You are a better-tasks teammate/)
 })
+
+test('task_search finds closed and older tasks, one compact line each', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on, [], {
+    [`${TASKS}/T-003-login-redirect.md`]: OWNED,
+    [`${TASKS}/T-001-old.md`]: '---\nid: T-001\ntitle: Session cookie\nsprint: 2026-09-21\nstatus: done\n---\n## Goal\nThe login redirect drops the cookie.\n',
+  })
+  await $.session.start(SESSION)
+  const found = await $.tool.call({ tool: 'mcp__better-tasks__task_search', tool_use_id: 's1', query: 'login redirect' } as never)
+  expect(String(found.result)).toBe(
+    'T-003 Login redirect · this sprint · auth\n' +
+      'T-001 Session cookie · done: The login redirect drops the cookie.',
+  )
+  const none = await $.tool.call({ tool: 'mcp__better-tasks__task_search', tool_use_id: 's2', query: 'banana' } as never)
+  expect(String(none.result)).toBe('No task matches "banana".')
+})

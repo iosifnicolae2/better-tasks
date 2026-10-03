@@ -151,6 +151,7 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__better-tasks__team_status' }, ($, e) => serveTool($, e, 'team_status'))
   on('tool.call', { tool: 'mcp__better-tasks__project_init' }, ($, e) => serveTool($, e, 'project_init'))
   on('tool.call', { tool: 'mcp__better-tasks__task_note' }, ($, e) => serveTool($, e, 'task_note'))
+  on('tool.call', { tool: 'mcp__better-tasks__task_search' }, ($, e) => serveTool($, e, 'task_search'))
 }
 
 /** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */
