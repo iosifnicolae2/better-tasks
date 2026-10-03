@@ -50,6 +50,8 @@ declare module 'claude-code' {
       footer: string
       /** The Tasks pane's selected task id. */
       selected: string
+      /** The task id whose actions hold the keys after Enter; '' for none. */
+      acting: string
       /** The task id the pane has picked up for moving; '' for none. */
       moving: string
       /** The agent id the pane's "View session" peek shows; '' for none. */
