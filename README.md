@@ -9,7 +9,7 @@ with **weekly sprints**, **task files** and a **Tasks pane**.
 
 - **Create a task:** "create a task to fix the login redirect" → it asks *Start now (currently working on) / This sprint / Next sprint / Backlog*. Nothing starts on its own.
 - **Sprint goal:** "set the sprint goal: ship login". New sprint → it asks for the next goal and which backlog tasks to pull in.
-- **Board:** `/supermanager` (right sidebar). `↑↓`/`j k` select · `enter` the task's actions (Open, Start, Mark as done, View session, Move) · `m` Move: then `↑↓` move the task (reorder in its section, cross sections at the edges, saved as you go), `enter` stops · `⌥↑`/`⌥↓` move up/down directly · `b` backlog ↔ this sprint · `o` open · `s` start · `d` mark as done · `v` teammate session · `c` settings · `ctrl+x tab` gives the pane the keys.
+- **Board:** `/supermanager` (right sidebar). `↑↓` select · `enter` hands the keys to the task's actions, `←→` choose, `enter` runs, `↑` back to the list · Move (`m`): `↑↓` move the task (within its section, on into the next at an edge, saved as you go), `enter` stops · `⌥↑`/`⌥↓` move directly · `b` backlog ↔ this sprint · `o` open · `s` start · `d` mark as done · `v` teammate session · `c` settings · the "✓ Closed" section opens with enter/click, and a closed task can be reopened (`r`) · `ctrl+x tab` gives the pane the keys.
 - **Start work:** "start T-003" or **Start** → the coordinator gives it to the teammate that owns the area, or spawns one named by the area.
 - **Go:** "go" → this sprint's tasks are worked in order.
 - **Routing:** every message goes to the teammate already in that area. Teammate above the context limit (50 %) → handoff note in its task file, fresh teammate.
