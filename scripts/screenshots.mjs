@@ -177,6 +177,9 @@ const CREATED = [
   gap(),
 ]
 
+/** What the person is typing in Claude Code's prompt box, per picture. */
+const TYPED = { board: '/better-tasks', actions: '/better-tasks' }
+
 const SCENES = {
   board: CREATED,
   actions: [...CREATED, you('/better-tasks'), result('Sprint board opened.')],
@@ -202,12 +205,16 @@ function sceneLine(pieces, width) {
 }
 
 /** Claude Code's side: the conversation from the top, the prompt box and its footer at the bottom. */
-function claudeSide(scene, rows) {
+function claudeSide(scene, rows, typed = '') {
   const width = LEFT - 2
   const border = { fg: THEME.promptBorder }
   const prompt = [
     [cell('╭', border), ...Array.from({ length: width - 2 }, () => cell('─', border)), cell('╮', border)],
-    [cell('│', border), cell(' ', {}), cell('>', { fg: THEME.text }), cell(' ', {}), cell(' ', { bg: THEME.text }), ...blank(width - 6), cell('│', border)],
+    [
+      cell('│', border), cell(' ', {}), cell('>', { fg: THEME.text }), cell(' ', {}),
+      ...[...typed].map(ch => cell(ch, { fg: THEME.text })), cell(' ', { bg: THEME.text }),
+      ...blank(width - 6 - [...typed].length), cell('│', border),
+    ],
     [cell('╰', border), ...Array.from({ length: width - 2 }, () => cell('─', border)), cell('╯', border)],
   ]
   const mode = [...'  ⏵⏵ accept edits on (shift+tab to cycle)'].map(ch => cell(ch, { fg: THEME.permission }))
@@ -220,9 +227,9 @@ function claudeSide(scene, rows) {
 }
 
 /** The whole terminal: Claude Code, the dock's border with the pane's title, the pane. */
-function terminal(scene, pane, paneColumns) {
+function terminal(scene, pane, paneColumns, typed) {
   const rows = Math.max(pane.length + 1, 26)
-  const left = claudeSide(scene, rows)
+  const left = claudeSide(scene, rows, typed)
   const edge = { fg: THEME.subtle }
   const title = fit([...' Sprint '].map(ch => cell(ch, { fg: THEME.text, bold: true })), paneColumns)
   const right = [title, ...pane]
@@ -296,7 +303,7 @@ const shots = output.split('\n').filter(line => line.startsWith('SCREENSHOT ')).
 mkdirSync(OUT, { recursive: true })
 for (const shot of shots) {
   const pane = draw(shot.tree, shot.columns, shot.focus)
-  const lines = terminal(SCENES[shot.name] ?? [], pane, shot.columns)
+  const lines = terminal(SCENES[shot.name] ?? [], pane, shot.columns, TYPED[shot.name])
   const columns = LEFT + 1 + shot.columns
   writeFileSync(join(OUT, `${shot.name}.svg`), svg(lines, columns))
   console.log(`docs/screenshots/${shot.name}.svg  ${columns}×${lines.length}`)
