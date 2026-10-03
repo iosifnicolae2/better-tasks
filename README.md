@@ -205,7 +205,7 @@ claude plugin test .       # tests/*.test.ts(x)
 tsc -p .                   # types: the engine lays .claude-plugin/types/ and a tsconfig.json here when it loads the mod
 ```
 
-Screenshots are drawn from the real pane in the test kit: `node scripts/screenshots.mjs` (writes `docs/screenshots/*.svg`).
+Screenshots are drawn from the real pane in the test kit: `node scripts/screenshots.mjs` runs the tests, takes the pane's trees from `tests/screenshots.test.ts` and rewrites `docs/screenshots/*.svg`.
 
 The validator's rules: `$` never crosses an import; state refs are declared in the file that uses them; one `session.start` without a matcher.
 
