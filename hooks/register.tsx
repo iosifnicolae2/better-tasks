@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
-import type { Activity, Task, Teammate, TurnFacts } from '../types'
+import type { Activity, CacheStep, Task, Teammate, TurnFacts } from '../types'
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
+import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
 import { contextBlock, footerText, isPerson, namesTime, withRules } from './coordinator'
 import type { Io } from './io'
@@ -14,7 +15,7 @@ import { projectSettings, readOverrides } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { listTasks, saveTask, today } from './tasks'
-import { contextTokens, refreshTeam, sendDenial } from './team'
+import { blockAdvice, contextTokens, refreshTeam, sendBlock } from './team'
 import { projectText } from './texts'
 import { startupTips } from './tips'
 import { runTool, TOOLS } from './tools'
@@ -30,6 +31,7 @@ const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as
 const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
 const tokensState = atom({ plugin: 'better-tasks', key: 'tokens' } as const, {} as Record<string, number>)
 const activityState = atom({ plugin: 'better-tasks', key: 'activity' } as const, {} as Record<string, Activity>)
+const cacheStepsState = atom({ plugin: 'better-tasks', key: 'cacheSteps' } as const, {} as Record<string, CacheStep>)
 const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
 const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, namedTime: false } as TurnFacts)
@@ -42,6 +44,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await declareAll($)
+    await useLongCache($).catch(error => logFailure($, 'the 1-hour cache', error))
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
@@ -92,8 +95,10 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {
     if (!(await teamsOn($))) return next(e)
     const team = await refreshTeam(ioOf($))
-    const denial = sendDenial(team, String(e.to), e.message, (await settingsNow($)).contextLimit)
-    return denial ? { deny: denial } : next(e)
+    const limit = (await settingsNow($)).contextLimit
+    const blocked = sendBlock(team, String(e.to), e.message, limit)
+    if (!blocked) return next(e)
+    return { deny: blockAdvice(blocked.mate, blocked.block, limit, await transcriptOf($, blocked.mate.id)) }
   })
 
   on('tool.call', async ($, e, next) => {
@@ -121,7 +126,9 @@ export const register: Register = (on, options) => {
     const agentId = e.agentId
     if (agentId !== undefined && result.usage) {
       const tokens = contextTokens(result.usage)
+      const step = { at: await $.clock.now(), read: result.usage.cache_read_input_tokens, created: result.usage.cache_creation_input_tokens }
       await update($, tokensState, all => ({ ...all, [agentId]: tokens }))
+      await update($, cacheStepsState, all => ({ ...all, [agentId]: step }))
       await refreshTeam(ioOf($))
     }
     return result
@@ -148,6 +155,31 @@ async function declareAll($: EngineInterface): Promise<void> {
 function logFailure($: EngineInterface, what: string, error: unknown): void {
   const reason = error instanceof Error ? error.message : String(error)
   $.ui.log(`better-tasks: ${what} failed: ${reason}`)
+}
+
+/**
+ * The 1-hour prompt cache for teammates and the main conversation (setting `longCache`), unless the user
+ * chose a TTL already. Set in this process's environment, which Claude Code reads per request.
+ */
+async function useLongCache($: EngineInterface): Promise<void> {
+  if (!(await settingsNow($)).longCache) return
+  const chosen = await $.settings.read()
+  if ((await $.env.get('CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL')) === undefined && chosen.subagentPromptCacheTtl === undefined) {
+    await $.env.set('CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL', '1h')
+  }
+  if ((await $.env.get('CLAUDE_CODE_PROMPT_CACHE_TTL')) === undefined && chosen.promptCacheTtl === undefined) {
+    await $.env.set('CLAUDE_CODE_PROMPT_CACHE_TTL', '1h')
+  }
+}
+
+/** Where a teammate's transcript is: ~/.claude/projects/<project>/<session>/subagents/, the file named for its id. */
+async function transcriptOf($: EngineInterface, agentId: string): Promise<string> {
+  const home = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
+  const project = (await $.session.root()).replace(/[^A-Za-z0-9]/g, '-')
+  const folder = `${home}/projects/${project}/${await $.session.id()}/subagents`
+  const files = await $.fs.list(folder).catch(() => [])
+  const file = files.find(entry => entry.name.includes(agentId) && entry.name.endsWith('.jsonl'))
+  return file ? `${folder}/${file.name}` : `${folder}/ (the .jsonl file whose name holds ${agentId})`
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {
@@ -182,6 +214,14 @@ function ioOf($: EngineInterface): Io {
     tokens: () => read($, tokensState),
     activities: () => read($, activityState),
     publishTeam: team => update($, teamState, () => team),
+    cacheSteps: () => read($, cacheStepsState),
+    cacheTtl: async () =>
+      subagentTtl({
+        subagentEnv: await $.env.get('CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL'),
+        subagentSetting: (await $.settings.read().catch(() => ({}) as Record<string, unknown>)).subagentPromptCacheTtl,
+        oneHourEnv: await $.env.get('ENABLE_PROMPT_CACHING_1H'),
+        force5mEnv: await $.env.get('FORCE_PROMPT_CACHING_5M'),
+      }),
     run: argv => $.process.run(argv),
     config: () => projectSettings(io, pluginOptions),
   }

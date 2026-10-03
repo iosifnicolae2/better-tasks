@@ -1,6 +1,7 @@
 import type { AgentInfo, FsEntry } from 'claude-code'
 
-import type { Activity, Task, Teammate } from '../types'
+import type { Activity, CacheStep, Task, Teammate } from '../types'
+import type { CacheTtl } from './cache'
 import type { Settings } from './settings'
 
 // `$` never crosses an import (the validator refuses it), so the parts take these
@@ -26,6 +27,10 @@ export type Io = Files & {
   tokens: () => Promise<Record<string, number>>
   /** The current activity per agent id. */
   activities: () => Promise<Record<string, Activity>>
+  /** The last request per agent id. */
+  cacheSteps: () => Promise<Record<string, CacheStep>>
+  /** The prompt-cache TTL teammates' requests use. */
+  cacheTtl: () => Promise<CacheTtl>
   publishTeam: (team: Teammate[]) => Promise<unknown>
   /** Runs a host command by argv (no shell). */
   run: (argv: string[]) => Promise<{ exitCode: number }>

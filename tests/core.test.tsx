@@ -1,5 +1,6 @@
 import type { AgentInfo, On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -21,6 +22,7 @@ type Host = {
   notices: string[]
   registered: string[]
   spawned: string[]
+  env: Map<string, string>
 }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
 
@@ -32,8 +34,15 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [] }
-  mock.env(on, teams.env)
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], env: new Map() }
+  const env = new Map(Object.entries(teams.env))
+  host.env = env
+  on('env.get', ($, e) => ({ value: env.get(e.name) }))
+  on('env.set', ($, e) => {
+    if (e.value === undefined) env.delete(e.name)
+    else env.set(e.name, e.value)
+    return { value: undefined }
+  })
   on('settings.read', () => ({ value: { env: teams.settingsEnv } }))
   on('ui.log', ($, e) => {
     host.notices.push(e.text)
@@ -146,7 +155,7 @@ test('each user prompt carries the sprint context', async ($, on) => {
   await $.tool.call({ tool: 'mcp__better-tasks__sprint_goal', tool_use_id: 'g1', goal: 'Ship login' })
   const entered = await $.prompt.submit(prompt('hi'))
   expect(entered.context?.at(-1)).toContain('[better-tasks] Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 0/0 done')
-  expect(entered.context?.at(-1)).toContain('Teammate auth · running')
+  expect(entered.context?.at(-1)).toContain('Teammate auth · idle')
 })
 
 test('the coordinator rules go into the main session prompt only', async ($, on) => {
@@ -176,7 +185,7 @@ test('SendMessage to a teammate over the context limit is refused with handoff a
   const fill: Record<string, number> = { a1: 0.63 * WINDOW, a2: 0.2 * WINDOW }
   on('turn.step', async function* ($, e) {
     const tokens = fill[e.agentId ?? ''] ?? 0
-    const usage = { input_tokens: tokens, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'm' }
+    const usage = { input_tokens: 0, output_tokens: 1, cache_read_input_tokens: tokens, cache_creation_input_tokens: 0, model: 'm' }
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
   })
   await $.session.start(SESSION)
@@ -358,10 +367,10 @@ test("a teammate's tool call shows as its activity until its turn ends", async (
 
   const teammateEdit = { tool: 'Edit', tool_use_id: 'e1', agentId: 'a1', file_path: '/p/src/auth.ts', old_string: 'a', new_string: 'b' }
   await $.tool.call(teammateEdit as never) // agentId: as the engine raises a teammate's call
-  expect(await status()).toBe('auth · running · context ? · editing auth.ts')
+  expect(await status()).toBe('auth · working · context ? · editing auth.ts')
 
   await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', agentId: 'a1', reason: 'answer' })
-  expect(await status()).toBe('auth · running · context ?')
+  expect(await status()).toBe('auth · idle · context ?')
 })
 
 test('a project customizes numbering, files, the task template and teammate instructions', async ($, on) => {
@@ -496,4 +505,75 @@ test('no move when the project already has .claude/tasks/', async ($, on) => {
   await clock.advance(0)
   expect(host.files.get(`${ROOT}/.claude/manager/sprints.md`)).toBe('old')
   expect(host.notices.some(line => line.includes('moved'))).toBe(false)
+})
+
+const TRANSCRIPTS = '/home/me/.claude/projects/-project/lead-session/subagents'
+
+function stepsFor(on: On, reads: Record<string, number>) {
+  on('turn.step', async function* ($, e) {
+    const usage = { input_tokens: 10, output_tokens: 1, cache_read_input_tokens: reads[e.agentId ?? ''] ?? 0, cache_creation_input_tokens: 0, model: 'm' }
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
+  })
+}
+
+async function step($: Engine, agentId: string) {
+  for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'm', messageCount: 1, agentId })) void chunk
+}
+
+test('the 1-hour cache is set for teammates and the manager, unless the user chose a TTL', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], {}, { env: { ...TEAMS_ON, CLAUDE_CODE_PROMPT_CACHE_TTL: '5m' }, settingsEnv: TEAMS_ON })
+  await $.session.start(SESSION)
+  expect(host.env.get('CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL')).toBe('1h')
+  expect(host.env.get('CLAUDE_CODE_PROMPT_CACHE_TTL')).toBe('5m')
+})
+
+test('no 1-hour cache when longCache is off', { options: { longCache: false } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  expect(host.env.has('CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL')).toBe(false)
+})
+
+test('a teammate whose cache went cold gets no new work: a fresh one reads its transcript', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [mate('a1', 'auth')], { [`${TRANSCRIPTS}/agent-a1-auth.jsonl`]: '{}' })
+  host.env.set('HOME', '/home/me')
+  stepsFor(on, { a1: 20_000 })
+  await $.session.start(SESSION)
+  await step($, 'a1')
+  const status = async () => String((await $.tool.call({ tool: 'mcp__better-tasks__team_status', tool_use_id: 'ts' })).result)
+  expect(await status()).toBe('auth · idle · context 10 % · cache warm 55m')
+
+  await clock.advance(14 * 60_000)
+  expect(await status()).toBe('auth · idle · context 10 % · cache warm 41m')
+  const warm = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'also fix the logout' })
+  expect(warm.result).toBe('sent')
+
+  await clock.advance(42 * 60_000)
+  expect(await status()).toBe('auth · idle · context 10 % · cache cold')
+  const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's2', to: 'auth', message: 'and the signup' })
+  expect(cold.deny ?? cold.text).toContain("auth's prompt cache is cold")
+  expect(cold.deny ?? cold.text).toContain(`${TRANSCRIPTS}/agent-a1-auth.jsonl`)
+  const entered = await $.prompt.submit(prompt('hi'))
+  expect(entered.context?.at(-1)).toContain('Teammate auth · idle · context 10 % · cache cold · NO NEW WORK (cache cold: fresh teammate)')
+  const shutdown = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's3', to: 'auth', message: { type: 'shutdown_request' } } as never)
+  expect(shutdown.result).toBe('sent')
+})
+
+test('with the 5-minute cache a teammate is cold after 4 minutes', { options: { longCache: false } }, async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on, [mate('a1', 'auth')])
+  stepsFor(on, { a1: 20_000 })
+  await $.session.start(SESSION)
+  await step($, 'a1')
+  await clock.advance(3 * 60_000)
+  expect((await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'go' })).result).toBe('sent')
+  await clock.advance(60_000)
+  const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's2', to: 'auth', message: 'go' })
+  expect(cold.deny ?? cold.text).toContain('cache is cold')
 })

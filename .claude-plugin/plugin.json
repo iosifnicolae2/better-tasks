@@ -34,6 +34,12 @@
       "description": "No new work goes to a teammate whose context is fuller than this.",
       "default": 50
     },
+    "longCache": {
+      "type": "boolean",
+      "title": "1-hour prompt cache",
+      "description": "Teammates and the manager keep their prompt cache for an hour, so a teammate stays cheap to resume. Unless you set a TTL yourself.",
+      "default": true
+    },
     "keepAwake": {
       "type": "boolean",
       "title": "Keep the Mac awake",

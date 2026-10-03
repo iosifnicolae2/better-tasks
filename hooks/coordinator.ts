@@ -1,13 +1,13 @@
 import type { PromptComposeSection, PromptComposeTrait, PromptOrigin } from 'claude-code'
 
-import type { Task, TurnFacts } from '../types'
+import type { Task, Teammate, TurnFacts } from '../types'
 import type { Io } from './io'
 import type { Settings } from './settings'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintNumber, sprintStart, sprintTitle } from './sprints'
 import type { SprintConfig } from './sprints'
 import { isOpen, listTasks, today } from './tasks'
-import { isActive, isFull, mateLine, refreshTeam } from './team'
+import { blockOf, isActive, mateLine, refreshTeam } from './team'
 
 // The main session as coordinator: its rules, a small context block per prompt, the task_create guard.
 
@@ -57,9 +57,16 @@ export async function contextBlock(io: Io, settings: Settings, notice: string): 
     `[better-tasks] ${sprintTitle(start, config, day)} · goal: ${goal || 'not set'} · ${done}/${tasks.length} done`,
     ...waitingLines(tasks),
     notice,
-    ...team.map(mate => `Teammate ${mateLine(mate)}${isFull(mate, settings.contextLimit) ? ' · FULL, no new work' : ''}`),
+    ...team.map(mate => `Teammate ${mateLine(mate)}${noNewWork(mate, settings.contextLimit)}`),
   ]
   return lines.filter(Boolean).join('\n')
+}
+
+const NO_NEW_WORK = { cold: ' · NO NEW WORK (cache cold: fresh teammate)', full: ' · NO NEW WORK (over the context limit)' }
+
+function noNewWork(mate: Teammate, limit: number): string {
+  const block = blockOf(mate, limit)
+  return block ? NO_NEW_WORK[block] : ''
 }
 
 function waitingLines(tasks: readonly Task[]): string[] {

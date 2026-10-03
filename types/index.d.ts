@@ -30,7 +30,14 @@ export type Teammate = {
   activity?: string
   /** When that activity began, in ms. */
   activeAt?: number
+  /** Its prompt cache: warm (a message now reads it) or cold (it would be written again); undefined before its first request. */
+  cache?: 'warm' | 'cold'
+  /** Minutes the warm cache is still trusted. */
+  cacheMinutesLeft?: number
 }
+
+/** A teammate's last model request, as the prompt cache saw it. */
+export type CacheStep = { at: number; read: number; created: number }
 
 export type Activity = { text: string; at: number }
 
@@ -44,6 +51,8 @@ declare module 'claude-code' {
       tokens: Record<string, number>
       /** The current activity per agent id; cleared when its turn ends. */
       activity: Record<string, Activity>
+      /** The last request per agent id, for cache warmth. */
+      cacheSteps: Record<string, CacheStep>
       notice: string
       turn: TurnFacts
       /** The footer label: sprint progress. */

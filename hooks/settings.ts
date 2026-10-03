@@ -31,6 +31,8 @@ export type Settings = {
   editor: Editor
   worktree: boolean
   contextLimit: number
+  /** The 1-hour prompt cache for teammates and the manager. */
+  longCache: boolean
   keepAwake: boolean
   sprint: SprintConfig
   tasks: TaskNaming
@@ -47,6 +49,7 @@ export const FIELDS: Record<string, Field> = {
   editor: { kind: 'string', values: EDITORS },
   worktree: { kind: 'boolean' },
   contextLimit: { kind: 'number' },
+  longCache: { kind: 'boolean' },
   keepAwake: { kind: 'boolean' },
   sprintWeeks: { kind: 'string', values: ['1', '2', '3', '4'] },
   sprintStart: { kind: 'string', values: WEEKDAYS },
@@ -63,6 +66,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   editor: 'auto',
   worktree: false,
   contextLimit: 50,
+  longCache: true,
   keepAwake: true,
   sprintWeeks: '1',
   sprintStart: 'monday',
@@ -81,6 +85,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     editor: value('editor') as Editor,
     worktree: value('worktree') === true,
     contextLimit: Number(value('contextLimit')),
+    longCache: value('longCache') !== false,
     keepAwake: value('keepAwake') !== false,
     sprint: {
       weeks: Math.min(4, Math.max(1, Number(value('sprintWeeks')) || 1)),
