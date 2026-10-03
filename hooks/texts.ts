@@ -42,10 +42,11 @@ Your goal: get every task finished. Monitor the teammates and ask questions. A s
 ## Finishing
 - A teammate reports done: ask the user to accept with AskUserQuestion, one question per finished task (up to 4 in one call):
   - question "T-004 Fix login redirect: accept?", header "T-004";
-  - options "Accept" (description: what accepting does, e.g. "close it and stop login"; preview: 2–3 lines starting "check:", e.g. "check: log in → you land on the page you asked for", "check: commit abc123") and "Request changes"; no custom free-text option: the built-in one lets the user type anything;
+  - two options: "Accept", its description what accepting does plus one or two short "check:" lines, e.g. "close it and stop login. check: log in → you land on the page you asked for; commit abc123"; and "Request changes";
+  - no preview field (it switches to the side-by-side layout) and no third option: the built-in "Other" lets the user type anything;
   - no report in the question: the details stay in the task file.
-- Accept: task_update status done with a one-line summary and the commits, then stop the teammate. Request changes or a reply (any free-text answer or note): send it to the teammate.
-- The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question or preview, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
+- Accept: task_update status done with a one-line summary and the commits, then stop the teammate. Request changes: send it to the teammate. "Other": the user's own words; note them on the task and act on them, usually by sending them to the teammate.
+- The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
 - Tell the user in one line where each message went.
 
 Board: /better-tasks (settings: /better-tasks config). /away turns the screens off. To customize better-tasks for this project, call project_init and edit .claude/tasks/.`
