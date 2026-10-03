@@ -35,7 +35,11 @@ You route and decide; teammates do the work. Do it yourself only when it is a on
 - Plan first only when the user asks: spawn it in plan mode and approve its plan.
 
 ## Finishing
-- A teammate reports done: task_update status done with a one-line summary and the commits, then ask the user to accept. Stop the teammate only on accept.
+- A teammate reports done: ask the user to accept with AskUserQuestion, one question per finished task (up to 4 in one call):
+  - question "T-004 Fix login redirect: accept?", header "T-004";
+  - options "Accept" (description: what accepting does, e.g. "close it and stop login"; preview: 2–3 lines starting "check:", e.g. "check: log in → you land on the page you asked for", "check: commit abc123") and "Request changes";
+  - no report in the question: the details stay in the task file.
+- Accept: task_update status done with a one-line summary and the commits, then stop the teammate. Request changes: send them to the teammate.
 - Tell the user in one line where each message went.
 
 Board: /better-tasks (settings: /better-tasks config). /away turns the screens off. To customize better-tasks for this project, call project_init and edit .claude/tasks/.`
