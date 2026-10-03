@@ -300,6 +300,15 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /^T-002 {2}Dark mode$/ })).toBeDefined()
   })
 
+  test(`an arrow past the board's ends never takes the ring off the board (${surface})`, async ($, on) => {
+    fakeProject(on)
+    await $.command.run(sprintCommand())
+    await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const offTheBoard = await $.ui.focus({ component: 'Pane', requestId: 'supermanager-sprint', origin: { kind: 'person' } })
+    expect(offTheBoard.deny).toBeDefined()
+    expect((await arrowTo($, 'task-T-004')).deny).toBeUndefined()
+  })
+
   test(`closed tasks sit collapsed in their own section; opened, one can be reopened (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     await $.command.run(sprintCommand())

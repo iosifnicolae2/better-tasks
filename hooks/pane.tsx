@@ -280,6 +280,9 @@ export function registerPane(on: On, options: PluginOptions): void {
   // Selection follows the ring. While a task moves, the person's ↑↓ carry it instead: the ring stays.
   // While its actions hold the keys, the ring coming back to the task's row leaves them.
   on('ui.focus', { requestId: PANE }, async ($, e, next) => {
+    // An arrow walking past the board's first or last element would land on the engine's own stops
+    // (the pane's close mark, another pane's tab) and the keys would wander off: the ring stays.
+    if (e.origin.kind === 'person' && e.element === undefined) return { deny: 'the ring stays on the board' }
     const movingId = await read($, movingState)
     if (movingId !== '' && e.origin.kind === 'person' && e.element !== `task-${movingId}`) {
       await carry($, options, movingId, e.element)
