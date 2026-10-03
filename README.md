@@ -2,6 +2,10 @@
 
 **Plan and track tasks inside Claude Code, kept as plain Markdown files in your project.**
 
+<p align="center">
+  <img src="docs/screenshots/board.svg" alt="Claude Code with the Sprint board docked on the right">
+</p>
+
 ## 📦 Install
 
 ```sh
@@ -10,10 +14,6 @@ claude plugin install supermanager@supermanager
 ```
 
 Restart Claude Code.
-
-<p align="center">
-  <img src="docs/screenshots/board.svg" alt="Claude Code with the Sprint board docked on the right">
-</p>
 
 ## ✨ Use
 
