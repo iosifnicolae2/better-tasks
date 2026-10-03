@@ -7,7 +7,8 @@ import { cacheText, isFull } from './team'
 import { isOpen, whenOf } from './tasks'
 
 // The board page of the Sprint pane: the task list (sections, then the collapsed closed tasks) in a
-// window of fixed height, and under it, pinned to the bottom, the selected task's box and the key line.
+// window of fixed height, and under it, pinned to the bottom, the selected task's box and the key line
+// (or, while the search is open, its box).
 // Nothing the person selects, moves or finishes changes a line count; only opening "Closed" does.
 // Colours are Claude Code's theme keys: claude (its orange), suggestion (selection), success, warning, subtle.
 
@@ -213,9 +214,8 @@ export function Board(props: BoardProps) {
   const { ui, selected, bodyRows, scrollStart, hasKeys, limit, actions } = props
   const { Box, Text } = ui
   const lines = props.hits ? resultLines(props, props.hits) : listLines(props)
-  // At any pane height the list takes exactly what the search line and the box leave, so the box
-  // sits at the bottom and the search line at the top.
-  const rows = bodyRows === undefined ? undefined : Math.max(1, bodyRows - BOTTOM_ROWS - 1)
+  // At any pane height the list takes exactly what the box and the key line leave, so they sit at the bottom.
+  const rows = bodyRows === undefined ? undefined : Math.max(1, bodyRows - BOTTOM_ROWS)
   const focus = Math.max(0, lines.findIndex(line => line.taskId !== undefined && line.taskId === selected?.task.id))
   const shown =
     rows === undefined ? { start: 0, end: lines.length }
@@ -226,33 +226,27 @@ export function Board(props: BoardProps) {
   const window = lines.slice(shown.start, shown.end).map(line => line.node)
   if (marks.above) window[0] = <Text color="subtle">  ⋯ {shown.start + 1} more above</Text>
   if (marks.below) window[window.length - 1] = <Text color="subtle">  ⋯ {lines.length - shown.end + 1} more below</Text>
+  const isLocked = selected?.isMoving === true || selected?.isActing === true
   return (
     <Box flexDirection="column">
-      <SearchLine ui={ui} search={props.search} isLocked={selected?.isMoving === true || selected?.isActing === true} actions={actions} />
       <Box flexDirection="column" height={rows} overflow="hidden">
         {window}
       </Box>
       <Detail ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
-      <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />
+      {props.search.isOpen && !isLocked ? (
+        <SearchLine ui={ui} search={props.search} actions={actions} />
+      ) : (
+        <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />
+      )}
     </Box>
   )
 }
 
-type SearchProps = { ui: Ui; search: SearchState; isLocked: boolean; actions: BoardActions }
+type SearchProps = { ui: Ui; search: SearchState; actions: BoardActions }
 
-/**
- * The line reserved at the top: "⌕ Search" (f, or a click) opens the box; open, it is an Input with
- * an ✕ that clears it and brings the sections back.
- */
-function SearchLine({ ui, search, isLocked, actions }: SearchProps) {
+/** The open search, in the key line's place: an Input, and an ✕ that clears it and brings the sections back. */
+function SearchLine({ ui, search, actions }: SearchProps) {
   const { Box, Button, Text } = ui
-  if (!search.isOpen) {
-    return (
-      <Box height={1} overflow="hidden">
-        {isLocked ? <Text color="subtle">⌕ Search</Text> : <Button key="search" plain dimColor hotkey="f" label="⌕ Search" onPress={actions.openSearch} />}
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="row" columnGap={1} height={1} overflow="hidden">
       <Text color="suggestion">⌕</Text>
@@ -529,13 +523,13 @@ function statusWords(task: Task): string {
   return task.status === 'doing' ? `${task.owner || 'someone'} · not running` : 'not started'
 }
 
-/** While the task moves nothing else takes the ring, so these two lines are text. */
+/** While the task moves nothing else takes the ring, so these two lines are text; the keys are on the key line. */
 function MovingLines({ ui }: { ui: Ui }) {
   const { Text } = ui
   return (
     <>
-      <DetailLine ui={ui}><Text color="claude">↕ ↑↓ move it · ⏎ stop</Text></DetailLine>
-      <DetailLine ui={ui}><Text color="subtle">Within its section, and on into the next at an edge; every step is saved.</Text></DetailLine>
+      <DetailLine ui={ui}><Text color="claude">↕ Moving: every step is saved</Text></DetailLine>
+      <DetailLine ui={ui}><Text color="subtle">At a section's edge it goes on into the next.</Text></DetailLine>
     </>
   )
 }
@@ -544,7 +538,7 @@ type ActionProps = { ui: Ui; selected: Selected; when: When; hasKeys: boolean; a
 
 /** The actions, in reading order so ←/→ walk them: Open … Move, then ⌥↑ ⌥↓ and the backlog toggle. */
 function ActionLines({ ui, selected, when, hasKeys, actions }: ActionProps) {
-  const { Button, Text } = ui
+  const { Box, Button, Text } = ui
   const { task, mate } = selected
   const toggle = backlogToggle(when)
   return (
@@ -552,23 +546,26 @@ function ActionLines({ ui, selected, when, hasKeys, actions }: ActionProps) {
       <DetailLine ui={ui}>
         <Button key="open" plain hotkey="o" label="Open" onPress={() => actions.open(task)} />
         {task.status === 'todo' && <Button key="start" plain hotkey="s" label="Start" onPress={() => actions.start(task)} />}
-        <Button key="done" plain hotkey="d" label="Mark as done" onPress={() => actions.done(task)} />
+        <Button key="done" plain hotkey="d" label="Done" onPress={() => actions.done(task)} />
         <Button key="move" plain hotkey="m" label="Move" onPress={() => actions.startMoving(task)} />
       </DetailLine>
       <DetailLine ui={ui}>
-        {/* Chord buttons fire even from the prompt, so they exist only while the board holds the keys. */}
-        {hasKeys ? (
-          <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
-        ) : (
-          <Text color="subtle">⌥↑</Text>
-        )}
-        {hasKeys ? (
-          <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
-        ) : (
-          <Text color="subtle">⌥↓</Text>
-        )}
-        <Text color="subtle">move up/down</Text>
-        <Button key="toggle" plain dimColor hotkey="b" label={TITLES[toggle]} onPress={() => actions.move(task, toggle)} />
+        {/* "⌥↑ ⌥↓: Reorder". Chord buttons fire even from the prompt, so they exist only while the board holds the keys. */}
+        <Box flexDirection="row">
+          {hasKeys ? (
+            <Button key="up" plain action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
+          ) : (
+            <Text color="subtle">⌥↑</Text>
+          )}
+          <Text> </Text>
+          {hasKeys ? (
+            <Button key="down" plain action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
+          ) : (
+            <Text color="subtle">⌥↓</Text>
+          )}
+          <Text>: Reorder</Text>
+        </Box>
+        <Button key="toggle" plain hotkey="b" label={TITLES[toggle]} onPress={() => actions.move(task, toggle)} />
       </DetailLine>
     </>
   )
@@ -590,17 +587,38 @@ function ClosedLines({ ui, task, actions }: { ui: Ui; task: Task; actions: Board
 
 type KeyLineProps = { ui: Ui; hasKeys: boolean; selected?: Selected; actions: BoardActions }
 
+/** The keys of each mode, as the key line shows them: the key, then what it does. */
+export const KEY_HINTS = {
+  list: [['↑↓', 'select'], ['⏎', 'actions']],
+  acting: [['←→', 'choose'], ['⏎', 'run'], ['↑', 'back']],
+  moving: [['↑↓', 'move'], ['⏎', 'stop']],
+} as const
+
 /**
- * One line at the bottom: the keys of the mode the board is in, or, while the pane does not hold
- * the keys, the one key that gives them to it, so a key that does nothing is never a mystery.
+ * One line at the bottom, every hint drawn alike, "key: what it does": the keys of the mode the board
+ * is in, then search and settings; while the pane does not hold the keys, the one way to give them
+ * to it, so a key that does nothing is never a mystery.
  */
 function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
   const { Box, Button, Text } = ui
+  if (!hasKeys) {
+    return (
+      <Box height={1} overflow="hidden">
+        <Text color="suggestion" wrap="truncate-end">Click or ctrl+x tab to use the board</Text>
+      </Box>
+    )
+  }
+  const hints = selected?.isMoving ? KEY_HINTS.moving : selected?.isActing ? KEY_HINTS.acting : KEY_HINTS.list
   const isLocked = selected?.isMoving === true || selected?.isActing === true
-  const words = selected?.isMoving ? '↑↓ move · ⏎ stop' : selected?.isActing ? '←→ choose · ⏎ run · ↑ back to the list' : '↑↓ select · ⏎ actions'
   return (
     <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
-      {hasKeys ? <Text color={isLocked ? 'claude' : 'subtle'}>{words}</Text> : <Text color="suggestion">The keys are with the prompt · click or ctrl+x tab to use the board</Text>}
+      {hints.map(([keys, word]) => (
+        <Text>
+          <Text color="claude">{keys}</Text>
+          <Text dimColor>: {word}</Text>
+        </Text>
+      ))}
+      {!isLocked && <Button key="search" plain dimColor hotkey="f" label="search" onPress={actions.openSearch} />}
       {!isLocked && <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />}
     </Box>
   )

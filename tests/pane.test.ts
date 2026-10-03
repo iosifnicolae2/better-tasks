@@ -184,8 +184,8 @@ async function listShape(ui: { drawn: () => Promise<unknown> }, depth = Infinity
 
 async function listLines(ui: { drawn: () => Promise<unknown> }): Promise<unknown[]> {
   const board = ((await ui.drawn()) as Node).children?.[0] as Node
-  // The board: the search line, the list window, the box, the key line.
-  return ((board.children?.[1] as Node).children ?? [])
+  // The board: the list window, the box, the key line.
+  return ((board.children?.[0] as Node).children ?? [])
 }
 
 /** ↑ or ↓ as the engine raises them: the person moving the ring to the next element that takes it. */
@@ -274,12 +274,12 @@ for (const surface of SURFACES) {
     const buttons = async () => (await ui.findAll({ type: 'Button' })).map(found => found.key)
     await ui.press({ key: 'task-T-001' })
     expect(await buttons()).toEqual(['task-T-001', 'open', 'start', 'done', 'move', 'up', 'down', 'toggle'])
-    expect(await ui.find({ type: 'Text', text: '←→ choose · ⏎ run · ↑ back to the list' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '←→: choose' })).toBeDefined()
     await arrowTo($, 'start')
     expect(await buttons()).toContain('open')
     await arrowTo($, 'task-T-001')
     expect(await buttons()).toContain('task-T-004')
-    expect(await ui.find({ type: 'Text', text: '↑↓ select · ⏎ actions' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '↑↓: select' })).toBeDefined()
   })
 
   test(`Enter → actions → Move: then ↑↓ carry the task and Enter stops (${surface})`, async ($, on) => {
@@ -294,7 +294,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
     await ui.press({ key: 'move' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '↕ ↑↓ move it · ⏎ stop' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '↕ Moving: every step is saved' })).toBeDefined()
     expect(await listShape(ui, 1)).toBe(before)
     // Only the moving task and the two slots ↑ and ↓ can land on take the ring.
     expect(await buttons()).toEqual(['slot-up', 'task-T-001', 'slot-down'])
@@ -325,11 +325,11 @@ for (const surface of SURFACES) {
     fakeProject(on)
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
-    expect(await ui.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Click or ctrl+x tab to use the board' })).toBeDefined()
     expect(await ui.find({ key: 'up' })).toBeUndefined()
     expect(await ui.find({ key: 'down' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: '⌥↑' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /↑↓ select/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /↑↓: select/ })).toBeUndefined()
   })
 
   test(`an arrow past the board's ends never takes the ring off the board (${surface})`, async ($, on) => {
@@ -346,9 +346,11 @@ for (const surface of SURFACES) {
     files.set(`${DIR}/T-008-theme.md`, taskFile('T-008', 'Theme cleanup', 'backlog', 'todo').replace('It works.', 'Also touches the login page colours.'))
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
-    expect((await ui.find({ key: 'search' }))?.props).toMatchObject({ hotkey: 'f', label: '⌕ Search' })
+    expect((await ui.find({ key: 'search' }))?.props).toMatchObject({ hotkey: 'f', label: 'search' })
     await ui.press({ key: 'search' })
     expect(await ui.find({ key: 'query' })).toBeDefined()
+    // The box takes the key line's place at the bottom, so nothing above it moves.
+    expect(await ui.find({ key: 'config' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeDefined()
 
     await ui.input({ key: 'query', text: 'login', kind: 'change' })
@@ -372,6 +374,7 @@ for (const surface of SURFACES) {
     await ui.press({ key: 'search-close' })
     expect(await ui.find({ key: 'query' })).toBeUndefined()
     expect(await ui.find({ key: 'search' })).toBeDefined()
+    expect(await ui.find({ key: 'config' })).toBeDefined()
   })
 
   test(`closed tasks sit collapsed in their own section; opened, one can be reopened (${surface})`, async ($, on) => {
@@ -396,10 +399,10 @@ for (const surface of SURFACES) {
     for (let n = 10; n < 40; n += 1) files.set(`${DIR}/T-0${n}-x.md`, taskFile(`T-0${n}`, `Task ${n}`, 'backlog', 'todo'))
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 24 } } })
-    expect(await listLines(ui)).toHaveLength(15)
+    expect(await listLines(ui)).toHaveLength(16)
     expect(await ui.find({ type: 'Text', text: /more below$/ })).toBeDefined()
     await arrowTo($, 'task-T-039')
-    expect(await listLines(ui)).toHaveLength(15)
+    expect(await listLines(ui)).toHaveLength(16)
     expect(await ui.find({ key: 'task-T-039' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /more above$/ })).toBeDefined()
   })
@@ -407,7 +410,7 @@ for (const surface of SURFACES) {
   test(`even a very short pane keeps the box at the bottom and the selection in the list (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 10 } } })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 9 } } })
     expect(await listLines(ui)).toHaveLength(1)
     expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
     expect(await ui.find({ key: 'open' })).toBeDefined()
@@ -418,10 +421,10 @@ for (const surface of SURFACES) {
     fakeProject(on)
     await $.command.run(sprintCommand())
     const unfocused = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
-    expect(await unfocused.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeDefined()
+    expect(await unfocused.find({ type: 'Text', text: 'Click or ctrl+x tab to use the board' })).toBeDefined()
     await unfocused.unmount()
     const focused = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
-    expect(await focused.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeUndefined()
+    expect(await focused.find({ type: 'Text', text: 'Click or ctrl+x tab to use the board' })).toBeUndefined()
   })
 }
 
@@ -523,7 +526,7 @@ test('the phone draws the board and settings without pickers', async ($, on) => 
   fakeProject(on)
   await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'mobile', ...PANE })
-  expect((await ui.find({ key: 'done' }))?.text).toBe('Mark as done')
+  expect((await ui.find({ key: 'done' }))?.text).toBe('Done')
   await ui.press({ key: 'config' })
   expect(await ui.find({ type: 'Text', text: 'auto' })).toBeDefined()
 })

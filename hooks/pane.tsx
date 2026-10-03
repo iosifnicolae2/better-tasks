@@ -261,7 +261,7 @@ async function showNewTask($: EngineInterface, options: PluginOptions, id: strin
   await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
 }
 
-/** f, or a click on "⌕ Search": the box opens empty and takes the keys. */
+/** f, or a click on "search": the box opens empty and takes the keys. */
 async function openSearch($: EngineInterface): Promise<void> {
   await leaveModes($)
   await update($, searchState, () => ({ isOpen: true, query: '' }))
