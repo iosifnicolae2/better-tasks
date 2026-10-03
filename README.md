@@ -11,7 +11,7 @@ Claude Code mod · TypeScript · no dependencies · macOS
 Your main session becomes a **manager** that hands work to agent **teammates**, keeps **tasks** in **sprints**,
 and shows them on a **board**. For people who run several agents on one project and want them organized.
 
-> The old Python app (daemon, tmux, dashboard) lives on the `main` branch.
+> It replaces the earlier Python app (daemon, tmux, dashboard).
 
 &nbsp;
 
@@ -32,30 +32,18 @@ and shows them on a **board**. For people who run several agents on one project 
 **Needs**
 
 - Claude Code **2.1.288** or newer. Mods are early access; the API may change between releases. Check with `claude --version`.
+- Access to the private repo `iosifnicolae2/supermanager`, and git able to reach GitHub (an ssh key, or `gh auth setup-git`).
 - macOS for `/away` and keep-awake (`caffeinate`, `osascript`).
 - Teammates in the same process (`teammateMode: in-process`). In tmux mode the board can't see their context fill.
 
-**Get it**: this repo on disk, on the `mod` branch.
+**Install**
 
 ```sh
-git clone https://github.com/bringes/supermanager ~/Documents/Projects/claude-manager
-cd ~/Documents/Projects/claude-manager && git switch mod
+claude plugin marketplace add iosifnicolae2/supermanager
+claude plugin install supermanager@supermanager
 ```
 
-**Try it once** (this session only)
-
-```sh
-claude --plugin-dir ~/Documents/Projects/claude-manager
-```
-
-**Always on**: add the folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of `~/.claude/settings.json`.
-Only your user settings count, never a project's.
-
-```json
-{ "env": { "CLAUDE_CODE_PLUGIN_DIRS": "~/Documents/Projects/claude-manager" } }
-```
-
-Several folders: separate them with `:`. Interactive sessions watch the folder, so a `git pull` reloads the mod.
+Then start `claude`. The settings have defaults, so the install's "options not yet set" note needs nothing.
 
 **First run**
 
@@ -65,11 +53,23 @@ Several folders: separate them with `:`. Interactive sessions watch the folder, 
 
 If the flag is already in settings, the status line only says to restart.
 
+**Update**
+
+```sh
+claude plugin marketplace update supermanager
+claude plugin update supermanager@supermanager
+```
+
+Restart the session to use the new version.
+
 **Uninstall**
 
-- Remove the folder from `CLAUDE_CODE_PLUGIN_DIRS`, or stop passing `--plugin-dir`.
-- Optional: delete `pluginConfigs.supermanager` (or `supermanager@inline`) from `~/.claude/settings.json` (your settings),
-  and `.claude/manager/` in your projects (tasks, sprints, overrides).
+```sh
+claude plugin uninstall supermanager@supermanager
+claude plugin marketplace remove supermanager
+```
+
+Optional: delete `.claude/manager/` in your projects (tasks, sprints, overrides).
 
 &nbsp;
 
@@ -199,8 +199,15 @@ Existing files are never overwritten.
 
 ## 🛠️ Development
 
+Run a working copy instead of the installed one:
+
 ```sh
-claude plugin validate .   # what the engine will load
+claude --plugin-dir ~/path/to/supermanager   # this session only; saving a file reloads the mod
+```
+
+```sh
+claude plugin validate .   # the marketplace manifest
+claude plugin validate .claude-plugin/plugin.json   # the plugin and its hooks module
 claude plugin test .       # tests/*.test.ts(x)
 tsc -p .                   # types: the engine lays .claude-plugin/types/ and a tsconfig.json here when it loads the mod
 ```
@@ -212,6 +219,7 @@ The validator's rules: `$` never crosses an import; state refs are declared in t
 | file | job |
 | --- | --- |
 | `.claude-plugin/plugin.json` | manifest, `/config` settings |
+| `.claude-plugin/marketplace.json` | makes the repo its own marketplace |
 | `types/index.d.ts` | task, teammate and state types |
 | `hooks/register.tsx` | wires every core hook; builds the `io` the parts use |
 | `hooks/settings.ts` | settings: defaults < `/config` < `config.json` |
