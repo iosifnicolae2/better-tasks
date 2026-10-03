@@ -139,7 +139,8 @@ export type BoardProps = {
 
 export function Board({ ui, sections, doneCount, selected, team, limit, hasKeys, actions }: BoardProps) {
   const { Box, Text } = ui
-  const visible = sections.filter(section => section.tasks.length > 0 || section.when === 'this-sprint')
+  // Every section is always drawn, empty or not, so a task leaving one never removes its heading.
+  const visible = sections
   const ids = visible.flatMap(section => section.tasks.map(task => task.id))
   const roles = selected?.isMoving ? rowRoles(ids, selected.task.id) : undefined
   return (
@@ -147,7 +148,7 @@ export function Board({ ui, sections, doneCount, selected, team, limit, hasKeys,
       {visible.map(section => (
         <Box flexDirection="column" marginTop={1}>
           <SectionTitle ui={ui} section={section} />
-          {section.tasks.length === 0 && <Text color="subtle">   Nothing planned yet</Text>}
+          {section.tasks.length === 0 && <Text color="subtle">  —  empty</Text>}
           {section.tasks.map(task => (
             <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id} hasKeys={hasKeys}
               role={roles?.[task.id]} isFirst={ids[0] === task.id} isLast={ids.at(-1) === task.id}

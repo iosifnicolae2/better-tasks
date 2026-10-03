@@ -176,6 +176,27 @@ for (const surface of SURFACES) {
     expect(await ui.findAll({ type: 'Text', text: /^▌$/ })).toHaveLength(1)
   })
 
+  test(`every section stays drawn when its last task leaves, so nothing above moves (${surface})`, async ($, on) => {
+    const { files } = fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    type Node = { children?: unknown[] }
+    const lines = async () => {
+      const board = ((await ui.drawn()) as Node).children?.[1] as Node
+      return (board.children ?? []).slice(0, -2).map(section => (section as Node).children?.length)
+    }
+    const headings = async () => (await ui.findAll({ type: 'Text', text: /^(Now|This sprint|Next sprint|Backlog)$/ })).map(found => found.text)
+    expect(await headings()).toEqual(['Now', 'This sprint', 'Next sprint', 'Backlog'])
+    expect(await ui.findAll({ type: 'Text', text: '  —  empty' })).toHaveLength(2)
+    const before = await lines()
+
+    await ui.press({ key: 'task-T-002' })
+    await ui.press({ key: 'up' })
+    expect(files.get(`${DIR}/T-002-dark-mode.md`)).toContain('sprint: 2026-10-12')
+    expect(await headings()).toEqual(['Now', 'This sprint', 'Next sprint', 'Backlog'])
+    expect(await lines()).toEqual(before)
+  })
+
   test(`⌥↑ ⌥↓ reorder within a section and cross at its edges; b toggles the backlog (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     const head = (id: string) => files.get([...files.keys()].find(path => path.includes(id)) ?? '') ?? ''
