@@ -36,7 +36,7 @@ const TASK_TEMPLATE = `## Goal
 ## Notes
 `
 
-const TIPS = `/supermanager  ↑↓ select · ⏎ pick up · j/k move · ⏎ drop · o open · d done
+const TIPS = `/supermanager  ↑↓ select · ⏎ actions · m move, ↑↓, ⏎ stop · o open · d done
 "create a task …" → asks which sprint · "start T-003" → a teammate takes it
 /away  screens off, Mac keeps working`
 
