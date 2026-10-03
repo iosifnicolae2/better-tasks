@@ -1,15 +1,21 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 const ROOT = '/project'
 const SESSION = { cwd: ROOT, surface: 'terminal', isInteractive: true } as const
 const PANE_ID = 'supermanager-sprint'
+const PANE = {
+  component: 'Pane',
+  requestId: PANE_ID,
+  props: { title: 'Sprint', isFocused: false, bodyColumns: 76, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
+} as const
 
 /** Just enough engine for a session to start, and a record of every pane it was asked to open. */
-function fakeEngine(on: On, stored: Record<string, unknown>, env: Record<string, string> = {}) {
+function fakeEngine(on: On, stored: Record<string, unknown>, env: Record<string, string> = {}, openPanes: string[] = [], seed: Record<string, string> = {}) {
   const opens: { id: string; focus?: true }[] = []
   const logs: string[] = []
-  const files = new Map<string, string>()
+  const files = new Map<string, string>(Object.entries(seed))
   mock.clock(on, { now: new Date(2026, 9, 7, 12).getTime() })
   mock.store(on, stored)
   mock.env(on, { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1', ...env })
@@ -32,10 +38,16 @@ function fakeEngine(on: On, stored: Record<string, unknown>, env: Record<string,
     files.set(e.path, e.text)
     return { value: undefined }
   })
-  on('fs.list', () => ({ value: [] }))
+  on('fs.list', ($, e) => ({
+    value: [...files.keys()]
+      .filter(path => path.startsWith(`${e.path}/`))
+      .map(path => ({ name: path.slice(e.path.length + 1), kind: 'file' as const, size: 0, mtimeMs: 0, isLink: false })),
+  }))
   on('process.spawn', async function* () {
     return { value: { code: 0, signal: null } }
   })
+  on('ui.panes', () => ({ value: openPanes.map(id => ({ id, title: 'Sprint', isShown: true, isFocused: false, isPlaced: true })) }))
+  on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'This sprint' } } }))
   on('ui.open', ($, e) => {
     opens.push(e)
     return { value: { isPlaced: true as const } }
@@ -91,4 +103,40 @@ test('inside tmux it does not reopen either', async ($, on) => {
   await $.session.start(SESSION)
   expect(opens).toEqual([])
   expect(logs).toContain('supermanager: the board was open last time: type /supermanager')
+})
+
+const CREATE = { tool: 'mcp__supermanager__task_create', tool_use_id: 'c1', title: 'Fix the login redirect', goal: 'No loop', when: 'this-sprint' } as const
+
+async function createTask($: Engine) {
+  await $.tool.call({ tool: 'AskUserQuestion', tool_use_id: 'q1', questions: [] } as never)
+  return $.tool.call(CREATE)
+}
+
+test('a created task opens the board on it, without taking the keys (fullscreen)', async ($, on) => {
+  const { opens } = fakeEngine(on, {})
+  await $.session.start(SESSION)
+  const made = await createTask($)
+  expect(String(made.result)).toMatch(/^Created T-001/)
+  expect(opens).toEqual([expect.objectContaining({ id: PANE_ID })])
+  expect(opens[0]?.focus).toBeUndefined()
+  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  expect(await ui.find({ type: 'Text', text: /^T-001 {2}Fix the login redirect$/ })).toBeDefined()
+})
+
+test('with the board already open, a created task only becomes the selection', async ($, on) => {
+  const older = '---\nid: T-001\ntitle: Older task\nsprint: 2026-10-05\nurgent: false\nstatus: todo\nowner: \nrolled: 0\norder: 0\ncreated: 2026-10-01\n---\n'
+  const { opens } = fakeEngine(on, {}, {}, [PANE_ID], { [`${ROOT}/.claude/manager/tasks/T-001-older-task.md`]: older })
+  await $.session.start(SESSION)
+  await createTask($)
+  expect(opens).toEqual([])
+  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  expect(await ui.find({ type: 'Text', text: /^T-002 {2}Fix the login redirect$/ })).toBeDefined()
+})
+
+test('outside the fullscreen layout a created task gets one line, not a board', async ($, on) => {
+  const { opens, logs } = fakeEngine(on, {}, { CLAUDE_CODE_NO_FLICKER: '0' })
+  await $.session.start(SESSION)
+  await createTask($)
+  expect(opens).toEqual([])
+  expect(logs).toContain('supermanager: task T-001 created · type /supermanager to see the board')
 })

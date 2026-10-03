@@ -243,6 +243,25 @@ function closedOf(tasks: readonly Task[]): Task[] {
   return tasks.filter(task => !isOpen(task)).sort((a, b) => b.sprint.localeCompare(a.sprint) || b.id.localeCompare(a.id, undefined, { numeric: true }))
 }
 
+/**
+ * After the model creates a task: the board shows it, selected, without taking the keys (the turn
+ * runs on and the person may be typing). A board that is not open opens only in the fullscreen
+ * layout, as at start; elsewhere one line says where to see it.
+ */
+async function showNewTask($: EngineInterface, options: PluginOptions, id: string): Promise<void> {
+  await listTasks(filesOf($, options))
+  await update($, selectedState, () => id)
+  if ((await $.ui.panes()).some(pane => pane.id === PANE)) return
+  if (!(await isFullscreenLayout($))) {
+    $.ui.log(`supermanager: task ${id} created · type /supermanager to see the board`)
+    return
+  }
+  await leaveModes($)
+  await update($, pageState, () => 'board')
+  await rememberOpen($, true)
+  await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
+}
+
 let refreshTimer: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
@@ -283,6 +302,14 @@ export function registerPane(on: On, options: PluginOptions): void {
   })
 
   // A closed pane needs no refresh; the spinners stop with their rows.
+  on('tool.call', { tool: 'mcp__supermanager__task_create' }, async ($, e, next) => {
+    const ran = await next(e)
+    const id = typeof ran.result === 'string' ? ran.result.match(/^Created (\S+)/)?.[1] : undefined
+    // Showing it is a courtesy: a failure here must never fail the model's tool call.
+    if (id !== undefined) await showNewTask($, options, id).catch(error => $.ui.log(`showing ${id} failed: ${error}`, { to: 'debug' }))
+    return ran
+  })
+
   // The register's own session.start runs for every session; this one, with a matcher, only reopens.
   on('session.start', { isInteractive: true, surface: 'terminal' }, async ($, e, next) => {
     const started = await next(e)
