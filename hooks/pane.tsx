@@ -18,7 +18,7 @@ import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
 import { isOpen, listTasks, placeOf, saveTask, today, whenOf } from './tasks'
 import { isActive } from './team'
-import { initProject, overridePath, starterFiles } from './texts'
+import { overridePath, starterFiles } from './texts'
 
 // The Supermanager pane: /supermanager opens the board, /supermanager config its settings page. This file holds `$`.
 // (/tasks is Claude Code's own command, so the pane cannot take that name.)
@@ -31,6 +31,8 @@ const PANE_OPEN = { id: PANE, title: 'Sprint', focus: true, columns: 76 } as con
 const OPEN_KEY = 'pane.open'
 /** $.store key: the Closed section is expanded. */
 const CLOSED_KEY = 'pane.closedOpen'
+/** $.store key: the settings row the focus ring is on, for its description line. */
+const CONFIG_ROW_KEY = 'pane.configRow'
 const NATIVE_PREFIX = 'Supermanager: '
 
 type Page = 'board' | 'config' | 'session'
@@ -165,7 +167,6 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
   const starters = Object.keys(starterFiles())
   const present = await Promise.all(starters.map(exists))
   const redraw = () => $.ui.invalidate('ui.render')
-  const created = () => initProject(files).then(redraw)
   const fileAt = (label: string) => PROJECT_FILES[label] ?? CONFIG_FILE
   /** Opens one of the project's files, writing its starter text first when it is missing. */
   const openOrCreate = async (label: string) => {
@@ -178,9 +179,7 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
     fromProject: Object.keys(overrides.values),
     project: {
       problems: overrides.problems,
-      missing: starters.filter((path, at) => !present[at]),
       files: Object.keys(PROJECT_FILES).map(label => ({ label, exists: present[starters.indexOf(fileAt(label))] ?? false })),
-      onCreate: () => void created(),
       onOpen: label => void openOrCreate(label),
     },
   }
@@ -285,6 +284,12 @@ export function registerPane(on: On, options: PluginOptions): void {
     // An arrow walking past the board's first or last element would land on the engine's own stops
     // (the pane's close mark, another pane's tab) and the keys would wander off: the ring stays.
     if (e.origin.kind === 'person' && e.element === undefined) return { deny: 'the ring stays on the board' }
+    if (e.element?.startsWith('cfg-') || e.element?.startsWith('file-')) {
+      const moved = await next(e)
+      if (moved.deny === undefined) await $.store.set(CONFIG_ROW_KEY, e.element)
+      $.ui.invalidate('ui.render')
+      return moved
+    }
     const movingId = await read($, movingState)
     if (movingId !== '' && e.origin.kind === 'person' && e.element !== `task-${movingId}`) {
       await carry($, options, movingId, e.element)
@@ -377,6 +382,7 @@ export function registerPane(on: On, options: PluginOptions): void {
             onChange={(field, value) => void setConfig($, field, value)}
             onOpenNative={() => void $.command.run({ command: 'config' })}
             onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
+            focusedRow={String((await $.store.get(CONFIG_ROW_KEY)) ?? '')}
             onBack={showPage('board')} />
         </Box>
       )

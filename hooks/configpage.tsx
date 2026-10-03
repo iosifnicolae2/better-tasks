@@ -1,127 +1,113 @@
 import type { Ui } from './board'
 import type { Settings } from './settings'
 
-// The settings page of the Sprint pane: one line per setting, each with the control its kind needs.
+// The settings page of the Sprint pane, in the manner of Claude Code's own /config: one row per
+// setting with its value in a fixed column; Enter (or a click) changes it in place; one line at the
+// bottom describes the focused row. Nothing ever expands, so changing a value moves nothing.
 
 export type ConfigValue = string | number | boolean
 
-type Base = {
-  /** Which group of the page it sits in. */
+/** A setting: what it is called, what it does, its values in order, and how it is stored. */
+export type Field = {
   group: 'team' | 'sprint'
   /** The userConfig field, written as `supermanager.<field>`. */
   field: string
   label: string
-  hint: string
-}
-
-/** A toggle: Enter or a click flips it. */
-type Toggle = Base & { kind: 'toggle'; value: (settings: Settings) => boolean; initial: boolean }
-
-/** A stepper: − and + move it by `step` within `min`..`max`. */
-type Stepper = Base & {
-  kind: 'stepper'
-  value: (settings: Settings) => number
-  initial: number
-  step: number
-  min: number
-  max: number
-  unit: string
-}
-
-/** A picker over fixed options. */
-type Choice = Base & {
-  kind: 'choice'
+  describe: string
+  /** The values Enter cycles through, as shown. */
+  options: readonly string[]
+  /** The setting's value as one of `options`. */
   value: (settings: Settings) => string
   initial: string
-  options: readonly { value: string; label?: string }[]
-  /** The picked option as the value the setting stores. */
+  /** The shown value as the value the setting stores. */
   stored: (value: string) => ConfigValue
 }
 
-export type Field = Toggle | Stepper | Choice
-
 const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-const valuesOf = (values: readonly string[]) => values.map(value => ({ value }))
+const ON_OFF = ['on', 'off']
+const isOn = (value: string) => value === 'on'
+const asIs = (value: string) => value
 
 export const FIELDS: readonly Field[] = [
   {
-    kind: 'choice',
     group: 'team',
     field: 'editor',
     label: 'Editor',
-    hint: 'auto: the IDE Claude runs in',
+    describe: 'Opens task files. auto: the IDE Claude runs in, else the default app.',
+    options: ['auto', 'default', 'code', 'idea', 'cursor', 'zed'],
     value: settings => settings.editor,
     initial: 'auto',
-    options: valuesOf(['auto', 'default', 'code', 'idea', 'cursor', 'zed']),
-    stored: value => value,
+    stored: asIs,
   },
   {
-    kind: 'toggle',
     group: 'team',
     field: 'worktree',
-    label: 'Worktrees',
-    hint: 'a git worktree per teammate',
-    value: settings => settings.worktree,
-    initial: false,
+    label: 'Worktree per teammate',
+    describe: 'Each named teammate works in its own git worktree.',
+    options: ON_OFF,
+    value: settings => (settings.worktree ? 'on' : 'off'),
+    initial: 'off',
+    stored: isOn,
   },
   {
-    kind: 'stepper',
     group: 'team',
     field: 'contextLimit',
     label: 'Context limit',
-    hint: 'no new work above this',
-    value: settings => settings.contextLimit,
-    initial: 50,
-    step: 5,
-    min: 10,
-    max: 90,
-    unit: '%',
+    describe: 'No new work goes to a teammate whose context is fuller than this.',
+    options: ['30%', '40%', '50%', '60%', '70%'],
+    value: settings => `${settings.contextLimit}%`,
+    initial: '50%',
+    stored: value => Number.parseInt(value, 10),
   },
   {
-    kind: 'toggle',
     group: 'team',
     field: 'keepAwake',
-    label: 'Keep Mac awake',
-    hint: 'while teammates run',
-    value: settings => settings.keepAwake,
-    initial: true,
+    label: 'Keep the Mac awake',
+    describe: 'Holds caffeinate while any teammate runs.',
+    options: ON_OFF,
+    value: settings => (settings.keepAwake ? 'on' : 'off'),
+    initial: 'on',
+    stored: isOn,
   },
   {
-    kind: 'choice',
     group: 'sprint',
     field: 'sprintWeeks',
     label: 'Sprint length',
-    hint: 'weeks per sprint',
-    value: settings => String(settings.sprint.weeks),
-    initial: '1',
-    options: ['1', '2', '3', '4'].map(value => ({ value, label: value === '1' ? '1 week' : `${value} weeks` })),
-    stored: value => value,
+    describe: 'How many weeks one sprint lasts.',
+    options: ['1 week', '2 weeks', '3 weeks', '4 weeks'],
+    value: settings => (settings.sprint.weeks === 1 ? '1 week' : `${settings.sprint.weeks} weeks`),
+    initial: '1 week',
+    stored: value => value.split(' ')[0] ?? '1',
   },
   {
-    kind: 'choice',
     group: 'sprint',
     field: 'sprintStart',
-    label: 'Sprint starts',
-    hint: 'first day of a sprint',
+    label: 'Sprint starts on',
+    describe: 'The weekday a new sprint begins.',
+    options: WEEKDAYS,
     value: settings => WEEKDAYS[(settings.sprint.startDay + 6) % 7] ?? 'monday',
     initial: 'monday',
-    options: valuesOf(WEEKDAYS),
-    stored: value => value,
+    stored: asIs,
   },
 ]
+
+/** The value after `current`, wrapping round; a value not in the list goes to the first. */
+export function nextOption(options: readonly string[], current: string): string {
+  return options[(options.indexOf(current) + 1) % options.length] ?? current
+}
 
 export function isChanged(field: Field, settings: Settings): boolean {
   return field.value(settings) !== field.initial
 }
 
-/** The stepper's next value, kept within its bounds. */
-export function stepped(field: Stepper, value: number, direction: -1 | 1): number {
-  return Math.min(field.max, Math.max(field.min, value + direction * field.step))
+/** What the settings page knows about the project's own files in .claude/manager/. */
+export type ProjectFacts = {
+  /** Bad keys and other problems in config.json. */
+  problems: readonly string[]
+  /** The project's own files by label (config.json, coordinator.md, …) and whether each exists. */
+  files: readonly { label: string; exists: boolean }[]
+  onOpen: (label: string) => void
 }
-
-// ---- Drawing ----
-
-type OnChange = (field: string, value: ConfigValue) => void
 
 export type ConfigPageProps = {
   ui: Ui
@@ -131,141 +117,117 @@ export type ConfigPageProps = {
   /** The fields this project's config.json sets; those win over /config. */
   fromProject: readonly string[]
   project: ProjectFacts
-  onChange: OnChange
+  /** The key of the row the focus ring is on, for the description line. */
+  focusedRow: string
+  onChange: (field: string, value: ConfigValue) => void
   onOpenNative: () => void
   onOpenSprints: () => void
   onBack: () => void
 }
 
-export function ConfigPage({ ui, settings, sprintPreview, fromProject, project, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
+const FILE_ABOUT: Record<string, string> = {
+  'config.json': "This project's values for any setting; they win over /config.",
+  'coordinator.md': 'Replaces or extends the rules the main session coordinates by.',
+  'teammate.md': 'Goes into every named teammate’s spawn prompt.',
+  'task-template.md': 'The body a new task file starts with.',
+}
+
+export function ConfigPage(props: ConfigPageProps) {
+  const { ui, settings, sprintPreview, fromProject, project, focusedRow, onChange, onOpenNative, onOpenSprints, onBack } = props
   const { Box, Button, Text } = ui
+  const fieldRow = (field: Field) => (
+    <Row ui={ui} rowKey={`cfg-${field.field}`} label={field.label} value={field.value(settings)}
+      isChanged={isChanged(field, settings)} isFromProject={fromProject.includes(field.field)}
+      onPress={() => onChange(field.field, field.stored(nextOption(field.options, field.value(settings))))} />
+  )
+  const describe = describeRow(focusedRow, fromProject, project)
   return (
     <Box flexDirection="column">
-      <Text bold>Team</Text>
-      {FIELDS.filter(field => field.group === 'team').map(field => (
-        <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
-      ))}
-      <Box marginTop={1}>
-        <Text bold>Sprint</Text>
+      <Heading ui={ui} title="Team" />
+      {FIELDS.filter(field => field.group === 'team').map(fieldRow)}
+      <Heading ui={ui} title="Sprint" />
+      {FIELDS.filter(field => field.group === 'sprint').map(fieldRow)}
+      <Box paddingLeft={4} height={1} overflow="hidden">
+        <Text color="subtle" wrap="truncate-end">{sprintPreview}</Text>
       </Box>
-      {FIELDS.filter(field => field.group === 'sprint').map(field => (
-        <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
+      <Row ui={ui} rowKey="cfg-sprints" label="Sprint goals & reviews" value="open" onPress={onOpenSprints} />
+      <Heading ui={ui} title="This project" />
+      {project.files.map(file => (
+        <Row ui={ui} rowKey={`file-${file.label}`} label={file.label}
+          value={fileValue(file, fromProject.length)} onPress={() => project.onOpen(file.label)} />
       ))}
-      <Box paddingLeft={2} height={1} overflow="hidden">
-        <Text color="suggestion" wrap="truncate-end">This sprint: {sprintPreview}</Text>
-      </Box>
-      <Text dimColor>• changed from the default · saved at once</Text>
-      <ProjectSection ui={ui} fromProject={fromProject} project={project} />
-      <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
-        <Button key="board" plain hotkey="b" label="Board" onPress={onBack} />
-        <Button key="native" plain hotkey="n" dimColor label="All settings (/config)" onPress={onOpenNative} />
-        <Button key="sprints" plain hotkey="g" dimColor label="Goals & reviews (sprints.md)" onPress={onOpenSprints} />
+      {project.problems.length > 0 && (
+        <Box paddingLeft={2} height={1} overflow="hidden">
+          <Text color="warning" wrap="truncate-end">⚠ {project.problems.join(' · ')}</Text>
+        </Box>
+      )}
+      <Row ui={ui} rowKey="cfg-native" label="All Claude Code settings" value="/config" onPress={onOpenNative} />
+      <Box flexDirection="column" marginTop={1}>
+        <Box height={1} overflow="hidden">
+          <Text color="subtle" wrap="truncate-end">{describe}</Text>
+        </Box>
+        <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
+          <Text color="subtle">↑↓ choose · ⏎ change</Text>
+          <Button key="board" plain dimColor hotkey="b" label="board" onPress={onBack} />
+        </Box>
       </Box>
     </Box>
   )
 }
 
-type FieldRowProps = { ui: Ui; field: Field; settings: Settings; isFromProject?: boolean; onChange: OnChange }
+function fileValue(file: { label: string; exists: boolean }, projectValues: number): string {
+  if (file.label === 'config.json') return file.exists ? `${projectValues} value${projectValues === 1 ? '' : 's'} · open` : 'none · create'
+  return file.exists ? 'custom · open' : 'default · create'
+}
 
-/** Marker, label, control, and the hint dim beside them. */
-function FieldRow({ ui, field, settings, isFromProject, onChange }: FieldRowProps) {
+/** The description line: what the focused row does, and where its value comes from. */
+function describeRow(rowKey: string, fromProject: readonly string[], project: ProjectFacts): string {
+  const field = FIELDS.find(one => `cfg-${one.field}` === rowKey)
+  if (field) {
+    const source = fromProject.includes(field.field) ? ' Set by this project’s config.json, which /config does not override.' : ''
+    return `${field.label}: ${field.describe}${source}`
+  }
+  const file = rowKey.startsWith('file-') ? rowKey.slice('file-'.length) : undefined
+  if (file !== undefined) {
+    const exists = project.files.find(one => one.label === file)?.exists === true
+    return `${file}: ${FILE_ABOUT[file] ?? ''} ⏎ ${exists ? 'opens it' : 'creates it from the shipped text, then opens it'}.`
+  }
+  if (rowKey === 'cfg-sprints') return 'Sprint goals & reviews: opens sprints.md, one section per sprint.'
+  if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Supermanager: …”."
+  return 'Values are saved as soon as they change · • differs from the default · ◆ set by this project'
+}
+
+function Heading({ ui, title }: { ui: Ui; title: string }) {
   const { Box, Text } = ui
   return (
-    <Box flexDirection="row" columnGap={1}>
-      <Text color="suggestion">{isChanged(field, settings) ? '•' : ' '}</Text>
-      <Box width={15} flexShrink={0}>
-        <Text>{field.label}</Text>
-      </Box>
-      <Box width={14} flexShrink={0}>
-        <Control ui={ui} field={field} settings={settings} onChange={onChange} />
-      </Box>
-      <Box flexShrink={1}>
-        {isFromProject ? (
-          <Text color="suggestion" wrap="truncate-end">◆ from project</Text>
-        ) : (
-          <Text dimColor wrap="truncate-end">{field.hint}</Text>
-        )}
-      </Box>
+    <Box marginTop={1} height={1}>
+      <Text bold color="subtle">{title}</Text>
     </Box>
   )
 }
 
-function Control({ ui, field, settings, onChange }: FieldRowProps) {
-  const { Box, Button, Text } = ui
-  if (field.kind === 'toggle') {
-    const isOn = field.value(settings)
-    return <Button key={field.field} plain label={isOn ? '● on' : '○ off'} onPress={() => onChange(field.field, !isOn)} />
-  }
-  if (field.kind === 'stepper') {
-    const value = field.value(settings)
-    return (
-      <Box flexDirection="row" columnGap={1}>
-        <Button key={`${field.field}-down`} plain label="−" onPress={() => onChange(field.field, stepped(field, value, -1))} />
-        <Text>{value}{field.unit}</Text>
-        <Button key={`${field.field}-up`} plain label="+" onPress={() => onChange(field.field, stepped(field, value, 1))} />
-      </Box>
-    )
-  }
-  const value = field.value(settings)
-  const options = field.options.some(option => option.value === value) ? field.options : [...field.options, { value }]
-  if (!('Select' in ui)) return <Text>{options.find(option => option.value === value)?.label ?? value}</Text>
-  return (
-    <ui.Select key={field.field} options={options} value={value}
-      onSelect={picked => onChange(field.field, field.stored(picked))} />
-  )
+type RowProps = {
+  ui: Ui
+  rowKey: string
+  label: string
+  value: string
+  isChanged?: boolean
+  isFromProject?: boolean
+  onPress: () => void
 }
 
-/** What the settings page knows about the project's own files in .claude/manager/. */
-export type ProjectFacts = {
-  /** Bad keys and other problems in config.json. */
-  problems: readonly string[]
-  /** The starter files the project does not have yet (paths relative to its root). */
-  missing: readonly string[]
-  /** The project's own files by label (config.json, coordinator.md, …) and whether each exists. */
-  files: readonly { label: string; exists: boolean }[]
-  onCreate: () => void
-  onOpen: (label: string) => void
-}
-
-/**
- * "This project": always four lines (where values come from, problems, starter files, files to
- * open), so creating the files or fixing a key never moves the rows above.
- */
-function ProjectSection({ ui, fromProject, project }: { ui: Ui; fromProject: readonly string[]; project: ProjectFacts }) {
+/** "  • Editor                    auto": marker, the label (the focusable part), the value in its column. */
+function Row({ ui, rowKey, label, value, isChanged, isFromProject, onPress }: RowProps) {
   const { Box, Button, Text } = ui
-  const line = (children: JSX.Children) => (
-    <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">{children}</Box>
-  )
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold>This project</Text>
-      {line(
-        fromProject.length === 0
-          ? <Text dimColor>No values from .claude/manager/config.json</Text>
-          : <Text color="suggestion" wrap="truncate-end">◆ {fromProject.length} from config.json; /config does not override them</Text>,
-      )}
-      {line(
-        project.problems.length === 0
-          ? <Text dimColor>config.json: no problems</Text>
-          : <Text color="warning" wrap="truncate-end">⚠ {project.problems.join(' · ')}</Text>,
-      )}
-      {line(
-        project.missing.length === 0
-          ? <Text dimColor>✓ All starter files are in place</Text>
-          : (
-            <Box flexDirection="row" columnGap={2}>
-              <Button key="init" plain hotkey="i" label={`Create ${project.missing.length} starter files`} onPress={project.onCreate} />
-              <Text dimColor>↗ opens a file · + creates it, then opens it</Text>
-            </Box>
-          ),
-      )}
-      <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
-        <Text dimColor>Files</Text>
-        {project.files.map(file => (
-          <Button key={`file-${file.label}`} plain dimColor={file.exists} label={`${file.exists ? '↗' : '+'} ${file.label}`}
-            onPress={() => project.onOpen(file.label)} />
-        ))}
+    <Box flexDirection="row" height={1} overflow="hidden">
+      <Box width={2} flexShrink={0}>
+        <Text color="suggestion">{isFromProject ? '◆' : isChanged ? '•' : ' '}</Text>
       </Box>
+      <Box width={28} flexShrink={0}>
+        <Button key={rowKey} plain label={label} onPress={onPress} />
+      </Box>
+      <Text color={isChanged || isFromProject ? 'suggestion' : 'subtle'} wrap="truncate-end">{value}</Text>
     </Box>
   )
 }

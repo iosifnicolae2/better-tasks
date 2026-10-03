@@ -400,39 +400,50 @@ test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
   expect(commands.at(-1)).toEqual(['open', '-b', 'com.jetbrains.intellij', `${DIR}/T-001-fix-login.md`])
 })
 
-test('/supermanager config: toggles flip, the stepper steps, pickers pick, all written at once', async ($, on) => {
-  const { settings } = fakeProject(on)
-  await $.command.run(sprintCommand('config'))
-  for (const surface of SURFACES) {
-    settings.length = 0
+for (const surface of SURFACES) {
+  test(`settings are rows like /config: Enter changes a value in place, nothing expands (${surface})`, async ($, on) => {
+    const { settings } = fakeProject(on)
+    await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const shape = async () => JSON.stringify(await ui.drawn(), (key, value) => (key === 'children' || key === 'type' ? value : typeof value === 'string' ? '' : value))
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
-    expect((await ui.find({ key: 'worktree' }))?.text).toBe('○ off')
-    await ui.press({ key: 'worktree' })
-    await ui.press({ key: 'keepAwake' })
-    await ui.press({ key: 'contextLimit-up' })
-    await ui.press({ key: 'contextLimit-down' })
-    await ui.select({ key: 'editor', value: 'code' })
+    expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
+    const before = await shape()
+    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-contextLimit', 'cfg-keepAwake', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+      await ui.press({ key })
+    }
     expect(settings).toEqual([
+      ['supermanager.editor', 'default'],
       ['supermanager.worktree', true],
+      ['supermanager.contextLimit', 60],
       ['supermanager.keepAwake', false],
-      ['supermanager.contextLimit', 55],
-      ['supermanager.contextLimit', 45],
-      ['supermanager.editor', 'code'],
+      ['supermanager.sprintWeeks', '2'],
+      ['supermanager.sprintStart', 'tuesday'],
     ])
+    expect(await shape()).toBe(before)
+    settings.length = 0
     await ui.unmount()
-  }
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
-  await ui.press({ key: 'board' })
-  expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
-})
+  })
+
+  test(`the line at the bottom describes the focused row (${surface})`, async ($, on) => {
+    fakeProject(on)
+    await $.command.run(sprintCommand('config'))
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    await arrowTo($, 'cfg-contextLimit')
+    expect(await ui.find({ type: 'Text', text: /^Context limit: No new work goes to a teammate/ })).toBeDefined()
+    await arrowTo($, 'file-teammate.md')
+    expect(await ui.find({ type: 'Text', text: /^teammate\.md: .*creates it/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '↑↓ choose · ⏎ change' })).toBeDefined()
+    await ui.press({ key: 'board' })
+    expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
+  })
+}
 
 test('only settings changed from the default are marked', { options: { worktree: true } }, async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand('config'))
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
   expect(await ui.findAll({ type: 'Text', text: /^•$/ })).toHaveLength(1)
-  expect((await ui.find({ key: 'worktree' }))?.text).toBe('● on')
 })
 
 test('the settings page hands off to /config, where our rows say whose they are', async ($, on) => {
@@ -445,7 +456,7 @@ test('the settings page hands off to /config, where our rows say whose they are'
   on('config.describe', ($, e) => ({ label: e.label, description: e.description, isHidden: e.isHidden }))
   await $.command.run(sprintCommand('config'))
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
-  await ui.press({ key: 'native' })
+  await ui.press({ key: 'cfg-native' })
   expect(ran).toEqual(['config'])
   const row = { label: 'Editor', isHidden: false, provider: { plugin: 'supermanager', tier: 'user' as const } }
   expect((await $.config.describe({ key: 'supermanager.editor', ...row })).label).toBe('Supermanager: Editor')
@@ -560,33 +571,27 @@ test("the pane follows the project's config.json, and its settings page says whi
   expect(commands.at(-1)).toEqual(['code', `${DIR}/T-001-fix-login.md`])
 
   await ui.press({ key: 'config' })
-  expect(await ui.findAll({ type: 'Text', text: '◆ from project' })).toHaveLength(2)
-  await ui.press({ key: 'sprints' })
+  expect(await ui.findAll({ type: 'Text', text: /^◆$/ })).toHaveLength(2)
+  await ui.press({ key: 'cfg-sprints' })
   expect(commands.at(-1)).toEqual(['code', `${ROOT}/docs/sprints.md`])
 })
 
 for (const surface of SURFACES) {
-  test(`"This project" shows config.json's problems, creates the starter files and opens them (${surface})`, async ($, on) => {
+  test(`"This project" rows open or create the project's files and show config.json's problems (${surface})`, async ($, on) => {
     const { files, commands } = fakeProject(on)
     files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ contextLimit: 40, colour: 'blue' }))
     await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    expect(await ui.find({ type: 'Text', text: /◆ 1 from config\.json; \/config does not override them/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1 value · open' })).toBeDefined()
+    expect(await ui.findAll({ type: 'Text', text: 'default · create' })).toHaveLength(3)
     expect(await ui.find({ type: 'Text', text: /⚠ .*colour/ })).toBeDefined()
-    expect((await ui.find({ key: 'init' }))?.text).toMatch(/^Create \d starter files$/)
-    expect((await ui.find({ key: 'file-config.json' }))?.text).toBe('↗ config.json')
-    expect((await ui.find({ key: 'file-teammate.md' }))?.text).toBe('+ teammate.md')
+
     await ui.press({ key: 'file-teammate.md' })
     expect(files.has(`${ROOT}/.claude/manager/teammate.md`)).toBe(true)
     expect(files.has(`${ROOT}/.claude/manager/coordinator.md`)).toBe(false)
     expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/manager/teammate.md`])
-    expect((await ui.find({ key: 'file-teammate.md' }))?.text).toBe('↗ teammate.md')
-
-    await ui.press({ key: 'init' })
-    expect(files.has(`${ROOT}/.claude/manager/coordinator.md`)).toBe(true)
-    expect(JSON.parse(files.get(`${ROOT}/.claude/manager/config.json`) ?? '{}')).toMatchObject({ contextLimit: 40 })
-    expect(await ui.find({ key: 'init' })).toBeUndefined()
-    expect(await ui.find({ type: 'Text', text: '✓ All starter files are in place' })).toBeDefined()
+    expect(await ui.findAll({ type: 'Text', text: 'default · create' })).toHaveLength(2)
+    expect(await ui.find({ type: 'Text', text: 'custom · open' })).toBeDefined()
   })
 }
 
@@ -609,7 +614,7 @@ for (const surface of SURFACES) {
 
     await ui.press({ key: 'config' })
     expect(await ui.find({ type: 'Text', text: 'Sprint' })).toBeDefined()
-    expect((await ui.find({ type: 'Text', text: /^This sprint: / }))?.text).toBe('This sprint: Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11')
+    expect(await ui.find({ type: 'Text', text: 'Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11' })).toBeDefined()
   })
 }
 
@@ -617,5 +622,5 @@ test('a 4-week sprint shows its weeks in the settings preview', { options: { spr
   fakeProject(on)
   await $.command.run(sprintCommand('config'))
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
-  expect((await ui.find({ type: 'Text', text: /^This sprint: / }))?.text).toMatch(/^This sprint: Sprint \d+ · Weeks \d+–\d+ · /)
+  expect(await ui.find({ type: 'Text', text: /^Sprint \d+ · Weeks \d+–\d+ · / })).toBeDefined()
 })
