@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import type { Task } from '../types'
-import { fold, searchTasks } from '../hooks/search'
+import { fold, matchRanges, searchTasks } from '../hooks/search'
 
 const task = (id: string, title: string, body = '', fields: Partial<Task> = {}): Task => ({
   id,
@@ -58,9 +58,19 @@ describe('task search', () => {
     expect(hit?.snippet).toBe('The login tests are slow on the redirect step.')
     expect(hit?.fields).toEqual(['body'])
     const [titleOnly] = searchTasks(tasks, 'speed')
-    expect(titleOnly?.snippet).toBe('')
+    expect(titleOnly?.snippet).toBeUndefined()
+    expect(titleOnly?.titleMatches).toEqual([[0, 5]])
     const long = task('T-020', 'Long', `${'a'.repeat(80)} needle ${'b'.repeat(80)}`)
     expect(searchTasks([long], 'needle')[0]?.snippet).toMatch(/^…a+ needle b+…$/)
+  })
+
+  test('ranges to highlight, in the title and in the snippet', () => {
+    const [hit] = searchTasks(tasks, 'login redirect')
+    expect(hit?.titleMatches).toEqual([[4, 9], [10, 18]])
+    const [body] = searchTasks(tasks, 'slow')
+    expect(body?.snippetMatches).toEqual([[20, 24]])
+    expect(matchRanges('Café café', ['cafe'])).toEqual([[0, 4], [5, 9]])
+    expect(matchRanges('redirected', ['redirect', 'direct'])).toEqual([[0, 8]])
   })
 
   test('the template headings never match', () => {

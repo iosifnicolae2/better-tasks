@@ -63,6 +63,8 @@ declare module 'claude-code' {
       cacheSteps: Record<string, CacheStep>
       notice: string
       turn: TurnFacts
+      /** The board's search box: shown or not, and its text. */
+      search: { isOpen: boolean; query: string }
       /** The footer label: sprint progress. */
       footer: string
       /** The Tasks pane's selected task id. */

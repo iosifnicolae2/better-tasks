@@ -5,13 +5,20 @@ import { isOpen } from './tasks'
 
 export type SearchField = 'id' | 'title' | 'body'
 
+/** A [start, end) character range to highlight. */
+export type Range = [number, number]
+
 export type SearchHit = {
   task: Task
   score: number
   /** Where the words were found. */
   fields: SearchField[]
-  /** "…text around the first body match…", or '' when only the id or title matched. */
-  snippet: string
+  /** The query's words in task.title. */
+  titleMatches: Range[]
+  /** "…text around the first body match…" on one line; absent when only the id or title matched. */
+  snippet?: string
+  /** The query's words in the snippet. */
+  snippetMatches?: Range[]
 }
 
 const SCORE = { id: 1000, phrase: 300, word: 100, prefix: 50, body: 10, bodyRepeat: 2, open: 5 } as const
@@ -41,6 +48,24 @@ const hasWord = (text: string, word: string) => new RegExp(`(^|[^\\p{L}\\p{N}])$
 const hasPrefix = (text: string, word: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${escape(word)}`, 'u').test(text)
 
 const count = (text: string, word: string) => text.split(word).length - 1
+
+/** Where the words occur in `text`, as merged [start, end) ranges of the original characters. */
+export function matchRanges(text: string, words: readonly string[]): Range[] {
+  const { text: plain, at } = folded(text)
+  const ranges: Range[] = []
+  for (const word of words) {
+    for (let index = plain.indexOf(word); index >= 0; index = plain.indexOf(word, index + word.length)) {
+      ranges.push([at[index] ?? 0, (at[index + word.length - 1] ?? 0) + 1])
+    }
+  }
+  ranges.sort((a, b) => a[0] - b[0])
+  return ranges.reduce<Range[]>((merged, range) => {
+    const last = merged.at(-1)
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1])
+    else merged.push([...range])
+    return merged
+  }, [])
+}
 
 /** "…around the first match…" in the original body text, on one line. */
 function snippetOf(body: string, words: readonly string[]): string {
@@ -84,7 +109,10 @@ function scoreOf(task: Task, query: string, words: readonly string[]): SearchHit
     }
   }
   if (isOpen(task)) score += SCORE.open
-  return { task, score, fields: [...fields], snippet: snippetOf(bodyText(task), words) }
+  const snippet = snippetOf(bodyText(task), words)
+  const titleMatches = matchRanges(task.title, words)
+  if (!snippet) return { task, score, fields: [...fields], titleMatches }
+  return { task, score, fields: [...fields], titleMatches, snippet, snippetMatches: matchRanges(snippet, words) }
 }
 
 const newestFirst = (a: Task, b: Task) =>
