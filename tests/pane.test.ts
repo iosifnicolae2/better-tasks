@@ -330,6 +330,16 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /more above$/ })).toBeDefined()
   })
 
+  test(`even a very short pane keeps the box at the bottom and the selection in the list (${surface})`, async ($, on) => {
+    fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 10 } } })
+    expect(await listLines(ui)).toHaveLength(2)
+    expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
+    expect(await ui.find({ key: 'open' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /done this sprint/ })).toBeUndefined()
+  })
+
   test(`the pane says how to give it the keys when it has none (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())

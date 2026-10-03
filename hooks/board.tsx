@@ -167,17 +167,19 @@ export function Board(props: BoardProps) {
   const { ui, selected, bodyRows, hasKeys, limit, actions } = props
   const { Box, Text } = ui
   const lines = listLines(props)
-  const rows = bodyRows === undefined ? undefined : bodyRows - BOTTOM_ROWS
+  // At any pane height the list takes exactly what the box leaves, so the box sits at the bottom.
+  const rows = bodyRows === undefined ? undefined : Math.max(1, bodyRows - BOTTOM_ROWS)
   const focus = Math.max(0, lines.findIndex(line => line.taskId !== undefined && line.taskId === selected?.task.id))
-  const shown = rows === undefined || rows < 4 ? { start: 0, end: lines.length } : windowOf(lines.length, rows, focus)
+  const shown = rows === undefined ? { start: 0, end: lines.length } : windowOf(lines.length, rows, focus)
   const above = shown.start
   const below = lines.length - shown.end
   const window = lines.slice(shown.start, shown.end).map(line => line.node)
-  if (above > 0) window[0] = <Text color="subtle">  ⋯ {above + 1} more above</Text>
-  if (below > 0) window[window.length - 1] = <Text color="subtle">  ⋯ {below + 1} more below</Text>
+  const hasRoomForMarks = window.length >= 3
+  if (hasRoomForMarks && above > 0) window[0] = <Text color="subtle">  ⋯ {above + 1} more above</Text>
+  if (hasRoomForMarks && below > 0) window[window.length - 1] = <Text color="subtle">  ⋯ {below + 1} more below</Text>
   return (
     <Box flexDirection="column">
-      <Box flexDirection="column" height={rows !== undefined && rows >= 4 ? rows : undefined} overflow="hidden">
+      <Box flexDirection="column" height={rows} overflow="hidden">
         {window}
       </Box>
       <Detail ui={ui} selected={selected} limit={limit} actions={actions} />
