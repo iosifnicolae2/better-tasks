@@ -388,7 +388,7 @@ test('a project customizes numbering, files, the task template and teammate inst
   expect(host.files.get(`${ROOT}/work/BUG-01.md`)).toContain('---\n# BUG-01 Fix login\nNo loop\n')
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'Fix BUG-01.', name: 'auth' })
-  expect(host.spawned.at(-1)).toContain('Fix BUG-01.\n\n# Working as a better-tasks teammate')
+  expect(host.spawned.at(-1)).toContain('Fix BUG-01.\n\n# You are a better-tasks teammate')
   expect(host.spawned.at(-1)).toMatch(/Run `make check` before you report\.$/)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find X.' })
   expect(host.spawned.at(-1)).toBe('Find X.')
@@ -576,4 +576,16 @@ test('with the 5-minute cache a teammate is cold after 4 minutes', { options: { 
   await clock.advance(60_000)
   const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's2', to: 'auth', message: 'go' })
   expect(cold.deny ?? cold.text).toContain('cache is cold')
+})
+
+test('every named teammate is spawned with the teammate rules; a scout is not', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'Finish T-001. Old transcript: x.jsonl', name: 'auth-2' })
+  expect(host.spawned.at(-1)).toMatch(/^Finish T-001\. Old transcript: x\.jsonl\n\n# You are a better-tasks teammate\n/)
+  expect(host.spawned.at(-1)).toContain("Given a predecessor's transcript? Search it for what you need")
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find the login code.' })
+  expect(host.spawned.at(-1)).toBe('Find the login code.')
 })
