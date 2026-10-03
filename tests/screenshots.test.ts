@@ -5,6 +5,9 @@ import type { On } from 'claude-code'
 // The README's pictures: the real pane mounted on a demo project, each scene printed as one
 // "SCREENSHOT {json}" line. `node scripts/screenshots.mjs` runs this and draws docs/screenshots/*.svg.
 
+// The test runner gives tests a console; the hooks' typings do not declare one.
+declare const console: { log: (text: string) => void }
+
 const ROOT = '/demo'
 const DIR = `${ROOT}/.claude/manager/tasks`
 const WEDNESDAY = new Date(2026, 9, 7, 12).getTime()
