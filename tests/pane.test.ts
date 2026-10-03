@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { backlogToggle, filledCells, neighbour, rowRoles, sectionsOf, shifted, shortDates, windowOf } from '../hooks/board'
+import { backlogToggle, filledCells, neighbour, partsOf, rowRoles, sectionsOf, shifted, shortDates, windowOf } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -147,6 +147,16 @@ test('moves: one section up or down, b in and out of the backlog, and the progre
   expect(filledCells(0, 0)).toBe(0)
   expect(filledCells(3, 5)).toBe(3)
   expect(filledCells(5, 5)).toBe(5)
+})
+
+test('search ranges cut a line into lit and plain parts', () => {
+  expect(partsOf('Café login redirect', [[0, 4], [5, 10]])).toEqual([
+    { text: 'Café', isMatch: true },
+    { text: ' ', isMatch: false },
+    { text: 'login', isMatch: true },
+    { text: ' redirect', isMatch: false },
+  ])
+  expect(partsOf('plain', [])).toEqual([{ text: 'plain', isMatch: false }])
 })
 
 type Node = { type?: string; props?: { key?: string }; children?: unknown[] }
@@ -334,7 +344,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeUndefined()
     const results = (await ui.findAll({ type: 'Button' })).map(found => found.key).filter(key => key?.startsWith('task-'))
     expect(results).toEqual(['task-T-001', 'task-T-008'])
-    expect(await ui.find({ type: 'Text', text: /^login$/ })).toBeDefined()
+    expect(await ui.findAll({ type: 'Text', text: /^login$/ })).toHaveLength(2)
     expect(await ui.find({ type: 'Text', text: /touches the login page/ })).toBeDefined()
     expect(await listLines(ui)).toHaveLength(4)
     expect((await ui.find({ type: 'Text', text: /^T-001 {2}Fix login$/ }))).toBeDefined()

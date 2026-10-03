@@ -108,23 +108,16 @@ export function rowRoles(ids: readonly string[], movingId: string): Record<strin
   return roles
 }
 
-/** A title cut into the parts a search query matches and the rest, for highlighting. */
-export function matchedParts(text: string, query: string): { text: string; isMatch: boolean }[] {
-  const words = query.toLowerCase().split(/[^\p{L}\p{N}-]+/u).filter(Boolean)
-  const lower = text.toLowerCase()
-  const marks = Array.from({ length: text.length }, () => false)
-  for (const word of words) {
-    for (let at = lower.indexOf(word); at >= 0; at = lower.indexOf(word, at + 1)) {
-      for (let index = at; index < at + word.length; index++) marks[index] = true
-    }
-  }
+/** Text cut at the [start, end) ranges a search matched, for highlighting. */
+export function partsOf(text: string, ranges: readonly (readonly [number, number])[]): { text: string; isMatch: boolean }[] {
   const parts: { text: string; isMatch: boolean }[] = []
-  for (const [index, ch] of [...text].entries()) {
-    const isMatch = marks[index] === true
-    const last = parts.at(-1)
-    if (last && last.isMatch === isMatch) last.text += ch
-    else parts.push({ text: ch, isMatch })
+  let at = 0
+  for (const [start, end] of ranges) {
+    if (start > at) parts.push({ text: text.slice(at, start), isMatch: false })
+    parts.push({ text: text.slice(start, end), isMatch: true })
+    at = end
   }
+  if (at < text.length) parts.push({ text: text.slice(at), isMatch: false })
   return parts
 }
 
@@ -160,8 +153,10 @@ export type BoardActions = {
 
 export type SearchState = { isOpen: boolean; query: string }
 
-/** One search result: the task, where it sits ("◆ This sprint", "✓ closed"), and a body snippet. */
-export type Hit = { task: Task; where: string; snippet: string }
+type Ranges = readonly (readonly [number, number])[]
+
+/** One search result: the task, where it sits ("◆ This sprint", "✓ closed"), a body snippet, what matched. */
+export type Hit = { task: Task; where: string; titleMatches: Ranges; snippet: string; snippetMatches: Ranges }
 
 /** The selected task: its section (none for a closed one) and the mode the keys are in. */
 export type Selected = { task: Task; when?: When; mate?: Teammate; isMoving?: boolean; isActing?: boolean }
@@ -259,18 +254,18 @@ function resultLines({ ui, search, selected, hasKeys, canSpin, actions }: BoardP
     {
       taskId: hit.task.id,
       node: (
-        <ResultRow ui={ui} hit={hit} query={search.query} isSelected={hit.task.id === selected?.task.id} hasKeys={hasKeys}
+        <ResultRow ui={ui} hit={hit} isSelected={hit.task.id === selected?.task.id} hasKeys={hasKeys}
           isStill={lockedTo !== undefined && hit.task.id !== lockedTo} canSpin={canSpin} actions={actions} />
       ),
     },
-    { node: <Text color="subtle" wrap="truncate-end">     {hit.snippet || ' '}</Text> },
+    { node: <Lit ui={ui} text={hit.snippet || ' '} ranges={hit.snippetMatches} indent="     " isDim /> },
   ])
 }
 
-type ResultProps = { ui: Ui; hit: Hit; query: string; isSelected: boolean; hasKeys: boolean; isStill: boolean; canSpin: boolean; actions: BoardActions }
+type ResultProps = { ui: Ui; hit: Hit; isSelected: boolean; hasKeys: boolean; isStill: boolean; canSpin: boolean; actions: BoardActions }
 
 /** "▌✻ T-007  Login loops after password reset   ⚡ Currently working on", the matched words lit. */
-function ResultRow({ ui, hit, query, isSelected, hasKeys, isStill, canSpin, actions }: ResultProps) {
+function ResultRow({ ui, hit, isSelected, hasKeys, isStill, canSpin, actions }: ResultProps) {
   const { Box, Button, Text } = ui
   const { task } = hit
   return (
@@ -285,14 +280,23 @@ function ResultRow({ ui, hit, query, isSelected, hasKeys, isStill, canSpin, acti
           label={task.id} onPress={() => actions.pressTask(task, isSelected)} />
       )}
       <Box flexGrow={1} flexShrink={1}>
-        <Text wrap="truncate-end">
-          {matchedParts(task.title, query).map(part =>
-            part.isMatch ? <Text bold color="suggestion">{part.text}</Text> : <Text>{part.text}</Text>,
-          )}
-        </Text>
+        <Lit ui={ui} text={task.title} ranges={hit.titleMatches} />
       </Box>
       <Text color="subtle">{hit.where}</Text>
     </Box>
+  )
+}
+
+type LitProps = { ui: Ui; text: string; ranges: Ranges; indent?: string; isDim?: boolean }
+
+/** One line with the search's matches lit in bold accent; the rest plain, or dim for a snippet. */
+function Lit({ ui, text, ranges, indent = '', isDim }: LitProps) {
+  const { Text } = ui
+  return (
+    <Text wrap="truncate-end" color={isDim ? 'subtle' : undefined}>
+      {indent}
+      {partsOf(text, ranges).map(part => (part.isMatch ? <Text bold color="suggestion">{part.text}</Text> : part.text))}
+    </Text>
   )
 }
 

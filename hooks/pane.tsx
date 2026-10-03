@@ -390,7 +390,13 @@ export function registerPane(on: On, options: PluginOptions): void {
     }
     const hits: Hit[] | undefined =
       search.isOpen && search.query.trim() !== ''
-        ? searchTasks(tasks, search.query).map(hit => ({ task: hit.task, where: whereOf(hit.task), snippet: hit.snippet ?? '' }))
+        ? searchTasks(tasks, search.query).map(hit => ({
+            task: hit.task,
+            where: whereOf(hit.task),
+            titleMatches: hit.titleMatches,
+            snippet: hit.snippet ?? '',
+            snippetMatches: hit.snippetMatches ?? [],
+          }))
         : undefined
     const shown = hits ? hits.map(hit => hit.task) : closedOpen ? [...open, ...closed] : open
     const order = shown.map(task => task.id)
