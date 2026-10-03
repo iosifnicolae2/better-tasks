@@ -2,8 +2,6 @@
 
 **Plan and track tasks inside Claude Code, kept as plain Markdown files in your project.**
 
-Claude Code mod · TypeScript · no dependencies · macOS
-
 <p align="center">
   <img src="docs/screenshots/board.svg" alt="Claude Code with the Sprint board docked on the right">
   <br><sub>Claude Code with the Sprint board docked on the right</sub>
@@ -61,28 +59,15 @@ Users land on /home after login, not on the page they asked for.
 
 ## 📦 Install
 
-Needs Claude Code **2.1.288+**, access to the private repo `iosifnicolae2/supermanager` (git over ssh or `gh auth setup-git`), and macOS for `/away`.
-
 ```sh
 claude plugin marketplace add iosifnicolae2/supermanager
 claude plugin install supermanager@supermanager
 ```
 
-**First run:** the mod needs agent teams. Claude offers to add `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` to `~/.claude/settings.json` (you approve), then restart `claude`.
+Restart Claude Code.
 
-**Update**, then restart:
-
-```sh
-claude plugin marketplace update supermanager
-claude plugin update supermanager@supermanager
-```
-
-**Uninstall:**
-
-```sh
-claude plugin uninstall supermanager@supermanager
-claude plugin marketplace remove supermanager
-```
+- **Update:** `claude plugin marketplace update supermanager && claude plugin update supermanager@supermanager`, then restart.
+- **Uninstall:** `claude plugin uninstall supermanager@supermanager && claude plugin marketplace remove supermanager`.
 
 &nbsp;
 
@@ -106,8 +91,6 @@ Click the board or press `ctrl+x tab` to give it the keys.
   <img src="docs/screenshots/actions.svg" alt="Enter on a task: its actions take the keys">
   <br><sub>Enter on a task: its actions take the keys</sub>
 </p>
-
-In IntelliJ's terminal, `⌥↑` `⌥↓` need *Settings › Tools › Terminal › Use Option as Meta key*.
 
 ## ⚙️ Settings
 
