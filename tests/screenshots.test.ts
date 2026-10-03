@@ -9,7 +9,7 @@ import type { On } from 'claude-code'
 declare const console: { log: (text: string) => void }
 
 const ROOT = '/demo'
-const DIR = `${ROOT}/.claude/manager/tasks`
+const DIR = `${ROOT}/.claude/tasks`
 const WEDNESDAY = new Date(2026, 9, 7, 12).getTime()
 const COLUMNS = 62
 const ROWS = 30
@@ -51,7 +51,7 @@ function taskFile(spec: Spec, order: number): string {
 /** The demo project, a running teammate "auth" at 63 % editing auth.ts, and a session to look into. */
 async function demo($: Engine, on: On): Promise<void> {
   const files = new Map<string, string>(TASKS.map((spec, order) => [`${DIR}/${spec.id}.md`, taskFile(spec, order)]))
-  files.set(`${ROOT}/.claude/manager/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the new login flow\n')
+  files.set(`${ROOT}/.claude/tasks/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the new login flow\n')
   mock.clock(on, { now: WEDNESDAY })
   mock.store(on)
   mock.env(on, { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' })
@@ -77,7 +77,7 @@ async function demo($: Engine, on: On): Promise<void> {
   on('tool.call', { tool: 'Edit' }, () => ({ result: 'edited' }))
   on('session.messages', () => ({
     value: [
-      { role: 'user' as const, text: 'T-007: login loops after a password reset. Task file: .claude/manager/tasks/T-007.md', toolUses: [] },
+      { role: 'user' as const, text: 'T-007: login loops after a password reset. Task file: .claude/tasks/T-007.md', toolUses: [] },
       { role: 'assistant' as const, text: 'The reset flow keeps the old session cookie; reading the middleware.', toolUses: [{ tool_use_id: 'u1', tool: 'Read', input: { file_path: '/demo/src/session.ts' } }] },
       { role: 'assistant' as const, text: '', toolUses: [{ tool_use_id: 'u2', tool: 'Bash', input: { command: 'npm test -- auth' } }] },
       { role: 'assistant' as const, text: 'Reproduced: the redirect sees a stale cookie. Clearing it on reset.', toolUses: [{ tool_use_id: 'u3', tool: 'Edit', input: { file_path: '/demo/src/auth.ts' } }] },

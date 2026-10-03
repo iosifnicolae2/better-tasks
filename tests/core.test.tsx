@@ -5,7 +5,7 @@ import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
 const ROOT = '/project'
-const TASKS = `${ROOT}/.claude/manager/tasks`
+const TASKS = `${ROOT}/.claude/tasks`
 const SESSION = { cwd: ROOT, surface: 'terminal', isInteractive: true } as const
 const MONDAY_OCT_5 = new Date(2026, 9, 5, 9).getTime()
 const SUNDAY_OCT_11_LATE = new Date(2026, 9, 11, 23, 58).getTime()
@@ -71,9 +71,24 @@ function fakeHost(
   })
   on('fs.list', ($, e) => {
     const prefix = `${e.path}/`
-    const names = [...host.files.keys()].filter(path => path.startsWith(prefix)).map(path => path.slice(prefix.length))
-    const entries = names.map(name => ({ name, kind: 'file' as const, size: 1, mtimeMs: 0, isLink: false }))
-    return { value: entries }
+    const inside = [...host.files.keys()].filter(path => path.startsWith(prefix)).map(path => path.slice(prefix.length))
+    if (inside.length === 0) return { deny: `ENOENT ${e.path}` }
+    const names = [...new Set(inside.map(path => path.split('/')[0] ?? path))]
+    const kindOf = (name: string) => (inside.includes(name) ? ('file' as const) : ('dir' as const))
+    return { value: names.map(name => ({ name, kind: kindOf(name), size: 1, mtimeMs: 0, isLink: false })) }
+  })
+  on('process.run', ($, e) => {
+    const [command, ...args] = e.argv
+    const paths = args.filter(arg => !arg.startsWith('-'))
+    if (command === 'mv' && paths.length === 2) {
+      const [from = '', to = ''] = paths
+      for (const [path, text] of [...host.files]) {
+        if (path !== from && !path.startsWith(`${from}/`)) continue
+        host.files.delete(path)
+        host.files.set(to + path.slice(from.length), text)
+      }
+    }
+    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'Now' } } }))
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
@@ -201,7 +216,7 @@ test('a new sprint rolls unfinished work over and writes the review', async ($, 
 
   await clock.advance(3 * 60_000)
   expect(host.files.get(`${TASKS}/T-001-open-one.md`)).toContain('sprint: 2026-10-12\nurgent: false\nstatus: todo\nowner:\nrolled: 1')
-  const sprints = host.files.get(`${ROOT}/.claude/manager/sprints.md`) ?? ''
+  const sprints = host.files.get(`${ROOT}/.claude/tasks/sprints.md`) ?? ''
   expect(sprints).toContain('Shipped:\n- T-002 Shipped one\nRolled over:\n- T-001 Open one')
   expect(host.toasts.at(-1)).toContain('Sprint 42 · Week 42 · Mon Oct 12 – Sun Oct 18 started')
   const entered = await $.prompt.submit(prompt('morning'))
@@ -254,7 +269,7 @@ test('every session start shows the tips once, with the live sprint line', async
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const seed = {
-    [`${ROOT}/.claude/manager/sprints.md`]: '# Sprints\n\n## 2026-10-05 · Sprint 41 · Oct 5–11\nGoal: Ship login\n',
+    [`${ROOT}/.claude/tasks/sprints.md`]: '# Sprints\n\n## 2026-10-05 · Sprint 41 · Oct 5–11\nGoal: Ship login\n',
     [`${TASKS}/T-001-a.md`]: '---\nid: T-001\ntitle: A\nsprint: 2026-10-05\nstatus: todo\n---\n',
     [`${TASKS}/T-002-b.md`]: '---\nid: T-002\ntitle: B\nsprint: 2026-10-05\nstatus: done\n---\n',
     [`${TASKS}/T-003-c.md`]: '---\nid: T-003\ntitle: C\nsprint: backlog\nstatus: todo\n---\n',
@@ -353,9 +368,9 @@ test('a project customizes numbering, files, the task template and teammate inst
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const seed = {
-    [`${ROOT}/.claude/manager/config.json`]: JSON.stringify({ taskPrefix: 'BUG-', taskPadding: 2, taskFileName: '{id}.md', tasksFolder: 'work' }),
-    [`${ROOT}/.claude/manager/task-template.md`]: '# {id} {title}\n{goal}\n',
-    [`${ROOT}/.claude/manager/teammate.md`]: '<!-- extend -->\nRun `make check` before you report.',
+    [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ taskPrefix: 'BUG-', taskPadding: 2, taskFileName: '{id}.md', tasksFolder: 'work' }),
+    [`${ROOT}/.claude/tasks/task-template.md`]: '# {id} {title}\n{goal}\n',
+    [`${ROOT}/.claude/tasks/teammate.md`]: '<!-- extend -->\nRun `make check` before you report.',
   }
   const host = fakeHost(on, [], seed)
   await $.session.start(SESSION)
@@ -373,7 +388,7 @@ test('a project customizes numbering, files, the task template and teammate inst
 test('a broken config.json is logged once and the defaults apply', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const host = fakeHost(on, [], { [`${ROOT}/.claude/manager/config.json`]: '{ taskPrefix: ' })
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/config.json`]: '{ taskPrefix: ' })
   await $.session.start(SESSION)
   await clock.advance(120_000)
   expect(host.notices.filter(line => line.includes('config.json'))).toHaveLength(1)
@@ -385,12 +400,12 @@ test('a broken config.json is logged once and the defaults apply', async ($, on)
 test('project_init writes the starter files once and keeps edits', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const host = fakeHost(on, [], { [`${ROOT}/.claude/manager/tips.md`]: 'my tips' })
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/tips.md`]: 'my tips' })
   await $.session.start(SESSION)
   const first = await $.tool.call({ tool: 'mcp__better-tasks__project_init', tool_use_id: 'i1' })
-  expect(String(first.result)).toContain('Wrote .claude/manager/config.json, .claude/manager/coordinator.md')
+  expect(String(first.result)).toContain('Wrote .claude/tasks/config.json, .claude/tasks/coordinator.md')
   expect(String(first.result)).not.toContain('tips.md')
-  expect(host.files.get(`${ROOT}/.claude/manager/tips.md`)).toBe('my tips')
+  expect(host.files.get(`${ROOT}/.claude/tasks/tips.md`)).toBe('my tips')
   const again = await $.tool.call({ tool: 'mcp__better-tasks__project_init', tool_use_id: 'i2' })
   expect(String(again.result)).toContain('All override files exist already.')
 })
@@ -423,7 +438,7 @@ test('changing the sprint length mid-sprint keeps every task, on a boundary', as
   await $.tool.call({ ...create, tool_use_id: 't2', when: 'next-sprint', title: 'Next week' })
   expect(host.files.get(`${TASKS}/T-002-next-week.md`)).toContain('sprint: 2026-10-12')
 
-  host.files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ sprintWeeks: '2' }))
+  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ sprintWeeks: '2' }))
   await clock.advance(60_000)
   expect(host.files.get(`${TASKS}/T-001-this-week.md`)).toContain('sprint: 2026-09-28')
   expect(host.files.get(`${TASKS}/T-002-next-week.md`)).toContain('sprint: 2026-10-12')
@@ -444,4 +459,41 @@ test('the user-facing name of the now section is "Currently working on"', async 
   expect(list).toBe('T-001 [todo] Fix login · currently working on')
   const entered = await $.prompt.submit(prompt('hi'))
   expect(entered.context?.at(-1)).toContain('Currently working on, not started yet: T-001 Fix login.')
+})
+
+test('a project still on .claude/manager/ is moved to .claude/tasks/ once, tasks and all', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const OLD = `${ROOT}/.claude/manager`
+  const host = fakeHost(on, [], {
+    [`${OLD}/tasks/T-001-fix-login.md`]: '---\nid: T-001\ntitle: Fix login\nsprint: 2026-10-05\nstatus: todo\n---\n',
+    [`${OLD}/sprints.md`]: '# Sprints\n',
+    [`${OLD}/config.json`]: JSON.stringify({ sprintsFile: '.claude/manager/sprints.md', taskPrefix: 'BUG-' }),
+    [`${OLD}/teammate.md`]: 'Be brief.',
+  })
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect([...host.files.keys()].filter(path => path.includes('/.claude/')).sort()).toEqual([
+    `${ROOT}/.claude/tasks/T-001-fix-login.md`,
+    `${ROOT}/.claude/tasks/config.json`,
+    `${ROOT}/.claude/tasks/sprints.md`,
+    `${ROOT}/.claude/tasks/teammate.md`,
+  ])
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '{}')).toEqual({ sprintsFile: '.claude/tasks/sprints.md', taskPrefix: 'BUG-' })
+  expect(host.notices).toContain('better-tasks: moved .claude/manager/ to .claude/tasks/ (tasks, sprints, settings)')
+  const list = String((await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1' })).result)
+  expect(list).toBe('T-001 [todo] Fix login · this sprint')
+})
+
+test('no move when the project already has .claude/tasks/', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], {
+    [`${ROOT}/.claude/manager/sprints.md`]: 'old',
+    [`${ROOT}/.claude/tasks/sprints.md`]: 'new',
+  })
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.files.get(`${ROOT}/.claude/manager/sprints.md`)).toBe('old')
+  expect(host.notices.some(line => line.includes('moved'))).toBe(false)
 })

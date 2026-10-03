@@ -62,13 +62,13 @@ describe('text overrides', () => {
   test('starter files change nothing until edited', () => {
     const starters = starterFiles()
     expect(Object.keys(starters)).toEqual([
-      '.claude/manager/config.json',
-      '.claude/manager/coordinator.md',
-      '.claude/manager/teammate.md',
-      '.claude/manager/task-template.md',
-      '.claude/manager/tips.md',
+      '.claude/tasks/config.json',
+      '.claude/tasks/coordinator.md',
+      '.claude/tasks/teammate.md',
+      '.claude/tasks/task-template.md',
+      '.claude/tasks/tips.md',
     ])
-    expect(parseOverrides(starters['.claude/manager/config.json'] ?? '')).toEqual({ values: {}, problems: [] })
-    expect(resolveText('Shipped.', starters['.claude/manager/teammate.md'])).toBe('Shipped.')
+    expect(parseOverrides(starters['.claude/tasks/config.json'] ?? '')).toEqual({ values: {}, problems: [] })
+    expect(resolveText('Shipped.', starters['.claude/tasks/teammate.md'])).toBe('Shipped.')
   })
 })

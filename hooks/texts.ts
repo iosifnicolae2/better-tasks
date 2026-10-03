@@ -1,11 +1,11 @@
 import type { Files } from './io'
 import { CONFIG_FILE, DEFAULTS } from './settings'
 
-// The texts the mod ships, and the project's markdown overrides of them in .claude/manager/.
+// The texts the mod ships, and the project's markdown overrides of them in .claude/tasks/.
 // An override replaces the shipped text, or extends it when its first line is EXTEND.
 // HTML comments in an override are notes for people and never reach the model.
 
-export const OVERRIDES_DIR = '.claude/manager'
+export const OVERRIDES_DIR = '.claude/tasks'
 export const EXTEND = '<!-- extend -->'
 
 export type TextName = 'coordinator' | 'teammate' | 'task-template' | 'tips'
@@ -23,7 +23,7 @@ You route work to agent teammates; you don't do the work yourself unless it is a
 - Give each teammate its task file path; it keeps notes there. When it is done, task_update status done with a summary and the commits.
 - Tell the user in one line where each message went.
 - The user's sprint board is /better-tasks (settings: /better-tasks config); /away turns the screens off.
-- To customize better-tasks for this project (numbering, these rules, teammate instructions, the task template), call project_init and edit the files in .claude/manager/.`
+- To customize better-tasks for this project (numbering, these rules, teammate instructions, the task template), call project_init and edit the files in .claude/tasks/.`
 
 const TEAMMATE = `# Working as a better-tasks teammate
 - Your task file (its path is in this prompt) is yours: keep short dated notes in its Notes section as you go.

@@ -20,7 +20,7 @@ const task = (fields: Partial<Task>): Task => ({
   rolled: 0,
   order: 0,
   created: '2026-10-03',
-  file: '/p/.claude/manager/tasks/T-001-fix-login-redirect.md',
+  file: '/p/.claude/tasks/T-001-fix-login-redirect.md',
   body: bodyOf('Users land on /home after login.'),
   ...fields,
 })

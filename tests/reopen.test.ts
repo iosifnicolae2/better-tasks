@@ -125,7 +125,7 @@ test('a created task opens the board on it, without taking the keys (fullscreen)
 
 test('with the board already open, a created task only becomes the selection', async ($, on) => {
   const older = '---\nid: T-001\ntitle: Older task\nsprint: 2026-10-05\nurgent: false\nstatus: todo\nowner: \nrolled: 0\norder: 0\ncreated: 2026-10-01\n---\n'
-  const { opens } = fakeEngine(on, {}, {}, [PANE_ID], { [`${ROOT}/.claude/manager/tasks/T-001-older-task.md`]: older })
+  const { opens } = fakeEngine(on, {}, {}, [PANE_ID], { [`${ROOT}/.claude/tasks/T-001-older-task.md`]: older })
   await $.session.start(SESSION)
   await createTask($)
   expect(opens).toEqual([])

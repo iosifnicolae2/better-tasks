@@ -9,7 +9,7 @@ import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
 
 const ROOT = '/project'
-const DIR = `${ROOT}/.claude/manager/tasks`
+const DIR = `${ROOT}/.claude/tasks`
 const WEDNESDAY = new Date(2026, 9, 7, 12).getTime()
 const SURFACES = ['terminal', 'desktop'] as const
 
@@ -562,7 +562,7 @@ test('a session reads as transcript lines: what it was told, what it says, what 
 
 test("the pane follows the project's config.json, and its settings page says which values come from it", async ($, on) => {
   const { files, commands } = fakeProject(on)
-  files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ sprintWeeks: '2', editor: 'code', sprintsFile: 'docs/sprints.md' }))
+  files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ sprintWeeks: '2', editor: 'code', sprintsFile: 'docs/sprints.md' }))
   await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   expect((await ui.find({ type: 'Text', text: /^◆ This sprint/ }))?.text).toMatch(/· Weeks 40–41 · Sep 28–Oct 11 · 5 days left$/)
@@ -579,7 +579,7 @@ test("the pane follows the project's config.json, and its settings page says whi
 for (const surface of SURFACES) {
   test(`"This project" rows open or create the project's files and show config.json's problems (${surface})`, async ($, on) => {
     const { files, commands } = fakeProject(on)
-    files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ contextLimit: 40, colour: 'blue' }))
+    files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ contextLimit: 40, colour: 'blue' }))
     await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await ui.find({ type: 'Text', text: '1 value · open' })).toBeDefined()
@@ -587,9 +587,9 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /⚠ .*colour/ })).toBeDefined()
 
     await ui.press({ key: 'file-teammate.md' })
-    expect(files.has(`${ROOT}/.claude/manager/teammate.md`)).toBe(true)
-    expect(files.has(`${ROOT}/.claude/manager/coordinator.md`)).toBe(false)
-    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/manager/teammate.md`])
+    expect(files.has(`${ROOT}/.claude/tasks/teammate.md`)).toBe(true)
+    expect(files.has(`${ROOT}/.claude/tasks/coordinator.md`)).toBe(false)
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks/teammate.md`])
     expect(await ui.findAll({ type: 'Text', text: 'default · create' })).toHaveLength(2)
     expect(await ui.find({ type: 'Text', text: 'custom · open' })).toBeDefined()
   })
@@ -607,7 +607,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /◎/ })).toBeUndefined()
     const lines = (await listLines(ui)).length
 
-    files.set(`${ROOT}/.claude/manager/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the login flow\n')
+    files.set(`${ROOT}/.claude/tasks/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the login flow\n')
     await ui.press({ key: 'task-T-004' })
     expect((await ui.find({ type: 'Text', text: /◎/ }))?.text).toBe('  ◎ Ship the login flow')
     expect((await listLines(ui)).length).toBe(lines)

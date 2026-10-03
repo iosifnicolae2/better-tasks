@@ -70,9 +70,9 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   taskPadding: 3,
   taskStart: 1,
   taskFileName: '{id}-{slug}.md',
-  tasksFolder: '.claude/manager/tasks',
+  tasksFolder: '.claude/tasks',
   logFile: 'docs/tasks.md',
-  sprintsFile: '.claude/manager/sprints.md',
+  sprintsFile: '.claude/tasks/sprints.md',
 }
 
 export function settingsOf(options: PluginOptions | Record<string, unknown>): Settings {
@@ -99,7 +99,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 
 // ---- The project's config.json ----
 
-export const CONFIG_FILE = '.claude/manager/config.json'
+export const CONFIG_FILE = '.claude/tasks/config.json'
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }

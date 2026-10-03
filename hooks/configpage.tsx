@@ -100,7 +100,7 @@ export function isChanged(field: Field, settings: Settings): boolean {
   return field.value(settings) !== field.initial
 }
 
-/** What the settings page knows about the project's own files in .claude/manager/. */
+/** What the settings page knows about the project's own files in .claude/tasks/. */
 export type ProjectFacts = {
   /** Bad keys and other problems in config.json. */
   problems: readonly string[]

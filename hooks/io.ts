@@ -27,4 +27,6 @@ export type Io = Files & {
   /** The current activity per agent id. */
   activities: () => Promise<Record<string, Activity>>
   publishTeam: (team: Teammate[]) => Promise<unknown>
+  /** Runs a host command by argv (no shell). */
+  run: (argv: string[]) => Promise<{ exitCode: number }>
 }

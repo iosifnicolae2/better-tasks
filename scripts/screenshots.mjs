@@ -167,7 +167,7 @@ const ASKED = [
   result('Which sprint? → This sprint'),
   gap(),
   tool('better-tasks - task_create (MCP)', 'title: "Fix the login redirect", …'),
-  result('Created T-001 in This sprint · .claude/manager/tasks/T-001.md'),
+  result('Created T-001 in This sprint · .claude/tasks/T-001.md'),
   gap(),
   says('Created T-001 in This sprint. It waits there until you say go.'),
   gap(),

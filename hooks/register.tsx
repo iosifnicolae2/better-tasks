@@ -4,6 +4,7 @@ import type { EngineInterface, PluginOptions, Register, ToolCallInput } from 'cl
 import type { Activity, Task, Teammate, TurnFacts } from '../types'
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
+import { migrateFolder } from './migrate'
 import { contextBlock, footerText, isPerson, namesTime, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
@@ -41,6 +42,8 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await declareAll($)
+    const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
+    if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
     await tick($).catch(error => logFailure($, 'the first refresh', error))
     $.clock.every(60_000, () => tick($))
@@ -179,6 +182,7 @@ function ioOf($: EngineInterface): Io {
     tokens: () => read($, tokensState),
     activities: () => read($, activityState),
     publishTeam: team => update($, teamState, () => team),
+    run: argv => $.process.run(argv),
     config: () => projectSettings(io, pluginOptions),
   }
   return io

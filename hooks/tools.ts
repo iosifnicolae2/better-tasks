@@ -62,7 +62,7 @@ export const TOOLS: readonly ToolSpec[] = [
   {
     name: 'project_init',
     description:
-      'Write starter override files for this project in .claude/manager/ (config.json, coordinator.md, teammate.md, ' +
+      'Write starter override files for this project in .claude/tasks/ (config.json, coordinator.md, teammate.md, ' +
       'task-template.md, tips.md). Existing files are kept. Use when the user wants to customize better-tasks here.',
   },
   {
@@ -145,5 +145,5 @@ async function teamStatus(io: Io): Promise<string> {
 async function projectInit(io: Io): Promise<string> {
   const written = await initProject(io)
   const list = written.length ? `Wrote ${written.join(', ')}.` : 'All override files exist already.'
-  return `${list} Edit them in .claude/manager/; config.json keys starting with // are off.`
+  return `${list} Edit them in .claude/tasks/; config.json keys starting with // are off.`
 }
