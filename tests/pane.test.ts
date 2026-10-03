@@ -163,7 +163,8 @@ async function listShape(ui: { drawn: () => Promise<unknown> }, depth = Infinity
 
 async function listLines(ui: { drawn: () => Promise<unknown> }): Promise<unknown[]> {
   const board = ((await ui.drawn()) as Node).children?.[0] as Node
-  return ((board.children?.[0] as Node).children ?? [])
+  // The board: the search line, the list window, the box, the key line.
+  return ((board.children?.[1] as Node).children ?? [])
 }
 
 /** ↑ or ↓ as the engine raises them: the person moving the ring to the next element that takes it. */
@@ -319,6 +320,39 @@ for (const surface of SURFACES) {
     expect((await arrowTo($, 'task-T-004')).deny).toBeUndefined()
   })
 
+  test(`search: f opens the box; results rank title over text, two fixed lines each; ✕ brings the sections back (${surface})`, async ($, on) => {
+    const { files } = fakeProject(on)
+    files.set(`${DIR}/T-008-theme.md`, taskFile('T-008', 'Theme cleanup', 'backlog', 'todo').replace('It works.', 'Also touches the login page colours.'))
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    expect((await ui.find({ key: 'search' }))?.props).toMatchObject({ hotkey: 'f', label: '⌕ Search' })
+    await ui.press({ key: 'search' })
+    expect(await ui.find({ key: 'query' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeDefined()
+
+    await ui.input({ key: 'query', text: 'login', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeUndefined()
+    const results = (await ui.findAll({ type: 'Button' })).map(found => found.key).filter(key => key?.startsWith('task-'))
+    expect(results).toEqual(['task-T-001', 'task-T-008'])
+    expect(await ui.find({ type: 'Text', text: /^login$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /touches the login page/ })).toBeDefined()
+    expect(await listLines(ui)).toHaveLength(4)
+    expect((await ui.find({ type: 'Text', text: /^T-001 {2}Fix login$/ }))).toBeDefined()
+    await arrowTo($, 'task-T-008')
+    expect(await ui.find({ type: 'Text', text: /^T-008 {2}Theme cleanup$/ })).toBeDefined()
+    expect(await ui.find({ key: 'open' })).toBeDefined()
+
+    await ui.input({ key: 'query', text: 'zzz', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: /No tasks match “zzz”/ })).toBeDefined()
+    await ui.input({ key: 'query', text: '', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeDefined()
+    expect(await ui.find({ key: 'query' })).toBeDefined()
+
+    await ui.press({ key: 'search-close' })
+    expect(await ui.find({ key: 'query' })).toBeUndefined()
+    expect(await ui.find({ key: 'search' })).toBeDefined()
+  })
+
   test(`closed tasks sit collapsed in their own section; opened, one can be reopened (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     await $.command.run(sprintCommand())
@@ -341,10 +375,10 @@ for (const surface of SURFACES) {
     for (let n = 10; n < 40; n += 1) files.set(`${DIR}/T-0${n}-x.md`, taskFile(`T-0${n}`, `Task ${n}`, 'backlog', 'todo'))
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 24 } } })
-    expect(await listLines(ui)).toHaveLength(16)
+    expect(await listLines(ui)).toHaveLength(15)
     expect(await ui.find({ type: 'Text', text: /more below$/ })).toBeDefined()
     await arrowTo($, 'task-T-039')
-    expect(await listLines(ui)).toHaveLength(16)
+    expect(await listLines(ui)).toHaveLength(15)
     expect(await ui.find({ key: 'task-T-039' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /more above$/ })).toBeDefined()
   })
@@ -353,7 +387,7 @@ for (const surface of SURFACES) {
     fakeProject(on)
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 10 } } })
-    expect(await listLines(ui)).toHaveLength(2)
+    expect(await listLines(ui)).toHaveLength(1)
     expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
     expect(await ui.find({ key: 'open' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /done this sprint/ })).toBeUndefined()

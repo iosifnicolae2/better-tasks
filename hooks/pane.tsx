@@ -2,8 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, sectionsOf, shortDates, shifted } from './board'
-import type { BoardActions, Section, SprintFacts } from './board'
+import { Board, ICONS, TITLES, sectionsOf, shortDates, shifted } from './board'
+import type { BoardActions, Hit, SearchState, Section, SprintFacts } from './board'
+import { searchTasks } from './search'
 import { ConfigPage } from './configpage'
 import type { ConfigValue, ProjectFacts } from './configpage'
 import { openCommand } from './editor'
@@ -48,6 +49,7 @@ const selectedState = atom({ plugin: 'better-tasks', key: 'selected' } as const,
 const pageState = atom({ plugin: 'better-tasks', key: 'page' } as const, 'board' as Page)
 const movingState = atom({ plugin: 'better-tasks', key: 'moving' } as const, '')
 const actingState = atom({ plugin: 'better-tasks', key: 'acting' } as const, '')
+const searchState = atom({ plugin: 'better-tasks', key: 'search' } as const, { isOpen: false, query: '' } as SearchState)
 
 // ---- With $ ----
 
@@ -255,6 +257,18 @@ async function showNewTask($: EngineInterface, options: PluginOptions, id: strin
   await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
 }
 
+/** f, or a click on "⌕ Search": the box opens empty and takes the keys. */
+async function openSearch($: EngineInterface): Promise<void> {
+  await leaveModes($)
+  await update($, searchState, () => ({ isOpen: true, query: '' }))
+  await $.ui.focus({ requestId: PANE, key: 'query' }).catch(() => undefined)
+}
+
+/** ✕: the box closes and the sections come back. */
+async function closeSearch($: EngineInterface): Promise<void> {
+  await update($, searchState, () => ({ isOpen: false, query: '' }))
+}
+
 let refreshTimer: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
@@ -368,7 +382,17 @@ export function registerPane(on: On, options: PluginOptions): void {
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
     const doneCount = inSprint.filter(task => task.status === 'done').length
     const open = sections.flatMap(section => section.tasks)
-    const shown = closedOpen ? [...open, ...closed] : open
+    const search = await read($, searchState)
+    const whereOf = (task: Task) => {
+      if (!isOpen(task)) return task.status === 'cancelled' ? '✗ cancelled' : '✓ closed'
+      const when = whenOf(task, day, settings.sprint)
+      return `${ICONS[when]} ${TITLES[when]}`
+    }
+    const hits: Hit[] | undefined =
+      search.isOpen && search.query.trim() !== ''
+        ? searchTasks(tasks, search.query).map(hit => ({ task: hit.task, where: whereOf(hit.task), snippet: hit.snippet ?? '' }))
+        : undefined
+    const shown = hits ? hits.map(hit => hit.task) : closedOpen ? [...open, ...closed] : open
     const order = shown.map(task => task.id)
     // Always a selection while there are tasks, so the box and ⌥↑/⌥↓ work from the start.
     const selectedTask = shown.find(task => task.id === selectedId) ?? shown[0]
@@ -393,7 +417,7 @@ export function registerPane(on: On, options: PluginOptions): void {
     const actions: BoardActions = {
       pressTask: (task, isSelected) =>
         void (task.id === movingId ? leave().then(keepFocus(task.id)) : isSelected ? toActions($, task.id) : leave().then(() => selectTask($, task.id))),
-      startMoving: task => void startMoving($, task.id),
+      startMoving: task => void closeSearch($).then(() => startMoving($, task.id)),
       shift: (task, step) => void shift(task, step),
       move: (task: Task, to: When) => void leave().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
       open: task => void leave().then(() => openFile($, settings.editor, task.file)).then(keepFocus(task.id)),
@@ -401,6 +425,9 @@ export function registerPane(on: On, options: PluginOptions): void {
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
       toggleClosed: () => void toggleClosed($),
+      openSearch: () => void openSearch($),
+      setQuery: query => void update($, searchState, now => ({ isOpen: true, query: query ?? now.query })),
+      closeSearch: () => void closeSearch($).then(keepFocus(selectedTask?.id)),
       showConfig: () => void leave().then(showPage('config')),
     }
 
@@ -421,7 +448,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       <Box flexDirection="column" paddingX={1}>
         <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
           team={team} limit={settings.contextLimit} hasKeys={e.props.isFocused} bodyRows={e.props.scroll.bodyRows}
-          canSpin={e.surface === 'terminal' || e.surface === 'desktop'} actions={actions} />
+          canSpin={e.surface === 'terminal' || e.surface === 'desktop'} search={search} hits={hits} actions={actions} />
       </Box>
     )
   })

@@ -108,6 +108,26 @@ export function rowRoles(ids: readonly string[], movingId: string): Record<strin
   return roles
 }
 
+/** A title cut into the parts a search query matches and the rest, for highlighting. */
+export function matchedParts(text: string, query: string): { text: string; isMatch: boolean }[] {
+  const words = query.toLowerCase().split(/[^\p{L}\p{N}-]+/u).filter(Boolean)
+  const lower = text.toLowerCase()
+  const marks = Array.from({ length: text.length }, () => false)
+  for (const word of words) {
+    for (let at = lower.indexOf(word); at >= 0; at = lower.indexOf(word, at + 1)) {
+      for (let index = at; index < at + word.length; index++) marks[index] = true
+    }
+  }
+  const parts: { text: string; isMatch: boolean }[] = []
+  for (const [index, ch] of [...text].entries()) {
+    const isMatch = marks[index] === true
+    const last = parts.at(-1)
+    if (last && last.isMatch === isMatch) last.text += ch
+    else parts.push({ text: ch, isMatch })
+  }
+  return parts
+}
+
 /** How many of the bar's cells are filled for `done` of `total`. */
 export function filledCells(done: number, total: number, cells = BAR_CELLS): number {
   return total === 0 ? 0 : Math.round((done / total) * cells)
@@ -132,8 +152,16 @@ export type BoardActions = {
   /** Move: the task follows ↑↓ until Enter. */
   startMoving: (task: Task) => void
   toggleClosed: () => void
+  openSearch: () => void
+  setQuery: (query: string) => void
+  closeSearch: () => void
   showConfig: () => void
 }
+
+export type SearchState = { isOpen: boolean; query: string }
+
+/** One search result: the task, where it sits ("◆ This sprint", "✓ closed"), and a body snippet. */
+export type Hit = { task: Task; where: string; snippet: string }
 
 /** The selected task: its section (none for a closed one) and the mode the keys are in. */
 export type Selected = { task: Task; when?: When; mate?: Teammate; isMoving?: boolean; isActing?: boolean }
@@ -156,6 +184,9 @@ export type BoardProps = {
   bodyRows?: number
   /** Whether the surface runs Client modules (terminal, desktop) for the spinner. */
   canSpin: boolean
+  search: SearchState
+  /** The ranked results while the search has a query; the sections otherwise. */
+  hits?: Hit[]
   actions: BoardActions
 }
 
@@ -164,9 +195,10 @@ type Line = { node: JSX.Element; taskId?: string }
 export function Board(props: BoardProps) {
   const { ui, selected, bodyRows, hasKeys, limit, actions } = props
   const { Box, Text } = ui
-  const lines = listLines(props)
-  // At any pane height the list takes exactly what the box leaves, so the box sits at the bottom.
-  const rows = bodyRows === undefined ? undefined : Math.max(1, bodyRows - BOTTOM_ROWS)
+  const lines = props.hits ? resultLines(props, props.hits) : listLines(props)
+  // At any pane height the list takes exactly what the search line and the box leave, so the box
+  // sits at the bottom and the search line at the top.
+  const rows = bodyRows === undefined ? undefined : Math.max(1, bodyRows - BOTTOM_ROWS - 1)
   const focus = Math.max(0, lines.findIndex(line => line.taskId !== undefined && line.taskId === selected?.task.id))
   const shown = rows === undefined ? { start: 0, end: lines.length } : windowOf(lines.length, rows, focus)
   const above = shown.start
@@ -177,11 +209,89 @@ export function Board(props: BoardProps) {
   if (hasRoomForMarks && below > 0) window[window.length - 1] = <Text color="subtle">  ⋯ {below + 1} more below</Text>
   return (
     <Box flexDirection="column">
+      <SearchLine ui={ui} search={props.search} isLocked={selected?.isMoving === true || selected?.isActing === true} actions={actions} />
       <Box flexDirection="column" height={rows} overflow="hidden">
         {window}
       </Box>
       <Detail ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
       <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />
+    </Box>
+  )
+}
+
+type SearchProps = { ui: Ui; search: SearchState; isLocked: boolean; actions: BoardActions }
+
+/**
+ * The line reserved at the top: "⌕ Search" (f, or a click) opens the box; open, it is an Input with
+ * an ✕ that clears it and brings the sections back.
+ */
+function SearchLine({ ui, search, isLocked, actions }: SearchProps) {
+  const { Box, Button, Text } = ui
+  if (!search.isOpen) {
+    return (
+      <Box height={1} overflow="hidden">
+        {isLocked ? <Text color="subtle">⌕ Search</Text> : <Button key="search" plain dimColor hotkey="f" label="⌕ Search" onPress={actions.openSearch} />}
+      </Box>
+    )
+  }
+  return (
+    <Box flexDirection="row" columnGap={1} height={1} overflow="hidden">
+      <Text color="suggestion">⌕</Text>
+      <Box flexGrow={1} flexShrink={1}>
+        {'Input' in ui ? (
+          <ui.Input key="query" placeholder="title or words in a task" value={search.query} autoFocus
+            onInput={actions.setQuery} onSubmit={actions.setQuery} />
+        ) : (
+          <Text>{search.query}</Text>
+        )}
+      </Box>
+      <Button key="search-close" plain dimColor label="✕" onPress={actions.closeSearch} />
+    </Box>
+  )
+}
+
+/** The search results: two lines each (the task, then a snippet of its text), or "No tasks match". */
+function resultLines({ ui, search, selected, hasKeys, canSpin, actions }: BoardProps, hits: Hit[]): Line[] {
+  const { Text } = ui
+  if (hits.length === 0) return [{ node: <Text color="subtle">  No tasks match “{search.query.trim()}”</Text> }]
+  const lockedTo = selected?.isActing ? selected.task.id : undefined
+  return hits.flatMap(hit => [
+    {
+      taskId: hit.task.id,
+      node: (
+        <ResultRow ui={ui} hit={hit} query={search.query} isSelected={hit.task.id === selected?.task.id} hasKeys={hasKeys}
+          isStill={lockedTo !== undefined && hit.task.id !== lockedTo} canSpin={canSpin} actions={actions} />
+      ),
+    },
+    { node: <Text color="subtle" wrap="truncate-end">     {hit.snippet || ' '}</Text> },
+  ])
+}
+
+type ResultProps = { ui: Ui; hit: Hit; query: string; isSelected: boolean; hasKeys: boolean; isStill: boolean; canSpin: boolean; actions: BoardActions }
+
+/** "▌✻ T-007  Login loops after password reset   ⚡ Currently working on", the matched words lit. */
+function ResultRow({ ui, hit, query, isSelected, hasKeys, isStill, canSpin, actions }: ResultProps) {
+  const { Box, Button, Text } = ui
+  const { task } = hit
+  return (
+    <Box flexDirection="row" columnGap={1} height={1} overflow="hidden"
+      backgroundColor={isSelected && hasKeys ? 'userMessageBackground' : undefined}>
+      <Text color={hasKeys ? 'suggestion' : 'subtle'}>{isSelected ? '▌' : ' '}</Text>
+      <StatusIcon ui={ui} task={task} canSpin={canSpin} />
+      {isStill ? (
+        <Text color="subtle">{task.id}</Text>
+      ) : (
+        <Button key={`task-${task.id}`} plain dimColor={!isOpen(task)} autoFocus={isSelected ? true : undefined}
+          label={task.id} onPress={() => actions.pressTask(task, isSelected)} />
+      )}
+      <Box flexGrow={1} flexShrink={1}>
+        <Text wrap="truncate-end">
+          {matchedParts(task.title, query).map(part =>
+            part.isMatch ? <Text bold color="suggestion">{part.text}</Text> : <Text>{part.text}</Text>,
+          )}
+        </Text>
+      </Box>
+      <Text color="subtle">{hit.where}</Text>
     </Box>
   )
 }
