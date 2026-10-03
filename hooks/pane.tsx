@@ -374,6 +374,10 @@ export function registerPane(on: On, options: PluginOptions): void {
 
   // While a task moves or its actions hold the keys, the wheel leaves the list as it is.
   on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    // TEMPORARY (T-001): says in the status line that the wheel reached the board, and whether its list fits.
+    $.ui.status(drawnList === undefined
+      ? `T-001 wheel ${e.by}: board not drawn yet`
+      : `T-001 wheel ${e.by}: ${drawnList.taskIds.length} list lines in ${drawnList.rows} rows, window at line ${drawnList.start}`)
     if (drawnList === undefined || (await read($, pageState)) !== 'board') return next(e)
     if ((await read($, movingState)) === '' && (await read($, actingState)) === '') await scrollList($, drawnList, e.by)
     return {}
