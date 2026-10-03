@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Draws the README's pictures: runs the plugin's tests, takes each "SCREENSHOT {json}" line that
 // tests/screenshots.test.ts prints (the pane's real tree), lays it out on a grid of terminal cells
-// and writes docs/screenshots/<name>.svg in Claude Code's dark theme. Usage: node scripts/screenshots.mjs
+// and writes docs/screenshots/<name>.svg in Claude Code's dark theme: the whole terminal in the
+// fullscreen layout, Claude Code on the left (a hand-written scene per picture, see SCENES) and the
+// real pane docked on the right. Usage: node scripts/screenshots.mjs
 
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -22,6 +24,8 @@ const THEME = {
   subtle: 'rgb(80,80,80)',
   inactive: 'rgb(153,153,153)',
   userMessageBackground: 'rgb(55,55,55)',
+  promptBorder: 'rgb(136,136,136)',
+  permission: 'rgb(177,185,249)',
 }
 const BACKGROUND = 'rgb(24,24,24)'
 const CELL = { width: 8.4, height: 19, font: 14, pad: 16 }
@@ -142,6 +146,107 @@ function row(kids, props, width, focus, style) {
   )
 }
 
+// ---- The terminal around the pane: Claude Code itself, hand-written per picture ----
+
+/** Columns for Claude Code's side (about 60 %); the pane takes the rest after a one-cell border. */
+const LEFT = 84
+const STATUS = 'Sprint 41 · 1/4 done'
+
+// A scene's line: [text, theme key or undefined, { bold, dim, bg }] pieces. The conversation is
+// made up for the picture; the pane on the right is the real one.
+const you = text => [['> ', 'subtle', { bg: 'userMessageBackground' }], [text, 'text', { bg: 'userMessageBackground', fill: true }]]
+const says = text => [['⏺ ', 'text'], [text, 'text']]
+const tool = (name, args) => [['⏺ ', 'success'], [name, 'text', { bold: true }], ...(args ? [[`(${args})`, 'text']] : [])]
+const result = text => [['  ⎿  ', 'subtle'], [text, 'inactive']]
+const gap = () => []
+
+const ASKED = [
+  you('create a task to fix the login redirect'),
+  gap(),
+  tool('User answered Claude’s questions', ''),
+  result('Which sprint? → This sprint'),
+  gap(),
+  tool('supermanager - task_create (MCP)', 'title: "Fix the login redirect", …'),
+  result('Created T-001 in This sprint · .claude/manager/tasks/T-001.md'),
+  gap(),
+  says('Created T-001 in This sprint. It waits there until you say go.'),
+  gap(),
+]
+const STARTED = [
+  you('start T-007 now, the login loop is hurting users'),
+  gap(),
+  tool('supermanager - team_status (MCP)', ''),
+  result('auth · running · context 41% · idle'),
+  gap(),
+  tool('SendMessage', 'to: "auth", message: "Start T-007 …"'),
+  result('Sent'),
+  gap(),
+  says('auth owns login and has room (41 %), so T-007 went to it.'),
+  gap(),
+]
+
+const SCENES = {
+  board: [...ASKED, ...STARTED],
+  actions: [...STARTED, you('/supermanager'), result('Sprint board opened.')],
+  moving: [
+    you('what’s left in this sprint?'),
+    gap(),
+    tool('supermanager - task_list (MCP)', 'sprint: "current"'),
+    result('T-007 [doing] … · T-001 [todo] … · T-004 [todo] …'),
+    gap(),
+    says('Three open: T-007 is with auth, T-001 and T-004 wait. Rate limiting'),
+    says('matters more for the launch, so I moved T-004 above T-001.'),
+    gap(),
+  ],
+  settings: [you('/supermanager config'), result('Sprint board opened.'), gap(), ...ASKED],
+  session: [
+    you('how is auth doing on T-007?'),
+    gap(),
+    tool('supermanager - team_status (MCP)', ''),
+    result('auth · running · context 63% · editing auth.ts'),
+    gap(),
+    says('auth reproduced the loop (a stale cookie after the reset) and is fixing'),
+    says('auth.ts now. It’s at 63 %, over the 50 % limit: new work goes elsewhere.'),
+    gap(),
+  ],
+}
+
+function sceneLine(pieces, width) {
+  const line = pieces.flatMap(([text, key, options = {}]) =>
+    [...text].map(ch => cell(ch, { fg: colour(key), bold: options.bold, bg: colour(options.bg) })),
+  )
+  const fill = pieces.find(([, , options]) => options?.fill)?.[2]
+  return fit(line, width, fill ? { bg: colour(fill.bg) } : {})
+}
+
+/** Claude Code's side: the conversation from the top, the prompt box and its footer at the bottom. */
+function claudeSide(scene, rows) {
+  const width = LEFT - 2
+  const border = { fg: THEME.promptBorder }
+  const prompt = [
+    [cell('╭', border), ...Array.from({ length: width - 2 }, () => cell('─', border)), cell('╮', border)],
+    [cell('│', border), cell(' ', {}), cell('>', { fg: THEME.text }), cell(' ', {}), cell(' ', { bg: THEME.text }), ...blank(width - 6), cell('│', border)],
+    [cell('╰', border), ...Array.from({ length: width - 2 }, () => cell('─', border)), cell('╯', border)],
+  ]
+  const mode = [...'  ⏵⏵ accept edits on (shift+tab to cycle)'].map(ch => cell(ch, { fg: THEME.permission }))
+  const status = [...STATUS].map(ch => cell(ch, { fg: THEME.inactive }))
+  const footer = [...mode, ...blank(Math.max(1, width - mode.length - status.length)), ...status]
+  const room = rows - prompt.length - 1
+  const talk = scene.slice(-room).map(pieces => sceneLine(pieces, width))
+  const lines = [...talk, ...Array.from({ length: room - talk.length }, () => blank(width)), ...prompt, fit(footer, width)]
+  return lines.map(line => [cell(' ', {}), ...line, cell(' ', {})])
+}
+
+/** The whole terminal: Claude Code, the dock's border with the pane's title, the pane. */
+function terminal(scene, pane, paneColumns) {
+  const rows = Math.max(pane.length + 1, 26)
+  const left = claudeSide(scene, rows)
+  const edge = { fg: THEME.subtle }
+  const title = fit([...' Sprint '].map(ch => cell(ch, { fg: THEME.text, bold: true })), paneColumns)
+  const right = [title, ...pane]
+  return Array.from({ length: rows }, (_, y) => [...left[y], cell('│', edge), ...fit(right[y] ?? [], paneColumns)])
+}
+
 // ---- SVG ----
 
 const escape = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -208,9 +313,11 @@ if (!output.includes('SCREENSHOT ')) {
 const shots = output.split('\n').filter(line => line.startsWith('SCREENSHOT ')).map(line => JSON.parse(line.slice('SCREENSHOT '.length)))
 mkdirSync(OUT, { recursive: true })
 for (const shot of shots) {
-  const lines = draw(shot.tree, shot.columns, shot.focus)
-  writeFileSync(join(OUT, `${shot.name}.svg`), svg(lines, shot.columns))
-  console.log(`docs/screenshots/${shot.name}.svg  ${shot.columns}×${lines.length}`)
+  const pane = draw(shot.tree, shot.columns, shot.focus)
+  const lines = terminal(SCENES[shot.name] ?? [], pane, shot.columns)
+  const columns = LEFT + 1 + shot.columns
+  writeFileSync(join(OUT, `${shot.name}.svg`), svg(lines, columns))
+  console.log(`docs/screenshots/${shot.name}.svg  ${columns}×${lines.length}`)
 }
 if (shots.length === 0) {
   console.error('No SCREENSHOT lines: did tests/screenshots.test.ts run?')

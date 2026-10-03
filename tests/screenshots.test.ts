@@ -11,7 +11,7 @@ declare const console: { log: (text: string) => void }
 const ROOT = '/demo'
 const DIR = `${ROOT}/.claude/manager/tasks`
 const WEDNESDAY = new Date(2026, 9, 7, 12).getTime()
-const COLUMNS = 76
+const COLUMNS = 62
 const ROWS = 30
 const PANE = {
   component: 'Pane',
