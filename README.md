@@ -20,7 +20,6 @@ Restart Claude Code.
 - **"create a task to fix the login redirect"**: asks which sprint, saves it as Markdown in `.claude/manager/tasks/`.
 - **`/supermanager`**: the sprint board. Weekly sprints with a goal; open tasks roll over.
 - **"start T-001"**: a teammate takes the task; the board shows what it's doing.
-- **`/supermanager config`**: settings.
 - **`/away`**: screens off, the Mac keeps working.
 
 ## 🔄 Update / uninstall
