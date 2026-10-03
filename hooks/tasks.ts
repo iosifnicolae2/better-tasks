@@ -92,6 +92,15 @@ export function fileNameOf(naming: TaskNaming, id: string, title: string): strin
   return fill(naming.fileName, { id, slug: slugOf(title), title: title.trim() })
 }
 
+/** The body with its Goal section's text replaced (a Goal section is added when there is none). */
+export function withGoalText(body: string, goal: string): string {
+  const start = body.indexOf('## Goal')
+  if (start < 0) return `## Goal\n${goal.trim()}\n\n${body}`
+  const next = body.indexOf('\n## ', start + 1)
+  const rest = next < 0 ? '' : `\n${body.slice(next + 1)}`
+  return `${body.slice(0, start)}## Goal\n${goal.trim()}\n${rest}`
+}
+
 /** Adds a dated line at the end of the Notes section. */
 export function withNote(body: string, day: string, note: string): string {
   const line = `- ${day}: ${note.trim()}\n`

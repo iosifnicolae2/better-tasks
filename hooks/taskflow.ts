@@ -3,7 +3,7 @@ import type { Files } from './io'
 import { settingsFrom } from './settings'
 import { sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
-import { edgeOrder, listTasks, placeOf, saveTask, today, withNote } from './tasks'
+import { edgeOrder, listTasks, placeOf, saveTask, today, withGoalText, withNote } from './tasks'
 
 // What happens to a task: changed, started, finished (finished ones are logged in docs/tasks.md).
 
@@ -18,6 +18,8 @@ export type TaskChange = {
   status?: TaskStatus
   when?: When
   owner?: string
+  title?: string
+  goal?: string
   note?: string
   commits?: string
 }
@@ -49,6 +51,8 @@ export async function changeTask(
   if (change.when) next = { ...next, ...(await moved(files, task, change.when, day, config)) }
   if (change.owner !== undefined) next.owner = change.owner.trim()
   if (change.status) next.status = change.status
+  if (change.title?.trim()) next.title = change.title.trim()
+  if (change.goal?.trim()) next.body = withGoalText(next.body, change.goal)
   if (change.note) next.body = withNote(next.body, day, change.note)
   if (change.status === 'done') next = { ...next, urgent: false, sprint: sprintStart(day, config) }
   await saveTask(files, next)

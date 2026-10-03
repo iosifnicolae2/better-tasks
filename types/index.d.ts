@@ -41,7 +41,16 @@ export type CacheStep = { at: number; read: number; created: number }
 
 export type Activity = { text: string; at: number }
 
-export type TurnFacts = { asked: boolean; namedTime: boolean }
+export type TurnFacts = {
+  asked: boolean
+  namedTime: boolean
+  /** A task was created or noted this turn. */
+  filed: boolean
+  /** The user's message reads as a question. */
+  question: boolean
+  /** A user message started this turn (false before the first). */
+  prompted: boolean
+}
 
 declare module 'claude-code' {
   interface PluginState {

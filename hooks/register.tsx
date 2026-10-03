@@ -6,7 +6,7 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
-import { contextBlock, footerText, isPerson, namesTime, withRules } from './coordinator'
+import { contextBlock, footerText, isPerson, isQuestion, namesTime, unfiledLine, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -24,6 +24,9 @@ import { runTool, TOOLS } from './tools'
 // validator follows neither across an import); the parts get `ioOf($)`.
 // Settings are read per call (settingsNow): the plugin's options with the project's config.json over them.
 
+/** The tools that file a user's message: as a new task, or on an existing one. */
+const FILING_TOOLS = ['task_create', 'task_update', 'task_note']
+
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
 
@@ -34,7 +37,7 @@ const activityState = atom({ plugin: 'better-tasks', key: 'activity' } as const,
 const cacheStepsState = atom({ plugin: 'better-tasks', key: 'cacheSteps' } as const, {} as Record<string, CacheStep>)
 const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
-const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, namedTime: false } as TurnFacts)
+const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, namedTime: false, filed: false, question: false, prompted: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
   pluginOptions = options
@@ -70,9 +73,11 @@ export const register: Register = (on, options) => {
     if (!isPerson(e.origin)) return next(e)
     const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
     if (state !== 'on') return next({ ...e, context: [...(e.context ?? []), waitingLine(state)] })
-    await update($, turnState, () => ({ asked: false, namedTime: namesTime(e.text) }))
+    const reminder = unfiledLine(await read($, turnState))
+    await update($, turnState, () => ({ asked: false, namedTime: namesTime(e.text), filed: false, question: isQuestion(e.text), prompted: true }))
     const settings = await settingsNow($)
-    const block = await contextBlock(ioOf($), settings, await read($, noticeState))
+    const notices = [await read($, noticeState), reminder].filter(Boolean).join('\n')
+    const block = await contextBlock(ioOf($), settings, notices)
     await update($, noticeState, () => '')
     await showStatus($, settings)
     return next({ ...e, context: [...(e.context ?? []), block] })
@@ -140,6 +145,7 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__better-tasks__sprint_goal' }, ($, e) => serveTool($, e, 'sprint_goal'))
   on('tool.call', { tool: 'mcp__better-tasks__team_status' }, ($, e) => serveTool($, e, 'team_status'))
   on('tool.call', { tool: 'mcp__better-tasks__project_init' }, ($, e) => serveTool($, e, 'project_init'))
+  on('tool.call', { tool: 'mcp__better-tasks__task_note' }, ($, e) => serveTool($, e, 'task_note'))
 }
 
 /** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */
@@ -243,7 +249,10 @@ async function logConfigProblems($: EngineInterface): Promise<void> {
 
 async function serveTool($: EngineInterface, e: ToolCallInput, name: string) {
   const facts = await read($, turnState)
-  return runTool(ioOf($), { name, input: e as never, facts, agentId: e.agentId }, await settingsNow($))
+  const answer = await runTool(ioOf($), { name, input: e as never, facts, agentId: e.agentId }, await settingsNow($))
+  const isFiling = FILING_TOOLS.includes(name) && e.agentId === undefined && !('deny' in answer)
+  if (isFiling) await update($, turnState, turn => ({ ...turn, filed: true }))
+  return answer
 }
 
 /** Sprint progress in the footer; the status line stays free for what needs attention. */

@@ -4,7 +4,8 @@ import type { Task } from '../types'
 import { realigned, rolledOver, shippedIn } from '../hooks/boundary'
 import { goalOf, withGoal, withReview } from '../hooks/sprintlog'
 import { logRow } from '../hooks/taskflow'
-import { bodyOf, edgeOrder, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withNote } from '../hooks/tasks'
+import { isQuestion, openTaskLines } from '../hooks/coordinator'
+import { bodyOf, edgeOrder, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withGoalText, withNote } from '../hooks/tasks'
 
 const CONFIG = { weeks: 1, startDay: 1 } as const
 const TODAY = '2026-10-07'
@@ -132,5 +133,31 @@ describe('sprint boundary', () => {
   test('a finished-task row has the CLAUDE.md columns', () => {
     const row = logRow(task({ owner: 'auth' }), TODAY, 'abc', { note: 'Fixed | done', commits: '1a2b3c' })
     expect(row).toBe('2026-10-07 | auth | T-001 Fix login redirect | Fixed / done | 1a2b3c | session abc teammate auth\n')
+  })
+})
+
+describe('filing messages', () => {
+  test('questions are told from work', () => {
+    expect(isQuestion("what's in this sprint?")).toBe(true)
+    expect(isQuestion('Show me the backlog')).toBe(true)
+    expect(isQuestion('the export button is too small')).toBe(false)
+    expect(isQuestion('fix the login redirect')).toBe(false)
+  })
+
+  test('open tasks in the context: near ones all, then the 10 newest others', () => {
+    const near = [task({ id: 'T-001', owner: 'auth' }), task({ id: 'T-002', urgent: true })]
+    const later = Array.from({ length: 12 }, (_, n) =>
+      task({ id: `T-${String(n + 10).padStart(3, '0')}`, sprint: 'backlog', created: `2026-09-${String(n + 10).padStart(2, '0')}` }),
+    )
+    const lines = openTaskLines([...near, ...later, task({ id: 'T-099', status: 'done' })], TODAY, CONFIG)
+    expect(lines[0]).toBe('Open tasks (match the message against these):')
+    expect(lines.slice(1, 3)).toEqual(['- T-001 Fix login redirect · this sprint · auth', '- T-002 Fix login redirect · currently working on'])
+    expect(lines[3]).toBe('- T-021 Fix login redirect · backlog')
+    expect(lines).toHaveLength(1 + 2 + 10 + 1)
+    expect(lines.at(-1)).toBe('- … 2 more: task_list')
+  })
+
+  test('a new goal replaces the Goal section only', () => {
+    expect(withGoalText(bodyOf('Old goal.') + '- 2026-10-01: a note\n', 'New goal.')).toBe('## Goal\nNew goal.\n\n## Notes\n- 2026-10-01: a note\n')
   })
 })

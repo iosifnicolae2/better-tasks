@@ -589,3 +589,49 @@ test('every named teammate is spawned with the teammate rules; a scout is not', 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find the login code.' })
   expect(host.spawned.at(-1)).toBe('Find the login code.')
 })
+
+const OWNED = `---\nid: T-003\ntitle: Login redirect\nsprint: 2026-10-05\nstatus: doing\nowner: auth\n---\n## Goal\nLand where you were going.\n\n## Notes\n`
+
+test('a message about an existing task: the note goes on it, and the owner is named to forward to', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [mate('a1', 'auth')], { [`${TASKS}/T-003-login-redirect.md`]: OWNED })
+  stepsFor(on, { a1: 20_000 })
+  await $.session.start(SESSION)
+  await step($, 'a1')
+
+  const entered = await $.prompt.submit(prompt('the login redirect still loops on Safari'))
+  expect(entered.context?.at(-1)).toContain('Open tasks (match the message against these):\n- T-003 Login redirect · this sprint · auth')
+
+  const noted = await $.tool.call({ tool: 'mcp__better-tasks__task_note', tool_use_id: 'n1', id: 'T-003', note: 'Still loops on Safari.' } as never)
+  expect(String(noted.result)).toBe('Noted on T-003 Login redirect.\nOwner auth (cache warm 55m, 10 %): forward the note with SendMessage.')
+  expect(host.files.get(`${TASKS}/T-003-login-redirect.md`)).toContain('## Notes\n- 2026-10-05: Still loops on Safari.\n')
+  expect([...host.files.keys()].filter(path => path.startsWith(`${TASKS}/T-`))).toEqual([`${TASKS}/T-003-login-redirect.md`])
+
+  const next = await $.prompt.submit(prompt('thanks'))
+  expect(next.context?.at(-1)).not.toContain('was not filed')
+})
+
+test('task_update changes the title and the goal when the user does', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${TASKS}/T-003-login-redirect.md`]: OWNED })
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u1', id: 'T-003', title: 'Login redirect on Safari', goal: 'No loop on Safari.' })
+  const file = host.files.get(`${TASKS}/T-003-login-redirect.md`) ?? ''
+  expect(file).toContain('title: Login redirect on Safari\n')
+  expect(file).toContain('## Goal\nNo loop on Safari.\n\n## Notes\n')
+})
+
+test('a message left unfiled gets one gentle line next time; a status question does not', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on)
+  await $.session.start(SESSION)
+  const reminder = 'Your last message was not filed.'
+  await $.prompt.submit(prompt('what is in this sprint?'))
+  expect((await $.prompt.submit(prompt('the export button is too small'))).context?.at(-1)).not.toContain(reminder)
+  expect((await $.prompt.submit(prompt('put it in the backlog'))).context?.at(-1)).toContain(reminder)
+  await $.tool.call({ ...create, when: 'backlog', tool_use_id: 'c9' })
+  expect((await $.prompt.submit(prompt('next one'))).context?.at(-1)).not.toContain(reminder)
+})

@@ -1,6 +1,6 @@
 import type { ToolSpec } from 'claude-code'
 
-import type { TaskStatus, TurnFacts, When } from '../types'
+import type { Task, TaskStatus, TurnFacts, When } from '../types'
 import { createDenial } from './coordinator'
 import type { Io } from './io'
 import type { Settings } from './settings'
@@ -8,7 +8,7 @@ import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
 import { createTask, findTask, isOpen, listTasks, taskLine, today } from './tasks'
-import { mateLine, refreshTeam } from './team'
+import { blockOf, cacheText, findMate, mateLine, refreshTeam } from './team'
 import { initProject } from './texts'
 
 // The tools the model gets, listed as mcp__better-tasks__<name>.
@@ -31,7 +31,7 @@ export const TOOLS: readonly ToolSpec[] = [
   {
     name: 'task_update',
     description:
-      'Change a task: status, when (moves it between sprints), owner (teammate name), a dated note. ' +
+      'Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note. ' +
       'status "done" also logs it in docs/tasks.md (pass a summary as note, and the commits).',
     inputSchema: {
       type: 'object',
@@ -40,10 +40,23 @@ export const TOOLS: readonly ToolSpec[] = [
         status: STATUS,
         when: WHEN,
         owner: { type: 'string' },
+        title: { type: 'string' },
+        goal: { type: 'string' },
         note: { type: 'string' },
         commits: { type: 'string' },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'task_note',
+    description:
+      'Add a dated note to an existing task: what the user just said about it (an observation, a bug, a wish). ' +
+      'Use it instead of task_create when the message refers to a task. The result names the owner to forward it to.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, note: { type: 'string' } },
+      required: ['id', 'note'],
     },
   },
   {
@@ -102,7 +115,14 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     const task = await findTask(io, input.id ?? '')
     if (!task) return { deny: `No task ${input.id}.` }
     const changed = await changeTask(io, task, input, config)
-    return { result: taskLine(changed, await today(io), config) }
+    const line = taskLine(changed, await today(io), config)
+    return { result: input.note ? `${line}\n${await ownerHint(io, changed, settings)}` : line }
+  }
+  if (run.name === 'task_note') {
+    const task = await findTask(io, input.id ?? '')
+    if (!task) return { deny: `No task ${input.id}. Create it with task_create, or check the id with task_list.` }
+    const noted = await changeTask(io, task, { note: input.note ?? '' }, config)
+    return { result: `Noted on ${noted.id} ${noted.title}.\n${await ownerHint(io, noted, settings)}` }
   }
   if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
   if (run.name === 'sprint_goal') return { result: await setGoal(io, input.goal ?? '', settings) }
@@ -146,4 +166,18 @@ async function projectInit(io: Io): Promise<string> {
   const written = await initProject(io)
   const list = written.length ? `Wrote ${written.join(', ')}.` : 'All override files exist already.'
   return `${list} Edit them in .claude/tasks/; config.json keys starting with // are off.`
+}
+
+/** Who should hear about a note on `task`, and how. */
+async function ownerHint(io: Io, task: Task, settings: Settings): Promise<string> {
+  if (!task.owner) return 'No owner yet: nobody to tell.'
+  const mate = findMate(await refreshTeam(io), task.owner)
+  if (!mate) return `Owner ${task.owner} is not running: tell it with SendMessage (it resumes) or route the task anew.`
+  const block = blockOf(mate, settings.contextLimit)
+  if (block) {
+    const why = block === 'cold' ? 'its cache is cold' : `it is over ${settings.contextLimit} % context`
+    return `Owner ${mate.name} takes no new work (${why}): give the note to a fresh teammate for the area, with the task file and ${mate.name}'s transcript.`
+  }
+  const facts = [cacheText(mate), mate.percent === undefined ? undefined : `${mate.percent} %`].filter(Boolean).join(', ')
+  return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: forward the note with SendMessage.`
 }
