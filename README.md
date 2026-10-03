@@ -73,35 +73,6 @@ Optional: delete `.claude/manager/` in your projects (tasks, sprints, overrides)
 
 &nbsp;
 
-## 🔄 How it works
-
-```
- you ──▶ manager (main session)
-           │  "which sprint?" → .claude/manager/tasks/T-001-fix-login.md
-           ▼
-         teammate "auth" ── works, keeps notes in its task file
-           │  board: working · editing auth.ts · 34 %
-           ▼
-         done ──▶ row in docs/tasks.md · sprint review in .claude/manager/sprints.md
-```
-
-1. You ask for something. The manager checks who owns that area (`team_status`) and forwards it, or creates a task.
-2. A task file is written: frontmatter (`sprint`, `status`, `owner`, `order`, …), then Goal and Notes.
-3. Starting a task hands it to a teammate with the task file's path. `teammate.md` instructions go into its prompt.
-4. The board and the footer (`Sprint 41 · 1/4 done`) follow every change. Each prompt gives the manager the sprint, due work and each teammate's context fill.
-5. Done: the task moves to "✓ Closed" and a row goes into `docs/tasks.md`. At the sprint's end open work rolls over and `sprints.md` gets the review.
-
-**Files, per project** (defaults; `config.json` can move them)
-
-| path | what |
-| --- | --- |
-| `.claude/manager/tasks/` | one file per task |
-| `.claude/manager/sprints.md` | each sprint's goal and review |
-| `docs/tasks.md` | one row per finished task |
-| `.claude/manager/config.json`, `*.md` | your overrides |
-
-&nbsp;
-
 ## ⌨️ Using it
 
 Just talk to the main session:
@@ -185,7 +156,7 @@ Existing files are never overwritten.
 
 | file | what |
 | --- | --- |
-| `config.json` | any setting above, plus `taskPrefix` (`T-`), `taskPadding` (3), `taskStart` (1), `taskFileName` (`{id}-{slug}.md`), `tasksFolder`, `logFile`, `sprintsFile`. Wins over `/config`. Keys starting with `//` are off. |
+| `config.json` | any setting above, plus `taskPrefix` (`T-`), `taskPadding` (3), `taskStart` (1), `taskFileName` (`{id}-{slug}.md`), and where files go: `tasksFolder` (`.claude/manager/tasks`), `sprintsFile` (`.claude/manager/sprints.md`, goals and reviews), `logFile` (`docs/tasks.md`, one row per finished task). Wins over `/config`. Keys starting with `//` are off. |
 | `coordinator.md` | the manager's rules |
 | `teammate.md` | added to every teammate's prompt |
 | `task-template.md` | a new task's body: `{goal}`, `{title}`, `{id}`, `{created}` |
