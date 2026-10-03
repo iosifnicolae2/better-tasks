@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { backlogToggle, filledCells, neighbour, sectionsOf, shifted, stepId } from '../hooks/board'
+import { backlogToggle, filledCells, neighbour, rowRoles, sectionsOf, shifted, stepId } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import { linesOf } from '../hooks/sessionview'
 import type { HostApp } from '../hooks/editor'
@@ -129,6 +129,7 @@ test('sections and moves', () => {
   expect(shifted(sections, 'T-004', 1)).toEqual({ when: 'next-sprint', ids: ['T-004'] })
   expect(shifted(sections, 'T-002', -1)).toEqual({ when: 'next-sprint', ids: ['T-002'] })
   expect(shifted(sections, 'T-002', 1)).toBeUndefined()
+  expect(rowRoles(['a', 'b', 'c', 'd'], 'b')).toEqual({ a: 'slot-up', b: 'moving', c: 'slot-down', d: 'still' })
   expect(stepId(['a', 'b', 'c'], undefined, 1)).toBe('a')
   expect(stepId(['a', 'b', 'c'], undefined, -1)).toBe('c')
   expect(stepId(['a', 'b', 'c'], 'b', 1)).toBe('c')
@@ -149,15 +150,16 @@ test('moves: one section up or down, b in and out of the backlog, and the progre
   expect(filledCells(5, 5)).toBe(10)
 })
 
-/** The list's rows as drawn: every element before the detail area, by type and key only. */
+/** The list's rows as drawn (the sections and the done line, not the detail box or key line), by type and key. */
 async function listShape(ui: { drawn: () => Promise<unknown> }, depth = Infinity): Promise<string> {
+  type Node = { type?: string; props?: { key?: string }; children?: unknown[] }
   const shape = (node: unknown, level = 0): unknown => {
     if (typeof node !== 'object' || node === null) return typeof node
-    const { type, props, children } = node as { type?: string; props?: { key?: string }; children?: unknown[] }
+    const { type, props, children } = node as Node
     return level >= depth ? [type] : [type, props?.key, (children ?? []).map(child => shape(child, level + 1))]
   }
-  const text = JSON.stringify(shape(await ui.drawn()))
-  return text.slice(0, text.indexOf('"open"'))
+  const board = ((await ui.drawn()) as Node).children?.[1] as Node
+  return JSON.stringify((board.children ?? []).slice(0, -2).map(child => shape(child, 1)))
 }
 
 for (const surface of SURFACES) {
@@ -223,46 +225,44 @@ for (const surface of SURFACES) {
   test(`Enter → actions → Move: then ↑↓ carry the task and Enter stops (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     const head = (id: string) => files.get([...files.keys()].find(path => path.includes(id)) ?? '') ?? ''
-    const rows = async () => (await ui.findAll({ type: 'Button' })).map(found => found.key).filter(key => key?.startsWith('task-'))
+    const buttons = async () => (await ui.findAll({ type: 'Button' })).map(found => found.key)
+    const rows = async () => (await ui.findAll({ type: 'Text', text: /^T-00\d {2}/ })).map(found => found.text.slice(0, 5))
+    // ↑ or ↓ as the engine raises them: the person moving the ring to the next element that takes it.
     const arrowTo = (element: string) =>
       $.ui.focus({ component: 'Pane', requestId: 'supermanager-sprint', plugin: 'supermanager', element, origin: { kind: 'person' } })
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    const before = await listShape(ui, 3)
+    const before = await listShape(ui, 2)
 
     await ui.press({ key: 'task-T-001' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
     await ui.press({ key: 'move' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '↕ ↑↓ move it · ⏎ stop' })).toBeDefined()
-    expect(await listShape(ui, 3)).toBe(before)
+    expect(await listShape(ui, 2)).toBe(before)
+    // Only the moving task and the two slots ↑ and ↓ can land on take the ring.
+    expect(await buttons()).toEqual(['slot-up', 'task-T-001', 'slot-down'])
 
-    expect((await arrowTo('task-T-004')).deny).toBeDefined()
-    expect(await rows()).toEqual(['task-T-004', 'task-T-001', 'task-T-002'])
+    expect((await arrowTo('slot-down')).deny).toBeDefined()
     expect(head('T-001')).toContain('order: 1')
-    await arrowTo('open')
+    expect(await buttons()).toEqual(['slot-up', 'task-T-001', 'slot-down'])
+    await arrowTo('slot-down')
     expect(head('T-001')).toContain('sprint: 2026-10-12')
-    await arrowTo('task-T-004')
+    await arrowTo('slot-up')
     expect(head('T-001')).toContain('sprint: 2026-10-05')
-    await ui.press({ key: 'next' })
-    expect(head('T-001')).toContain('sprint: 2026-10-12')
-    await ui.press({ key: 'previous' })
+    await arrowTo('slot-up')
+    await arrowTo('slot-up')
+    expect(head('T-001')).toContain('urgent: true')
+    await arrowTo('slot-up')
+    expect(head('T-001')).toContain('urgent: true')
+    await arrowTo('slot-down')
+    expect(head('T-001')).toContain('urgent: false')
 
     await ui.press({ key: 'task-T-001' })
     expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
+    expect(await buttons()).toContain('open')
     expect((await arrowTo('task-T-002')).deny).toBeUndefined()
-    expect(await rows()).toEqual(['task-T-004', 'task-T-001', 'task-T-002'])
     expect(await ui.find({ type: 'Text', text: /^T-002 {2}Dark mode$/ })).toBeDefined()
-  })
-
-  test(`any other action stops moving (${surface})`, async ($, on) => {
-    fakeProject(on)
-    await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    await ui.press({ key: 'move' })
-    expect(await ui.find({ type: 'Text', text: 'moving' })).toBeDefined()
-    await ui.press({ key: 'toggle' })
-    expect(await ui.find({ type: 'Text', text: 'moving' })).toBeUndefined()
   })
 
   test(`the pane says how to give it the keys when it has none (${surface})`, async ($, on) => {

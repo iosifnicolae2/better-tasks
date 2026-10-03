@@ -77,6 +77,22 @@ export function shifted(sections: readonly Section[], id: string, step: -1 | 1):
   return { when: target, ids: step === -1 ? [...there, id] : [id, ...there] }
 }
 
+/** In move mode, what each visible row is: the moving task, the focusable row just above or below it, or still text. */
+export type RowRole = 'moving' | 'slot-up' | 'slot-down' | 'still'
+
+/**
+ * While a task moves, only it and its two neighbours can take the focus ring, so ↑ can only land
+ * on "slot-up" and ↓ on "slot-down"; the pane turns that landing into one step of the task.
+ */
+export function rowRoles(ids: readonly string[], movingId: string): Record<string, RowRole> {
+  const at = ids.indexOf(movingId)
+  const roles: Record<string, RowRole> = {}
+  ids.forEach((id, index) => {
+    roles[id] = index === at ? 'moving' : index === at - 1 ? 'slot-up' : index === at + 1 ? 'slot-down' : 'still'
+  })
+  return roles
+}
+
 /** How many of the bar's cells are filled for `done` of `total`. */
 export function filledCells(done: number, total: number, cells = BAR_CELLS): number {
   return total === 0 ? 0 : Math.round((done / total) * cells)
@@ -124,6 +140,8 @@ export type BoardProps = {
 export function Board({ ui, sections, doneCount, selected, team, limit, hasKeys, actions }: BoardProps) {
   const { Box, Text } = ui
   const visible = sections.filter(section => section.tasks.length > 0 || section.when === 'this-sprint')
+  const ids = visible.flatMap(section => section.tasks.map(task => task.id))
+  const roles = selected?.isMoving ? rowRoles(ids, selected.task.id) : undefined
   return (
     <Box flexDirection="column">
       {visible.map(section => (
@@ -132,7 +150,7 @@ export function Board({ ui, sections, doneCount, selected, team, limit, hasKeys,
           {section.tasks.length === 0 && <Text color="subtle">   Nothing planned yet</Text>}
           {section.tasks.map(task => (
             <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id} hasKeys={hasKeys}
-              isMoving={task.id === selected?.task.id && selected.isMoving === true}
+              role={roles?.[task.id]} isFirst={ids[0] === task.id} isLast={ids.at(-1) === task.id}
               owner={team.find(one => one.name === task.owner)} limit={limit} actions={actions} />
           ))}
         </Box>
@@ -163,25 +181,43 @@ type RowProps = {
   task: Task
   isSelected: boolean
   hasKeys: boolean
-  isMoving: boolean
+  /** Set while some task moves (see rowRoles). */
+  role?: RowRole
+  isFirst: boolean
+  isLast: boolean
   owner?: Teammate
   limit: number
   actions: BoardActions
 }
 
-/** Always one line: selection bar, status, id and title, then owner, context and roll-overs. */
-function TaskRow({ ui, task, isSelected, hasKeys, isMoving, owner, limit, actions }: RowProps) {
+/**
+ * Always one line: selection bar, status, id and title, then owner, context and roll-overs.
+ * While a task moves, the title is a button only on it and its two neighbours (the slots ↑ and ↓
+ * land on); the moving row with no row above or below gets a ▲ or ▼ slot of its own instead.
+ */
+function TaskRow({ ui, task, isSelected, hasKeys, role, isFirst, isLast, owner, limit, actions }: RowProps) {
   const { Box, Button, Text } = ui
   const isOverLimit = owner !== undefined && isFull(owner, limit)
+  const isMoving = role === 'moving'
+  const label = `${task.id}  ${task.title}`
+  const title =
+    role === 'still' ? (
+      <Text color="subtle" wrap="truncate-end">{label}</Text>
+    ) : role === 'slot-up' || role === 'slot-down' ? (
+      // The ring never rests here: the pane's ui.focus hook turns landing on it into a step.
+      <Button key={role} plain dimColor label={label} onPress={() => undefined} />
+    ) : (
+      <Button key={`task-${task.id}`} plain autoFocus={isSelected ? true : undefined}
+        label={label} onPress={() => actions.pressTask(task, isSelected)} />
+    )
   return (
     <Box flexDirection="row" columnGap={1} height={1} overflow="hidden"
       backgroundColor={isSelected ? 'userMessageBackground' : undefined}>
       <Text color={isMoving ? 'claude' : hasKeys ? 'suggestion' : 'subtle'}>{isMoving ? '↕' : isSelected ? '▌' : ' '}</Text>
       <StatusIcon ui={ui} task={task} />
-      <Box flexGrow={1} flexShrink={1}>
-        <Button key={`task-${task.id}`} plain autoFocus={isSelected ? true : undefined}
-          label={`${task.id}  ${task.title}`} onPress={() => actions.pressTask(task, isSelected)} />
-      </Box>
+      {isMoving && isFirst && <Button key="slot-up" plain label="▲" onPress={() => undefined} />}
+      <Box flexGrow={1} flexShrink={1}>{title}</Box>
+      {isMoving && isLast && <Button key="slot-down" plain label="▼" onPress={() => undefined} />}
       {isMoving && <Text color="claude">moving</Text>}
       {!isMoving && task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
       {!isMoving && owner?.percent !== undefined && <Text color={isOverLimit ? 'warning' : 'subtle'}>{percentText(owner)}</Text>}
@@ -234,10 +270,8 @@ function Detail({ ui, selected, limit, actions }: DetailProps) {
 }
 
 function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, 'selected'>> & Omit<DetailProps, 'selected'>) {
-  const { Button, Text } = ui
+  const { Text } = ui
   const { task, when, mate } = selected
-  const toggle = backlogToggle(when)
-  const targets = ORDER.filter(to => to !== when)
   return (
     <>
       <DetailLine ui={ui}>
@@ -252,6 +286,30 @@ function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, '
           <Text color="subtle">{task.status === 'doing' ? `${task.owner || 'someone'} · not running` : 'not started'}</Text>
         )}
       </DetailLine>
+      {selected.isMoving ? <MovingLines ui={ui} /> : <ActionLines ui={ui} selected={selected} actions={actions} />}
+    </>
+  )
+}
+
+/** While the task moves nothing else takes the ring, so these three lines are text. */
+function MovingLines({ ui }: { ui: Ui }) {
+  const { Text } = ui
+  return (
+    <>
+      <DetailLine ui={ui}><Text color="claude">↕ ↑↓ move it · ⏎ stop</Text></DetailLine>
+      <DetailLine ui={ui}><Text color="subtle">It moves within its section and on into the next at an edge.</Text></DetailLine>
+      <DetailLine ui={ui}><Text color="subtle">Every step is saved.</Text></DetailLine>
+    </>
+  )
+}
+
+function ActionLines({ ui, selected, actions }: { ui: Ui; selected: Selected; actions: BoardActions }) {
+  const { Button, Text } = ui
+  const { task, when, mate } = selected
+  const toggle = backlogToggle(when)
+  const targets = ORDER.filter(to => to !== when)
+  return (
+    <>
       <DetailLine ui={ui}>
         <Button key="open" plain hotkey="o" label="Open" onPress={() => actions.open(task)} />
         {task.status === 'todo' && <Button key="start" plain hotkey="s" label="Start" onPress={() => actions.start(task)} />}
@@ -262,11 +320,7 @@ function DetailOf({ ui, selected, limit, actions }: Required<Pick<DetailProps, '
       <DetailLine ui={ui}>
         <Button key="up" plain dimColor action="app:diffFileListUp" label="⌥↑" onPress={() => actions.shift(task, -1)} />
         <Button key="down" plain dimColor action="app:diffFileListDown" label="⌥↓" onPress={() => actions.shift(task, 1)} />
-        {selected.isMoving ? (
-          <Text color="claude">↕ ↑↓ move it · ⏎ stop</Text>
-        ) : (
-          <Text color="subtle">move up/down</Text>
-        )}
+        <Text color="subtle">move up/down</Text>
         <Button key="toggle" plain dimColor hotkey="b" label={TITLES[toggle]} onPress={() => actions.move(task, toggle)} />
       </DetailLine>
       <DetailLine ui={ui}>
@@ -294,9 +348,9 @@ function KeyLine({ ui, hasKeys, isMoving, actions }: KeyLineProps) {
       ) : (
         <Text color="suggestion">ctrl+x tab to use the keys here</Text>
       )}
-      <Button key="next" plain dimColor hotkey="j" label="↓" onPress={() => actions.selectStep(1)} />
-      <Button key="previous" plain dimColor hotkey="k" label="↑" onPress={() => actions.selectStep(-1)} />
-      <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />
+      {!isMoving && <Button key="next" plain dimColor hotkey="j" label="↓" onPress={() => actions.selectStep(1)} />}
+      {!isMoving && <Button key="previous" plain dimColor hotkey="k" label="↑" onPress={() => actions.selectStep(-1)} />}
+      {!isMoving && <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />}
     </Box>
   )
 }

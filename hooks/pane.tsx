@@ -97,20 +97,15 @@ async function startMoving($: EngineInterface, id: string): Promise<void> {
   await selectTask($, id)
 }
 
-/**
- * Moves the moving task one step toward where the person sent the ring: a task row above or
- * below it, past the last row (the first action, "open"), or wrapping round from the top (the
- * last element, "config").
- */
+/** While a task moves, ↑ lands the ring on "slot-up" and ↓ on "slot-down": one step of the task. */
 async function carry($: EngineInterface, options: PluginOptions, movingId: string, element: string | undefined): Promise<void> {
+  const step = element === 'slot-up' ? -1 : element === 'slot-down' ? 1 : undefined
+  if (step === undefined) return
   const files = filesOf($, options)
   const settings = await settingsFrom(files)
   const sections = sectionsOf(await read($, tasksState), await today(files), settings.sprint)
-  const ids = sections.flatMap(section => section.tasks.map(task => task.id))
-  const target = element?.match(/^task-(.+)$/)?.[1]
-  const step = target !== undefined ? Math.sign(ids.indexOf(target) - ids.indexOf(movingId)) : element === 'open' ? 1 : element === 'config' ? -1 : 0
   const task = sections.flatMap(section => section.tasks).find(one => one.id === movingId)
-  if (task !== undefined && (step === 1 || step === -1)) await shiftTask(files, sections, task, step, settings.sprint)
+  if (task !== undefined) await shiftTask(files, sections, task, step, settings.sprint)
 }
 
 /** Selects the task and keeps the focus ring on it (best effort: only while the pane holds the keys). */
