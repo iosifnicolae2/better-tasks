@@ -1,6 +1,6 @@
 {
   "name": "supermanager",
-  "description": "Turns the main session into a coordinator of agent teammates, with weekly sprints, task files and a Tasks pane.",
+  "description": "Plan and track tasks inside Claude Code, kept as plain Markdown files in your project, with weekly sprints, a sprint board and agent teammates.",
   "author": {
     "name": "Iosif Nicolae",
     "email": "iosif@bringes.io"
@@ -11,7 +11,7 @@
     "editor": {
       "type": "string",
       "title": "Editor",
-      "description": "Opens task files from the Tasks pane. auto: IntelliJ inside a JetBrains terminal, VS Code inside VS Code, else the default app.",
+      "description": "Opens task files from the sprint board. auto: IntelliJ inside a JetBrains terminal, VS Code inside VS Code, else the default app.",
       "options": [
         "auto",
         "default",
