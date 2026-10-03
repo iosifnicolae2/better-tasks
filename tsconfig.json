@@ -1,0 +1,11 @@
+{
+  // The engine's options and types, laid in .claude-plugin/types/ at each load.
+  "extends": "./.claude-plugin/types/tsconfig.json",
+  "compilerOptions": {
+    // Leaves out claude-code-mcp: it lists whatever MCP servers the last session had
+    // connected, and a stale entry for our own tools sends tsc out of memory.
+    "types": ["claude-code", "claude-code-tools"],
+    "incremental": true,
+    "tsBuildInfoFile": "./.claude-plugin/types/tsconfig.tsbuildinfo"
+  }
+}
