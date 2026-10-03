@@ -4,7 +4,9 @@
 
 Claude Code mod · TypeScript · no dependencies · macOS
 
-<!-- screenshot: board (docs/screenshots/board.svg) -->
+<p align="center">
+  <img src="docs/screenshots/board.svg" alt="The sprint board: sections, owners, a teammate at work and its context fill" width="560">
+</p>
 
 Your main session becomes a **manager** that hands work to agent **teammates**, keeps **tasks** in **sprints**,
 and shows them on a **board**. For people who run several agents on one project and want them organized.
@@ -114,7 +116,16 @@ Each session opens with a few dim tip lines. The model never reads them.
 
 `/supermanager` opens it. Click it, or press `ctrl+x tab`, to give it the keys.
 
-<!-- screenshot: actions (docs/screenshots/actions.svg), moving (docs/screenshots/moving.svg) -->
+<table>
+  <tr>
+    <td><img src="docs/screenshots/actions.svg" alt="Enter on a task: its actions take the keys"></td>
+    <td><img src="docs/screenshots/moving.svg" alt="Move mode: the arrows carry the task"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><code>enter</code>: the task's actions</sub></td>
+    <td align="center"><sub><code>m</code>: move mode</sub></td>
+  </tr>
+</table>
 
 | key | does |
 | --- | --- |
@@ -135,12 +146,20 @@ Sections: ⚡ Currently working on · ◆ This sprint · ◇ Next sprint · ○ 
 - **IntelliJ terminal:** for `⌥↑` `⌥↓`, turn on *Settings › Tools › Terminal › Use Option as Meta key*.
 - **Docking:** on the right only in the fullscreen layout with 110+ columns; otherwise it opens above the prompt.
 
+**View session** (`v`) shows the teammate's live transcript:
+
+<p align="center">
+  <img src="docs/screenshots/session.svg" alt="View session: a teammate's live transcript" width="560">
+</p>
+
 ### ⚙️ Settings
 
 `c` on the board, or `/supermanager config`. One row per setting; `enter` changes it.
 The same rows are in `/config` as "Supermanager: …".
 
-<!-- screenshot: settings (docs/screenshots/settings.svg) -->
+<p align="center">
+  <img src="docs/screenshots/settings.svg" alt="The settings page: Team, Sprint and This project" width="560">
+</p>
 
 | setting | default | what |
 | --- | --- | --- |
@@ -186,6 +205,8 @@ claude plugin test .       # tests/*.test.ts(x)
 tsc -p .                   # types: the engine lays .claude-plugin/types/ and a tsconfig.json here when it loads the mod
 ```
 
+Screenshots are drawn from the real pane in the test kit: `node scripts/screenshots.mjs` (writes `docs/screenshots/*.svg`).
+
 The validator's rules: `$` never crosses an import; state refs are declared in the file that uses them; one `session.start` without a matcher.
 
 | file | job |
@@ -203,4 +224,5 @@ The validator's rules: `$` never crosses an import; state refs are declared in t
 | `hooks/activity.ts` · `editor.ts` · `spinner.tsx` | what a teammate is doing · which editor opens · spinners |
 | `hooks/screen.ts` · `bin/away.sh` · `bin/blackout.js` | `/away` and keep-awake |
 | `tests/` | `claude plugin test` suites |
+| `scripts/screenshots.mjs` · `docs/screenshots/` | the README pictures |
 | `docs/tasks.md` | this repo's finished-task log |
