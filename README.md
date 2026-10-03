@@ -5,7 +5,8 @@
 Claude Code mod · TypeScript · no dependencies · macOS
 
 <p align="center">
-  <img src="docs/screenshots/board.svg" alt="The sprint board: sections, owners, a teammate at work and its context fill" width="560">
+  <img src="docs/screenshots/board.svg" alt="Claude Code with the Sprint board docked on the right">
+  <br><sub>Claude Code with the Sprint board docked on the right</sub>
 </p>
 
 Your main session becomes a **manager** that hands work to agent **teammates**, keeps **tasks** in **sprints**,
@@ -87,16 +88,15 @@ Each session opens with a few dim tip lines. The model never reads them.
 
 `/supermanager` opens it. Click it, or press `ctrl+x tab`, to give it the keys.
 
-<table>
-  <tr>
-    <td><img src="docs/screenshots/actions.svg" alt="Enter on a task: its actions take the keys"></td>
-    <td><img src="docs/screenshots/moving.svg" alt="Move mode: the arrows carry the task"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub><code>enter</code>: the task's actions</sub></td>
-    <td align="center"><sub><code>m</code>: move mode</sub></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/screenshots/actions.svg" alt="Enter on a task: its actions take the keys">
+  <br><sub>Enter on a task: its actions take the keys</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/moving.svg" alt="Move: ↑↓ carry the task, Enter stops">
+  <br><sub>Move: ↑↓ carry the task, Enter stops</sub>
+</p>
 
 | key | does |
 | --- | --- |
@@ -120,7 +120,8 @@ Sections: ⚡ Currently working on · ◆ This sprint · ◇ Next sprint · ○ 
 **View session** (`v`) shows the teammate's live transcript:
 
 <p align="center">
-  <img src="docs/screenshots/session.svg" alt="View session: a teammate's live transcript" width="560">
+  <img src="docs/screenshots/session.svg" alt="View session: a teammate's live transcript">
+  <br><sub>View session: a teammate's live transcript</sub>
 </p>
 
 ### ⚙️ Settings
@@ -129,7 +130,8 @@ Sections: ⚡ Currently working on · ◆ This sprint · ◇ Next sprint · ○ 
 The same rows are in `/config` as "Supermanager: …".
 
 <p align="center">
-  <img src="docs/screenshots/settings.svg" alt="The settings page: Team, Sprint and This project" width="560">
+  <img src="docs/screenshots/settings.svg" alt="/supermanager config">
+  <br><sub>/supermanager config</sub>
 </p>
 
 | setting | default | what |
