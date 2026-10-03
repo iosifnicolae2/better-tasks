@@ -9,11 +9,7 @@ import type { SprintConfig } from './sprints'
 import { isOpen, listTasks, today, WHEN_LABELS, whenOf } from './tasks'
 import { blockOf, isActive, mateLine, refreshTeam } from './team'
 
-// The main session as coordinator: its rules, a small context block per prompt, the task_create guard.
-
-const TIME_WORDS = /\b(now|right away|asap|urgent|immediately|today|this sprint|next sprint|backlog|later|this week|next week)\b/i
-
-export const namesTime = (text: string) => TIME_WORDS.test(text)
+// The main session as coordinator: its rules and a small context block per prompt.
 
 export const isPerson = (origin: PromptOrigin) => ['composer', 'bridge', 'sdk'].includes(origin.kind)
 
@@ -36,12 +32,6 @@ export function withRules(
 ): readonly PromptComposeSection[] {
   if (!isMainPrompt(sections, traits, tools) || rules === '') return sections
   return [...sections, { id: 'better-tasks:coordinator', text: rules, scope: 'session' }]
-}
-
-/** Why the main session may not create a task yet, or undefined when it may. */
-export function createDenial(facts: TurnFacts, agentId: string | undefined): string | undefined {
-  if (agentId !== undefined || facts.asked || facts.namedTime) return undefined
-  return 'Ask the user when first: AskUserQuestion with "Start now (currently working on)" / This sprint / Next sprint / Backlog, then call task_create again.'
 }
 
 /** What the coordinator reads beside each user prompt: sprint, due work, notice, teammates. */

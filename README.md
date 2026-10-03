@@ -17,7 +17,7 @@ Restart Claude Code.
 
 ## ✨ Use
 
-- **"create a task to fix the login redirect"**: asks which sprint, saves it as Markdown in `.claude/tasks/`.
+- **"fix the login redirect"**: a task, saved as Markdown in `.claude/tasks/`, and a teammate starts on it now. Say "next sprint" or "backlog" to plan it instead.
 - **`/better-tasks`**: the sprint board. Weekly sprints with a goal; open tasks roll over.
 - **"start T-001"**: a teammate takes the task; the board shows what it's doing.
 - **`/away`**: screens off, the Mac keeps working.

@@ -5,6 +5,7 @@ import { realigned, rolledOver, shippedIn } from '../hooks/boundary'
 import { goalOf, withGoal, withReview } from '../hooks/sprintlog'
 import { logRow } from '../hooks/taskflow'
 import { isQuestion, openTaskLines } from '../hooks/coordinator'
+import { spawnTask, taskIdIn, withSummary } from '../hooks/spawn'
 import { bodyOf, edgeOrder, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withGoalText, withNote } from '../hooks/tasks'
 
 const CONFIG = { weeks: 1, startDay: 1 } as const
@@ -159,5 +160,26 @@ describe('filing messages', () => {
 
   test('a new goal replaces the Goal section only', () => {
     expect(withGoalText(bodyOf('Old goal.') + '- 2026-10-01: a note\n', 'New goal.')).toBe('## Goal\nNew goal.\n\n## Notes\n- 2026-10-01: a note\n')
+  })
+})
+
+describe('spawn summaries', () => {
+  test('the id a prompt names, with the project prefix', () => {
+    expect(taskIdIn('You own task T-004. File: .claude/tasks/T-004-x.md', 'T-')).toBe('T-004')
+    expect(taskIdIn('see BUG-12 and T-3', 'BUG-')).toBe('BUG-12')
+    expect(taskIdIn('no id here', 'T-')).toBeUndefined()
+  })
+
+  test('the task a spawn is for: by id, else the one open task its name owns', () => {
+    const tasks = [task({ id: 'T-001', owner: 'login' }), task({ id: 'T-002', owner: 'ci' }), task({ id: 'T-003', owner: 'ci' })]
+    expect(spawnTask(tasks, 'Finish T-002', 'login', 'T-')?.id).toBe('T-002')
+    expect(spawnTask(tasks, 'Carry on', 'login', 'T-')?.id).toBe('T-001')
+    expect(spawnTask(tasks, 'Carry on', 'ci', 'T-')).toBeUndefined()
+  })
+
+  test('the summary comes first, once', () => {
+    const one = task({ id: 'T-001', title: 'Fix login redirect' })
+    expect(withSummary({ description: 'x', prompt: 'Go.' }, one)).toEqual({ description: 'Fix login redirect · T-001', prompt: 'Fix login redirect · T-001\n\nGo.' })
+    expect(withSummary({ description: 'x', prompt: 'Fix login redirect · T-001\n\nGo.' }, one).prompt).toBe('Fix login redirect · T-001\n\nGo.')
   })
 })

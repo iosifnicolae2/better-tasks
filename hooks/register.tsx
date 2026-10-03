@@ -6,7 +6,7 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
-import { contextBlock, footerText, isPerson, isQuestion, namesTime, unfiledLine, withRules } from './coordinator'
+import { contextBlock, footerText, isPerson, isQuestion, unfiledLine, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -17,6 +17,7 @@ import { sprintStart } from './sprints'
 import { listTasks, saveTask, today } from './tasks'
 import { blockAdvice, contextTokens, refreshTeam, sendBlock } from './team'
 import { projectText } from './texts'
+import { spawnTask, withSummary } from './spawn'
 import { startupTips } from './tips'
 import { runTool, TOOLS } from './tools'
 
@@ -37,7 +38,7 @@ const activityState = atom({ plugin: 'better-tasks', key: 'activity' } as const,
 const cacheStepsState = atom({ plugin: 'better-tasks', key: 'cacheSteps' } as const, {} as Record<string, CacheStep>)
 const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
-const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, namedTime: false, filed: false, question: false, prompted: false } as TurnFacts)
+const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, filed: false, question: false, prompted: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
   pluginOptions = options
@@ -75,7 +76,7 @@ export const register: Register = (on, options) => {
     const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
     if (state !== 'on') return next({ ...e, context: [...(e.context ?? []), waitingLine(state)] })
     const reminder = unfiledLine(await read($, turnState))
-    await update($, turnState, () => ({ asked: false, namedTime: namesTime(e.text), filed: false, question: isQuestion(e.text), prompted: true }))
+    await update($, turnState, () => ({ asked: false, filed: false, question: isQuestion(e.text), prompted: true }))
     const settings = await settingsNow($)
     const notices = [await read($, noticeState), reminder].filter(Boolean).join('\n')
     const block = await contextBlock(ioOf($), settings, notices)
@@ -92,10 +93,13 @@ export const register: Register = (on, options) => {
 
   on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
     if (!e.name || !(await teamsOn($))) return next(e)
+    const settings = await settingsNow($)
+    const task = spawnTask(await listTasks(ioOf($)), e.prompt, e.name, settings.tasks.prefix)
+    const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
     const teammate = await projectText(ioOf($), 'teammate')
-    const prompt = teammate ? `${e.prompt}\n\n${teammate}` : e.prompt
-    const isWorktree = (await settingsNow($)).worktree && !e.isolation
-    return next({ ...e, prompt, ...(isWorktree ? { isolation: 'worktree' as const } : {}) })
+    const prompt = teammate ? `${named.prompt}\n\n${teammate}` : named.prompt
+    const isWorktree = settings.worktree && !e.isolation
+    return next({ ...e, description: named.description, prompt, ...(isWorktree ? { isolation: 'worktree' as const } : {}) })
   })
 
   on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {

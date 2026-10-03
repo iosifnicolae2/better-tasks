@@ -1,13 +1,12 @@
 import type { ToolSpec } from 'claude-code'
 
 import type { Task, TaskStatus, TurnFacts, When } from '../types'
-import { createDenial } from './coordinator'
 import type { Io } from './io'
 import type { Settings } from './settings'
 import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
-import { createTask, findTask, isOpen, listTasks, taskLine, today } from './tasks'
+import { createTask, findTask, isOpen, listTasks, taskLine, today, WHEN_LABELS } from './tasks'
 import { blockOf, cacheText, findMate, mateLine, refreshTeam } from './team'
 import { initProject } from './texts'
 
@@ -20,12 +19,12 @@ export const TOOLS: readonly ToolSpec[] = [
   {
     name: 'task_create',
     description:
-      'Create a task file. Never starts it. Ask the user which sprint first (start now = currently working on / this sprint / ' +
-      'next sprint / backlog) unless they said. when: now = currently working on.',
+      'Create a task file. By default it goes to "currently working on" (when: now) and you route it at once. ' +
+      'Only when the user names a sprint or the backlog, pass when: this-sprint, next-sprint or backlog; then nothing starts.',
     inputSchema: {
       type: 'object',
       properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN },
-      required: ['title', 'goal', 'when'],
+      required: ['title', 'goal'],
     },
   },
   {
@@ -105,11 +104,10 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
   const config = settings.sprint
   const { input } = run
   if (run.name === 'task_create') {
-    const denial = createDenial(run.facts, run.agentId)
-    if (denial) return { deny: denial }
-    const when = input.when ?? 'backlog'
+    const when = input.when ?? 'now'
     const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when })
-    return { result: `Created ${task.id} (${when}): ${task.file}. Not started.` }
+    const next = when === 'now' ? 'Route it now: the owner of its area, or a new teammate.' : 'Not started: it waits in its sprint.'
+    return { result: `Created ${task.id} (${WHEN_LABELS[when]}): ${task.file}. ${next}` }
   }
   if (run.name === 'task_update') {
     const task = await findTask(io, input.id ?? '')
@@ -156,7 +154,7 @@ async function teamStatus(io: Io): Promise<string> {
   const team = await refreshTeam(io)
   const tasks = (await listTasks(io)).filter(isOpen)
   const lines = team.map(mate => {
-    const owned = tasks.filter(task => task.owner === mate.name).map(task => task.id)
+    const owned = tasks.filter(task => task.owner === mate.name).map(task => `${task.id} ${task.title}`)
     return `${mateLine(mate)}${owned.length ? ` · ${owned.join(', ')}` : ''}`
   })
   return lines.length ? lines.join('\n') : 'No teammates.'

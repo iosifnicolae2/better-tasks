@@ -43,7 +43,6 @@ export type Activity = { text: string; at: number }
 
 export type TurnFacts = {
   asked: boolean
-  namedTime: boolean
   /** A task was created or noted this turn. */
   filed: boolean
   /** The user's message reads as a question. */

@@ -22,6 +22,7 @@ type Host = {
   notices: string[]
   registered: string[]
   spawned: string[]
+  descriptions: string[]
   env: Map<string, string>
 }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
@@ -34,7 +35,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], env: new Map() }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], env: new Map() }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -103,6 +104,7 @@ function fakeHost(
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
   on('tool.call', { tool: 'Agent' }, ($, e) => {
     host.spawned.push(e.prompt)
+    host.descriptions.push(e.description)
     return { result: { isolation: e.isolation ?? 'none' } }
   })
   on('prompt.submit', ($, e) => {
@@ -120,31 +122,30 @@ const mate = (id: string, name: string): AgentInfo => ({ id, name, description: 
 const prompt = (text: string) => ({ text, origin: { kind: 'composer' }, wait: false }) as const
 const create = { tool: 'mcp__better-tasks__task_create', tool_use_id: 't1', title: 'Fix login', goal: 'No loop', when: 'now' } as const
 
-test('task_create is refused until the user was asked when', async ($, on) => {
+test('a new task starts now by default, with no question asked', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
   await $.session.start(SESSION)
-  await $.prompt.submit(prompt('create a task to fix the login loop'))
-  const refused = await $.tool.call(create)
-  expect(refused.deny ?? refused.text).toContain('Ask the user when first')
-  expect([...host.files.keys()].some(path => path.startsWith(TASKS))).toBe(false)
-
-  await $.tool.call({ tool: 'AskUserQuestion', tool_use_id: 'q1', questions: [] } as never)
-  const made = await $.tool.call(create)
-  expect(String(made.result)).toContain('Created T-001 (now)')
-  const file = host.files.get(`${TASKS}/T-001-fix-login.md`)
-  expect(file).toContain('sprint: 2026-10-05\nurgent: true\nstatus: todo')
+  await $.prompt.submit(prompt('fix the login loop'))
+  const { title, goal } = create
+  const made = await $.tool.call({ tool: 'mcp__better-tasks__task_create', tool_use_id: 't1', title, goal } as never)
+  expect(String(made.result)).toBe(`Created T-001 (currently working on): ${TASKS}/T-001-fix-login.md. Route it now: the owner of its area, or a new teammate.`)
+  expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('sprint: 2026-10-05\nurgent: true\nstatus: todo')
 })
 
-test('a prompt that names the time needs no question', async ($, on) => {
+test('a named sprint or the backlog plans the task: placed, not started', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  fakeHost(on)
+  const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.prompt.submit(prompt('add a backlog task to clean up the logs'))
-  const made = await $.tool.call({ ...create, when: 'backlog' })
-  expect(String(made.result)).toContain('Created T-001 (backlog)')
+  const backlog = await $.tool.call({ ...create, when: 'backlog' })
+  expect(String(backlog.result)).toContain('Created T-001 (backlog)')
+  expect(String(backlog.result)).toContain('Not started: it waits in its sprint.')
+  const later = await $.tool.call({ ...create, tool_use_id: 't2', title: 'Rate limit', when: 'next-sprint' })
+  expect(String(later.result)).toContain('Created T-002 (next sprint)')
+  expect(host.files.get(`${TASKS}/T-002-rate-limit.md`)).toContain('sprint: 2026-10-12\nurgent: false')
 })
 
 test('each user prompt carries the sprint context', async ($, on) => {
@@ -289,7 +290,7 @@ test('every session start shows the tips once, with the live sprint line', async
   expect(host.notices).toEqual([
     'better-tasks · Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 1 open',
     '/better-tasks  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop',
-    '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
+    '"fix the login redirect" → a task, started now · "… next sprint" or "… backlog" → planned, not started',
     '/away  screens off, Mac keeps working',
   ])
 })
@@ -460,9 +461,6 @@ test('the user-facing name of the now section is "Currently working on"', async 
   mock.store(on)
   fakeHost(on)
   await $.session.start(SESSION)
-  const refused = await $.tool.call(create)
-  expect(refused.deny ?? refused.text).toContain('"Start now (currently working on)" / This sprint / Next sprint / Backlog')
-  await $.prompt.submit(prompt('start it now'))
   await $.tool.call(create)
   const list = String((await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1' })).result)
   expect(list).toBe('T-001 [todo] Fix login · currently working on')
@@ -672,4 +670,22 @@ test('no CLAUDE.md yet: Claude is asked to create it with only our section; not 
   expect(pointers(host)).toEqual([])
   await $.session.start(SESSION)
   expect(pointers(host)[0]).toContain(`Create ${GLOBAL_RULES} with the Write tool`)
+})
+
+test('a teammate spawned for a task reads as its title and id in the agent list', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const file = `${TASKS}/T-004-fix-login.md`
+  const host = fakeHost(on, [], { [file]: '---\nid: T-004\ntitle: Fix the login redirect after a password reset\nsprint: 2026-10-05\nstatus: todo\nowner: billing-export\n---\n' })
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', name: 'login', description: 'encoder', prompt: `You own task T-004. The task file is ${file}.` })
+  expect(host.descriptions.at(-1)).toBe('Fix the login redirect after a password… · T-004')
+  expect(host.spawned.at(-1)).toMatch(new RegExp(`^Fix the login redirect after a password… · T-004\\n\\nYou own task T-004\\. The task file is `))
+
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', name: 'billing-export', description: 'export', prompt: 'Carry on.' })
+  expect(host.descriptions.at(-1)).toBe('Fix the login redirect after a password… · T-004')
+
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', name: 'ci', description: 'Speed up CI', prompt: 'Make CI faster.' })
+  expect(host.descriptions.at(-1)).toBe('Speed up CI')
+  expect(host.spawned.at(-1)).toMatch(/^Make CI faster\.\n\n# You are a better-tasks teammate/)
 })
