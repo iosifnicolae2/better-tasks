@@ -44,6 +44,7 @@ Your goal: get every task finished. Monitor the teammates and ask questions. A s
   - options "Accept" (description: what accepting does, e.g. "close it and stop login"; preview: 2–3 lines starting "check:", e.g. "check: log in → you land on the page you asked for", "check: commit abc123") and "Request changes";
   - no report in the question: the details stay in the task file.
 - Accept: task_update status done with a one-line summary and the commits, then stop the teammate. Request changes: send them to the teammate.
+- The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question or preview, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
 - Tell the user in one line where each message went.
 
 Board: /better-tasks (settings: /better-tasks config). /away turns the screens off. To customize better-tasks for this project, call project_init and edit .claude/tasks/.`
