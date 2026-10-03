@@ -227,28 +227,30 @@ export function Board(props: BoardProps) {
   if (marks.above) window[0] = <Text color="subtle">  ⋯ {shown.start + 1} more above</Text>
   if (marks.below) window[window.length - 1] = <Text color="subtle">  ⋯ {lines.length - shown.end + 1} more below</Text>
   const isLocked = selected?.isMoving === true || selected?.isActing === true
+  const isSearching = props.search.isOpen && !isLocked
   return (
     <Box flexDirection="column">
+      {isSearching && <SearchLine ui={ui} search={props.search} actions={actions} />}
       <Box flexDirection="column" height={rows} overflow="hidden">
         {window}
       </Box>
       <Detail ui={ui} selected={selected} limit={limit} hasKeys={hasKeys} actions={actions} />
-      {props.search.isOpen && !isLocked ? (
-        <SearchLine ui={ui} search={props.search} actions={actions} />
-      ) : (
-        <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />
-      )}
+      {isSearching ? <Box height={1} /> : <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />}
     </Box>
   )
 }
 
 type SearchProps = { ui: Ui; search: SearchState; actions: BoardActions }
 
-/** The open search, in the key line's place: an Input, and an ✕ that clears it and brings the sections back. */
+/**
+ * The open search, an Input and an ✕ that clears it and brings the sections back, painted in the key
+ * line's place. It is drawn first all the same: the engine keeps the focus ring as a place in the
+ * drawing order, and a list changing above the Input as the person types would move the ring off it.
+ */
 function SearchLine({ ui, search, actions }: SearchProps) {
   const { Box, Button, Text } = ui
   return (
-    <Box flexDirection="row" columnGap={1} height={1} overflow="hidden">
+    <Box position="absolute" bottom={0} left={0} right={0} flexDirection="row" columnGap={1} height={1} overflow="hidden">
       <Text color="suggestion">⌕</Text>
       <Box flexGrow={1} flexShrink={1}>
         {'Input' in ui ? (

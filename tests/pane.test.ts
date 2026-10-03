@@ -184,8 +184,23 @@ async function listShape(ui: { drawn: () => Promise<unknown> }, depth = Infinity
 
 async function listLines(ui: { drawn: () => Promise<unknown> }): Promise<unknown[]> {
   const board = ((await ui.drawn()) as Node).children?.[0] as Node
-  // The board: the list window, the box, the key line.
-  return ((board.children?.[0] as Node).children ?? [])
+  // The board: the search box while open, the list window, the box, the key line.
+  const window = (board.children ?? []).find(child => (child as { props?: { overflow?: string; position?: string } }).props?.overflow === 'hidden'
+    && (child as { props?: { position?: string } }).props?.position !== 'absolute')
+  return ((window as Node | undefined)?.children ?? [])
+}
+
+/** The keys of the elements that can hold the focus ring, in drawing order: the order the engine numbers the ring by. */
+async function ringOrder(ui: { drawn: () => Promise<unknown> }): Promise<string[]> {
+  const keys: string[] = []
+  const walk = (node: unknown) => {
+    if (typeof node !== 'object' || node === null) return
+    const { type, props, children } = node as Node
+    if ((type === 'Button' || type === 'Input' || type === 'Select') && props?.key !== undefined) keys.push(props.key)
+    for (const child of children ?? []) walk(child)
+  }
+  walk(await ui.drawn())
+  return keys
 }
 
 /** ↑ or ↓ as the engine raises them: the person moving the ring to the next element that takes it. */
@@ -351,10 +366,14 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'query' })).toBeDefined()
     // The box takes the key line's place at the bottom, so nothing above it moves.
     expect(await ui.find({ key: 'config' })).toBeUndefined()
+    // Yet it is drawn first: the ring is a place in the drawing order, and the results changing above
+    // it as the person types would otherwise move the ring off it, the letters going to the prompt.
+    expect((await ringOrder(ui))[0]).toBe('query')
     expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeDefined()
 
     await ui.input({ key: 'query', text: 'login', kind: 'change' })
     expect(await ui.find({ type: 'Text', text: HEADINGS })).toBeUndefined()
+    expect((await ringOrder(ui))[0]).toBe('query')
     const results = (await ui.findAll({ type: 'Button' })).map(found => found.key).filter(key => key?.startsWith('task-'))
     expect(results).toEqual(['task-T-001', 'task-T-008'])
     expect(await ui.findAll({ type: 'Text', text: /^login$/ })).toHaveLength(2)
