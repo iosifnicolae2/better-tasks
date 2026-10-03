@@ -191,10 +191,30 @@ async function rememberOpen($: EngineInterface, isOpen: boolean): Promise<void> 
   await $.store.set(OPEN_KEY, { ...open, [root]: isOpen })
 }
 
-/** At start: the board comes back if it was open when this project's last session ended. */
+/**
+ * Whether this terminal session uses the fullscreen layout, where a click on the board gives it the
+ * keys. Read the way Claude Code decides it: on unless CLAUDE_CODE_NO_FLICKER=0, and off inside
+ * tmux unless that variable turns it on.
+ */
+async function isFullscreenLayout($: EngineInterface): Promise<boolean> {
+  const noFlicker = await $.env.get('CLAUDE_CODE_NO_FLICKER')
+  if (noFlicker === '0') return false
+  if (noFlicker === '1') return true
+  return (await $.env.get('TMUX')) === undefined
+}
+
+/**
+ * At start: the board comes back if it was open when this project's last session ended, but only
+ * in the fullscreen layout, where a click gives it the keys. Elsewhere one line says how to open it,
+ * and the flag stays for a later fullscreen session.
+ */
 async function reopenIfOpenBefore($: EngineInterface, options: PluginOptions): Promise<void> {
   const open = ((await $.store.get(OPEN_KEY)) ?? {}) as Record<string, boolean>
   if (open[await $.session.root()] !== true) return
+  if (!(await isFullscreenLayout($))) {
+    $.ui.log('supermanager: the board was open last time: type /supermanager')
+    return
+  }
   const files = filesOf($, options)
   await listTasks(files)
   refreshTimer ??= $.clock.every(REFRESH_MS, () => void listTasks(files))
@@ -264,7 +284,7 @@ export function registerPane(on: On, options: PluginOptions): void {
 
   // A closed pane needs no refresh; the spinners stop with their rows.
   // The register's own session.start runs for every session; this one, with a matcher, only reopens.
-  on('session.start', { isInteractive: true }, async ($, e, next) => {
+  on('session.start', { isInteractive: true, surface: 'terminal' }, async ($, e, next) => {
     const started = await next(e)
     await reopenIfOpenBefore($, options)
     return started
