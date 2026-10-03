@@ -35,7 +35,7 @@ export function withRules(
   rules: string,
 ): readonly PromptComposeSection[] {
   if (!isMainPrompt(sections, traits, tools) || rules === '') return sections
-  return [...sections, { id: 'supermanager:coordinator', text: rules, scope: 'session' }]
+  return [...sections, { id: 'better-tasks:coordinator', text: rules, scope: 'session' }]
 }
 
 /** Why the main session may not create a task yet, or undefined when it may. */
@@ -54,7 +54,7 @@ export async function contextBlock(io: Io, settings: Settings, notice: string): 
   const goal = goalOf(await readSprints(io), start)
   const done = tasks.filter(task => task.status === 'done').length
   const lines = [
-    `[supermanager] ${sprintTitle(start, config, day)} · goal: ${goal || 'not set'} · ${done}/${tasks.length} done`,
+    `[better-tasks] ${sprintTitle(start, config, day)} · goal: ${goal || 'not set'} · ${done}/${tasks.length} done`,
     ...waitingLines(tasks),
     notice,
     ...team.map(mate => `Teammate ${mateLine(mate)}${isFull(mate, settings.contextLimit) ? ' · FULL, no new work' : ''}`),

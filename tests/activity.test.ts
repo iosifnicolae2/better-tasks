@@ -8,7 +8,7 @@ test('a tool call reads as a few words of activity', () => {
   expect(activityOf('Bash', { command: 'npm test\necho done' })).toBe('running npm test')
   expect(activityOf('Grep', { pattern: 'login' })).toBe('searching login')
   expect(activityOf('AskUserQuestion', {})).toBe('waiting for your answer')
-  expect(activityOf('mcp__supermanager__task_update', {})).toBe('task update')
+  expect(activityOf('mcp__better-tasks__task_update', {})).toBe('task update')
   expect(activityOf('Bash', { command: 'x'.repeat(80) })).toHaveLength(40)
 })
 

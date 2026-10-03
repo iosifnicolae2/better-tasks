@@ -15,7 +15,7 @@ const SURFACES = ['terminal', 'desktop'] as const
 
 const PANE = {
   component: 'Pane',
-  requestId: 'supermanager-sprint',
+  requestId: 'better-tasks-sprint',
   props: {
     title: 'Sprint',
     isFocused: true,
@@ -90,7 +90,7 @@ function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<st
 }
 
 const sprintCommand = (args = '') => ({
-  command: 'supermanager',
+  command: 'better-tasks',
   args,
   origin: { kind: 'composer' as const },
   presentation: { isFullscreen: true, columns: 160 },
@@ -169,7 +169,7 @@ async function listLines(ui: { drawn: () => Promise<unknown> }): Promise<unknown
 
 /** ↑ or ↓ as the engine raises them: the person moving the ring to the next element that takes it. */
 const arrowTo = ($: Engine, element: string) =>
-  $.ui.focus({ component: 'Pane', requestId: 'supermanager-sprint', plugin: 'supermanager', element, origin: { kind: 'person' } })
+  $.ui.focus({ component: 'Pane', requestId: 'better-tasks-sprint', plugin: 'better-tasks', element, origin: { kind: 'person' } })
 
 const HEADINGS = /^(Currently working on|This sprint|Next sprint|Backlog)$/
 
@@ -177,7 +177,7 @@ for (const surface of SURFACES) {
   test(`selecting, moving and acting never shift the rows (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     const before = await listShape(ui, 2)
     expect(await ui.find({ key: 'open' })).toBeDefined()
     await ui.press({ key: 'task-T-004' })
@@ -190,7 +190,7 @@ for (const surface of SURFACES) {
   test(`every section stays drawn when its last task leaves, so nothing above moves (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     const headings = async () => (await ui.findAll({ type: 'Text', text: HEADINGS })).map(found => found.text)
     expect(await headings()).toEqual(['Currently working on', 'This sprint', 'Next sprint', 'Backlog'])
     expect(await ui.findAll({ type: 'Text', text: '  —  empty' })).toHaveLength(2)
@@ -207,7 +207,7 @@ for (const surface of SURFACES) {
     const { files } = fakeProject(on)
     const head = (id: string) => files.get([...files.keys()].find(path => path.includes(id)) ?? '') ?? ''
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect((await ui.find({ key: 'up' }))?.props).toMatchObject({ action: 'app:diffFileListUp' })
     expect((await ui.find({ key: 'toggle' }))?.props).toMatchObject({ hotkey: 'b' })
 
@@ -233,7 +233,7 @@ for (const surface of SURFACES) {
   test(`↑↓ select; o opens the selected one; no j/k anywhere (${surface})`, async ($, on) => {
     const { commands } = fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     const title = async () => (await ui.find({ type: 'Text', text: /^T-00\d {2}/ }))?.text
     expect(await title()).toBe('T-001  Fix login')
     await arrowTo($, 'task-T-004')
@@ -249,7 +249,7 @@ for (const surface of SURFACES) {
   test(`Enter hands the keys to the actions: only the row and the actions take the ring, ↑ comes back (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     const buttons = async () => (await ui.findAll({ type: 'Button' })).map(found => found.key)
     await ui.press({ key: 'task-T-001' })
     expect(await buttons()).toEqual(['task-T-001', 'open', 'start', 'done', 'move', 'up', 'down', 'toggle'])
@@ -266,7 +266,7 @@ for (const surface of SURFACES) {
     const head = (id: string) => files.get([...files.keys()].find(path => path.includes(id)) ?? '') ?? ''
     const buttons = async () => (await ui.findAll({ type: 'Button' })).map(found => found.key)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     const before = await listShape(ui, 1)
 
     await ui.press({ key: 'task-T-001' })
@@ -303,7 +303,7 @@ for (const surface of SURFACES) {
   test(`a board without the keys looks it and cannot act on a chord from the prompt (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
     expect(await ui.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeDefined()
     expect(await ui.find({ key: 'up' })).toBeUndefined()
     expect(await ui.find({ key: 'down' })).toBeUndefined()
@@ -314,8 +314,8 @@ for (const surface of SURFACES) {
   test(`an arrow past the board's ends never takes the ring off the board (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
-    const offTheBoard = await $.ui.focus({ component: 'Pane', requestId: 'supermanager-sprint', origin: { kind: 'person' } })
+    await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    const offTheBoard = await $.ui.focus({ component: 'Pane', requestId: 'better-tasks-sprint', origin: { kind: 'person' } })
     expect(offTheBoard.deny).toBeDefined()
     expect((await arrowTo($, 'task-T-004')).deny).toBeUndefined()
   })
@@ -323,7 +323,7 @@ for (const surface of SURFACES) {
   test(`closed tasks sit collapsed in their own section; opened, one can be reopened (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect((await ui.find({ key: 'closed' }))?.text).toBe('Closed · 1 ▸')
     expect(await ui.find({ key: 'task-T-003' })).toBeUndefined()
     await ui.press({ key: 'closed' })
@@ -341,7 +341,7 @@ for (const surface of SURFACES) {
     const { files } = fakeProject(on)
     for (let n = 10; n < 40; n += 1) files.set(`${DIR}/T-0${n}-x.md`, taskFile(`T-0${n}`, `Task ${n}`, 'backlog', 'todo'))
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 24 } } })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 24 } } })
     expect(await listLines(ui)).toHaveLength(16)
     expect(await ui.find({ type: 'Text', text: /more below$/ })).toBeDefined()
     await arrowTo($, 'task-T-039')
@@ -353,7 +353,7 @@ for (const surface of SURFACES) {
   test(`even a very short pane keeps the box at the bottom and the selection in the list (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 10 } } })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 10 } } })
     expect(await listLines(ui)).toHaveLength(2)
     expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
     expect(await ui.find({ key: 'open' })).toBeDefined()
@@ -363,18 +363,18 @@ for (const surface of SURFACES) {
   test(`the pane says how to give it the keys when it has none (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
-    const unfocused = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
+    const unfocused = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, isFocused: false } })
     expect(await unfocused.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeDefined()
     await unfocused.unmount()
-    const focused = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const focused = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await focused.find({ type: 'Text', text: 'The keys are with the prompt · click or ctrl+x tab to use the board' })).toBeUndefined()
   })
 }
 
-test('/supermanager opens the pane asking for the keys, and asks again once the command is done', async ($, on) => {
+test('/better-tasks opens the pane asking for the keys, and asks again once the command is done', async ($, on) => {
   const { opens, clock } = fakeProject(on)
   await $.command.run(sprintCommand())
-  expect(opens).toEqual([expect.objectContaining({ id: 'supermanager-sprint', focus: true })])
+  expect(opens).toEqual([expect.objectContaining({ id: 'better-tasks-sprint', focus: true })])
   await clock.advance(200)
   expect(opens).toHaveLength(2)
   expect(opens[1]).toEqual(expect.objectContaining({ focus: true }))
@@ -383,7 +383,7 @@ test('/supermanager opens the pane asking for the keys, and asks again once the 
 test('Mark as done logs the task and moves the selection to the next one', async ($, on) => {
   const { files } = fakeProject(on)
   await $.command.run(sprintCommand())
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'done' })
   expect(files.get(`${DIR}/T-001-fix-login.md`)).toContain('status: done')
   expect(files.get(`${ROOT}/docs/tasks.md`)).toContain('T-001 Fix login')
@@ -394,7 +394,7 @@ test('Mark as done logs the task and moves the selection to the next one', async
 test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
   const { commands } = fakeProject(on, { __CFBundleIdentifier: 'com.jetbrains.intellij', TERMINAL_EMULATOR: 'JetBrains-JediTerm' })
   await $.command.run(sprintCommand())
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'desktop', ...PANE })
   await ui.press({ key: 'task-T-001' })
   await ui.press({ key: 'open' })
   expect(commands.at(-1)).toEqual(['open', '-b', 'com.jetbrains.intellij', `${DIR}/T-001-fix-login.md`])
@@ -404,7 +404,7 @@ for (const surface of SURFACES) {
   test(`settings are rows like /config: Enter changes a value in place, nothing expands (${surface})`, async ($, on) => {
     const { settings } = fakeProject(on)
     await $.command.run(sprintCommand('config'))
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     const shape = async () => JSON.stringify(await ui.drawn(), (key, value) => (key === 'children' || key === 'type' ? value : typeof value === 'string' ? '' : value))
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
@@ -413,12 +413,12 @@ for (const surface of SURFACES) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
-      ['supermanager.editor', 'default'],
-      ['supermanager.worktree', true],
-      ['supermanager.contextLimit', 60],
-      ['supermanager.keepAwake', false],
-      ['supermanager.sprintWeeks', '2'],
-      ['supermanager.sprintStart', 'tuesday'],
+      ['better-tasks.editor', 'default'],
+      ['better-tasks.worktree', true],
+      ['better-tasks.contextLimit', 60],
+      ['better-tasks.keepAwake', false],
+      ['better-tasks.sprintWeeks', '2'],
+      ['better-tasks.sprintStart', 'tuesday'],
     ])
     expect(await shape()).toBe(before)
     settings.length = 0
@@ -428,7 +428,7 @@ for (const surface of SURFACES) {
   test(`the line at the bottom describes the focused row (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand('config'))
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     await arrowTo($, 'cfg-contextLimit')
     expect(await ui.find({ type: 'Text', text: /^Context limit: No new work goes to a teammate/ })).toBeDefined()
     await arrowTo($, 'file-teammate.md')
@@ -442,7 +442,7 @@ for (const surface of SURFACES) {
 test('only settings changed from the default are marked', { options: { worktree: true } }, async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand('config'))
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'desktop', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'desktop', ...PANE })
   expect(await ui.findAll({ type: 'Text', text: /^•$/ })).toHaveLength(1)
 })
 
@@ -455,18 +455,18 @@ test('the settings page hands off to /config, where our rows say whose they are'
   })
   on('config.describe', ($, e) => ({ label: e.label, description: e.description, isHidden: e.isHidden }))
   await $.command.run(sprintCommand('config'))
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'cfg-native' })
   expect(ran).toEqual(['config'])
-  const row = { label: 'Editor', isHidden: false, provider: { plugin: 'supermanager', tier: 'user' as const } }
-  expect((await $.config.describe({ key: 'supermanager.editor', ...row })).label).toBe('Supermanager: Editor')
+  const row = { label: 'Editor', isHidden: false, provider: { plugin: 'better-tasks', tier: 'user' as const } }
+  expect((await $.config.describe({ key: 'better-tasks.editor', ...row })).label).toBe('Better Tasks: Editor')
   expect((await $.config.describe({ key: 'theme', ...row, label: 'Theme' })).label).toBe('Theme')
 })
 
 test('the phone draws the board and settings without pickers', async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand())
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'mobile', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'mobile', ...PANE })
   expect((await ui.find({ key: 'done' }))?.text).toBe('Mark as done')
   await ui.press({ key: 'config' })
   expect(await ui.find({ type: 'Text', text: 'auto' })).toBeDefined()
@@ -475,11 +475,11 @@ test('the phone draws the board and settings without pickers', async ($, on) => 
 test('the arrow keys select: the focus ring carries the selection', async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand())
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   const moved = await $.ui.focus({
     component: 'Pane',
-    requestId: 'supermanager-sprint',
-    plugin: 'supermanager',
+    requestId: 'better-tasks-sprint',
+    plugin: 'better-tasks',
     element: 'task-T-002',
     origin: { kind: 'person' },
   })
@@ -493,12 +493,12 @@ test('a task being worked on spins; the phone shows a still ✻', async ($, on) 
   files.set(`${DIR}/T-001-fix-login.md`, taskFile('T-001', 'Fix login', '2026-10-05', 'doing', 'auth'))
   await $.command.run(sprintCommand())
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await ui.find({ type: 'Client', key: 'spin-T-001' })).toBeDefined()
     expect(await ui.find({ type: 'Text', in: 'spin-T-001' })).toBeDefined()
     await ui.unmount()
   }
-  const phone = await $.ui.mount({ plugin: 'supermanager', surface: 'mobile', ...PANE })
+  const phone = await $.ui.mount({ plugin: 'better-tasks', surface: 'mobile', ...PANE })
   expect(await phone.find({ type: 'Text', text: '✻' })).toBeDefined()
 })
 
@@ -529,7 +529,7 @@ async function withTeammate($: Engine, on: On) {
 for (const surface of SURFACES) {
   test(`a task in progress shows its teammate; View session shows its transcript (${surface})`, async ($, on) => {
     await withTeammate($, on)
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await ui.find({ type: 'Text', text: /^⎿$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'idle' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /63%/ })).toBeDefined()
@@ -564,7 +564,7 @@ test("the pane follows the project's config.json, and its settings page says whi
   const { files, commands } = fakeProject(on)
   files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ sprintWeeks: '2', editor: 'code', sprintsFile: 'docs/sprints.md' }))
   await $.command.run(sprintCommand())
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   expect((await ui.find({ type: 'Text', text: /^◆ This sprint/ }))?.text).toMatch(/· Weeks 40–41 · Sep 28–Oct 11 · 5 days left$/)
   expect((await ui.find({ type: 'Text', text: /^◇ Next sprint/ }))?.text).toBe('◇ Next sprint 2 · Weeks 42–43 · Oct 12–25')
   await ui.press({ key: 'open' })
@@ -581,7 +581,7 @@ for (const surface of SURFACES) {
     const { files, commands } = fakeProject(on)
     files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ contextLimit: 40, colour: 'blue' }))
     await $.command.run(sprintCommand('config'))
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await ui.find({ type: 'Text', text: '1 value · open' })).toBeDefined()
     expect(await ui.findAll({ type: 'Text', text: 'default · create' })).toHaveLength(3)
     expect(await ui.find({ type: 'Text', text: /⚠ .*colour/ })).toBeDefined()
@@ -599,7 +599,7 @@ for (const surface of SURFACES) {
   test(`each sprint's heading carries its week, dates and days left; the goal sits under This sprint (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)
     await $.command.run(sprintCommand())
-    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect((await ui.find({ type: 'Text', text: /^◆ This sprint/ }))?.text).toBe('◆ This sprint 2 · Week 41 · Oct 5–11 · 5 days left')
     expect((await ui.find({ type: 'Text', text: /^◇ Next sprint/ }))?.text).toBe('◇ Next sprint · Week 42 · Oct 12–18')
     expect(await ui.find({ type: 'Text', text: /^⚡ Currently working on$/ })).toBeDefined()
@@ -621,6 +621,6 @@ for (const surface of SURFACES) {
 test('a 4-week sprint shows its weeks in the settings preview', { options: { sprintWeeks: '4' } }, async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand('config'))
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   expect(await ui.find({ type: 'Text', text: /^Sprint \d+ · Weeks \d+–\d+ · / })).toBeDefined()
 })

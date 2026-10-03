@@ -10,7 +10,7 @@ export const EXTEND = '<!-- extend -->'
 
 export type TextName = 'coordinator' | 'teammate' | 'task-template' | 'tips'
 
-const COORDINATOR = `# Supermanager: you are the coordinator
+const COORDINATOR = `# Better Tasks: you are the coordinator
 You route work to agent teammates; you don't do the work yourself unless it is a one-line answer.
 - Every user message is routed: if a teammate already owns that area (files, feature, question), forward it with SendMessage, word for word plus missing context. New work → a task, then a teammate named by its area.
 - One owner per set of files. Similar work goes to the same teammate, even a stopped one (SendMessage resumes it).
@@ -22,10 +22,10 @@ You route work to agent teammates; you don't do the work yourself unless it is a
 - Plan first only when the user asks: then spawn the teammate in plan mode and approve its plan.
 - Give each teammate its task file path; it keeps notes there. When it is done, task_update status done with a summary and the commits.
 - Tell the user in one line where each message went.
-- The user's sprint board is /supermanager (settings: /supermanager config); /away turns the screens off.
-- To customize supermanager for this project (numbering, these rules, teammate instructions, the task template), call project_init and edit the files in .claude/manager/.`
+- The user's sprint board is /better-tasks (settings: /better-tasks config); /away turns the screens off.
+- To customize better-tasks for this project (numbering, these rules, teammate instructions, the task template), call project_init and edit the files in .claude/manager/.`
 
-const TEAMMATE = `# Working as a supermanager teammate
+const TEAMMATE = `# Working as a better-tasks teammate
 - Your task file (its path is in this prompt) is yours: keep short dated notes in its Notes section as you go.
 - Stay in your area's files; ask the lead before you touch files another teammate owns.
 - Commit small and often. When done, report to the lead: what changed, the commits, and what you could not verify.
@@ -37,7 +37,7 @@ const TASK_TEMPLATE = `## Goal
 ## Notes
 `
 
-const TIPS = `/supermanager  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop
+const TIPS = `/better-tasks  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop
 "create a task …" → asks which sprint · "start T-003" → a teammate takes it
 /away  screens off, Mac keeps working`
 
@@ -73,12 +73,12 @@ export async function projectText(files: Files, name: TextName): Promise<string>
   return resolveText(SHIPPED[name], override)
 }
 
-// ---- Starter files: what /supermanager init (or the project_init tool) writes ----
+// ---- Starter files: what /better-tasks init (or the project_init tool) writes ----
 
 function starterConfig(): string {
   const lines = Object.entries(DEFAULTS).map(([key, value]) => `  "// ${key}": ${JSON.stringify(value)}`)
   const note =
-    '  "//": "supermanager settings for this project. Remove the // in front of a key to set it here; ' +
+    '  "//": "better-tasks settings for this project. Remove the // in front of a key to set it here; ' +
     'keys left out come from /config or the defaults. {id}, {slug} and {title} work in taskFileName."'
   return `{\n${[note, ...lines].join(',\n')}\n}\n`
 }
@@ -87,7 +87,7 @@ function starterText(name: TextName): string {
   const shipped = SHIPPED[name].replace(/-->/g, '--&gt;')
   return (
     `${EXTEND}\n` +
-    `<!-- What you write below is added to supermanager's own ${name} text. Delete the first line to replace ` +
+    `<!-- What you write below is added to better-tasks' own ${name} text. Delete the first line to replace ` +
     'that text instead. Comments like this one never reach the model. The shipped text, for reference:\n\n' +
     `${shipped}\n-->\n`
   )

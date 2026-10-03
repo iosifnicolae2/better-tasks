@@ -46,7 +46,7 @@ function fakeHost(
   on('agent.list', () => ({ value: agents }))
   on('tool.register', ($, e) => {
     host.registered.push(e.name)
-    return { value: { tool: `mcp__supermanager__${e.name}` } }
+    return { value: { tool: `mcp__better-tasks__${e.name}` } }
   })
   on('command.register', ($, e) => {
     if (takenNames.includes(e.name)) return { deny: `"/${e.name}" refused: it is the built-in /${e.name}` }
@@ -94,7 +94,7 @@ function fakeHost(
 const mate = (id: string, name: string): AgentInfo => ({ id, name, description: name, type: 'teammate', status: 'running' })
 
 const prompt = (text: string) => ({ text, origin: { kind: 'composer' }, wait: false }) as const
-const create = { tool: 'mcp__supermanager__task_create', tool_use_id: 't1', title: 'Fix login', goal: 'No loop', when: 'now' } as const
+const create = { tool: 'mcp__better-tasks__task_create', tool_use_id: 't1', title: 'Fix login', goal: 'No loop', when: 'now' } as const
 
 test('task_create is refused until the user was asked when', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
@@ -128,9 +128,9 @@ test('each user prompt carries the sprint context', async ($, on) => {
   mock.store(on)
   fakeHost(on, [mate('a1', 'auth')])
   await $.session.start(SESSION)
-  await $.tool.call({ tool: 'mcp__supermanager__sprint_goal', tool_use_id: 'g1', goal: 'Ship login' })
+  await $.tool.call({ tool: 'mcp__better-tasks__sprint_goal', tool_use_id: 'g1', goal: 'Ship login' })
   const entered = await $.prompt.submit(prompt('hi'))
-  expect(entered.context?.at(-1)).toContain('[supermanager] Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 0/0 done')
+  expect(entered.context?.at(-1)).toContain('[better-tasks] Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 0/0 done')
   expect(entered.context?.at(-1)).toContain('Teammate auth · running')
 })
 
@@ -147,8 +147,8 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
     return (await $.prompt.compose({ ...base, tools, traits })).sections.map(section => section.id)
   }
 
-  expect(await idsFor('intro', MAIN_TOOLS)).toEqual(['intro', 'supermanager:coordinator'])
-  expect(await idsFor('lean_body', MAIN_TOOLS, ['lean'])).toEqual(['lean_body', 'supermanager:coordinator'])
+  expect(await idsFor('intro', MAIN_TOOLS)).toEqual(['intro', 'better-tasks:coordinator'])
+  expect(await idsFor('lean_body', MAIN_TOOLS, ['lean'])).toEqual(['lean_body', 'better-tasks:coordinator'])
   expect(await idsFor('intro', MAIN_TOOLS, ['teammate'])).toEqual(['intro'])
   expect(await idsFor('intro', ['Read', 'Grep', 'Bash'])).toEqual(['intro']) // an Explore scout: no Agent tool
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
@@ -196,7 +196,7 @@ test('a new sprint rolls unfinished work over and writes the review', async ($, 
   await $.prompt.submit(prompt('two tasks for this sprint'))
   await $.tool.call({ ...create, when: 'this-sprint', title: 'Open one' })
   await $.tool.call({ ...create, tool_use_id: 't2', when: 'this-sprint', title: 'Shipped one' })
-  await $.tool.call({ tool: 'mcp__supermanager__task_update', tool_use_id: 'u1', id: 'T-002', status: 'done', note: 'Works', commits: 'abc123' })
+  await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u1', id: 'T-002', status: 'done', note: 'Works', commits: 'abc123' })
   expect(host.files.get(`${ROOT}/docs/tasks.md`)).toContain('| T-002 Shipped one | Works | abc123 | session lead-session')
 
   await clock.advance(3 * 60_000)
@@ -236,7 +236,7 @@ test('agent teams missing everywhere: one prompt asks Claude to set them up; the
   const composed = await $.prompt.compose(COMPOSE_BASE)
   expect(composed.sections.map(section => section.id)).toEqual(['intro'])
   const entered = await $.prompt.submit(prompt('hi'))
-  expect(entered.context).toEqual(['[supermanager] off: agent teams are not set up (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1).'])
+  expect(entered.context).toEqual(['[better-tasks] off: agent teams are not set up (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1).'])
 })
 
 test('agent teams in settings but not in this session: toast and status, no prompt', async ($, on) => {
@@ -263,8 +263,8 @@ test('every session start shows the tips once, with the live sprint line', async
   await $.session.start(SESSION)
   await clock.advance(0)
   expect(host.notices).toEqual([
-    'supermanager · Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 1 open',
-    '/supermanager  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop',
+    'better-tasks · Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11 · 7 days left · goal: Ship login · 1 open',
+    '/better-tasks  ↑↓ select · ⏎ actions, ←→ choose · m move, ↑↓, ⏎ stop',
     '"create a task …" → asks which sprint · "start T-003" → a teammate takes it',
     '/away  screens off, Mac keeps working',
   ])
@@ -295,7 +295,7 @@ test('sprint progress goes in the footer; no teammate count anywhere the user se
   await $.tool.call(create)
   await $.prompt.submit(prompt('ok'))
 
-  const footer = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', component: 'SessionMode', props: { modes: ['focus'] } })
+  const footer = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', component: 'SessionMode', props: { modes: ['focus'] } })
   expect(drawn.at(-1)).toEqual(['focus', 'Sprint 41 · 0/1 done · 1 due'])
   await footer.unmount()
   expect(host.status.join('\n')).not.toMatch(/teammate/i)
@@ -312,8 +312,8 @@ test('a refused command name is logged; the other commands, the tools and the ti
   expect(host.registered).toEqual(expect.arrayContaining(['task_create', 'team_status', 'screen_off']))
   expect(host.registered).not.toContain(`/${first}`)
   expect(host.registered).toEqual(expect.arrayContaining(SCREEN_COMMANDS.map(command => `/${command.name}`)))
-  expect(host.notices.some(line => line.startsWith(`supermanager: /${first} failed:`))).toBe(true)
-  expect(host.notices.some(line => line.startsWith('supermanager · Sprint 41'))).toBe(true)
+  expect(host.notices.some(line => line.startsWith(`better-tasks: /${first} failed:`))).toBe(true)
+  expect(host.notices.some(line => line.startsWith('better-tasks · Sprint 41'))).toBe(true)
 })
 
 // Claude Code 2.1.288's built-in commands and bundled skills. The test kit refuses no name, so this list stands in.
@@ -328,7 +328,7 @@ const BUILT_IN = [
 
 test('no command of ours takes a built-in name', () => {
   const ours = [...PANE_COMMANDS, ...SCREEN_COMMANDS].map(command => command.name)
-  expect(ours).toEqual(['supermanager', 'away'])
+  expect(ours).toEqual(['better-tasks', 'away'])
   expect(ours.filter(name => BUILT_IN.includes(name))).toEqual([])
 })
 
@@ -339,7 +339,7 @@ test("a teammate's tool call shows as its activity until its turn ends", async (
   on('tool.call', { tool: 'Edit' }, () => ({ result: 'edited' }))
   on('turn.complete', ($, e) => ({ text: e.answer }))
   await $.session.start(SESSION)
-  const status = async () => String((await $.tool.call({ tool: 'mcp__supermanager__team_status', tool_use_id: 'ts' })).result)
+  const status = async () => String((await $.tool.call({ tool: 'mcp__better-tasks__team_status', tool_use_id: 'ts' })).result)
 
   const teammateEdit = { tool: 'Edit', tool_use_id: 'e1', agentId: 'a1', file_path: '/p/src/auth.ts', old_string: 'a', new_string: 'b' }
   await $.tool.call(teammateEdit as never) // agentId: as the engine raises a teammate's call
@@ -364,7 +364,7 @@ test('a project customizes numbering, files, the task template and teammate inst
   expect(host.files.get(`${ROOT}/work/BUG-01.md`)).toContain('---\n# BUG-01 Fix login\nNo loop\n')
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'Fix BUG-01.', name: 'auth' })
-  expect(host.spawned.at(-1)).toContain('Fix BUG-01.\n\n# Working as a supermanager teammate')
+  expect(host.spawned.at(-1)).toContain('Fix BUG-01.\n\n# Working as a better-tasks teammate')
   expect(host.spawned.at(-1)).toMatch(/Run `make check` before you report\.$/)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find X.' })
   expect(host.spawned.at(-1)).toBe('Find X.')
@@ -387,11 +387,11 @@ test('project_init writes the starter files once and keeps edits', async ($, on)
   mock.store(on)
   const host = fakeHost(on, [], { [`${ROOT}/.claude/manager/tips.md`]: 'my tips' })
   await $.session.start(SESSION)
-  const first = await $.tool.call({ tool: 'mcp__supermanager__project_init', tool_use_id: 'i1' })
+  const first = await $.tool.call({ tool: 'mcp__better-tasks__project_init', tool_use_id: 'i1' })
   expect(String(first.result)).toContain('Wrote .claude/manager/config.json, .claude/manager/coordinator.md')
   expect(String(first.result)).not.toContain('tips.md')
   expect(host.files.get(`${ROOT}/.claude/manager/tips.md`)).toBe('my tips')
-  const again = await $.tool.call({ tool: 'mcp__supermanager__project_init', tool_use_id: 'i2' })
+  const again = await $.tool.call({ tool: 'mcp__better-tasks__project_init', tool_use_id: 'i2' })
   expect(String(again.result)).toContain('All override files exist already.')
 })
 
@@ -407,9 +407,9 @@ test('tasks keep their order: new ones at the end, now at the top, a move lands 
   const orderOf = (file: string) => host.files.get(`${TASKS}/${file}`)?.match(/^order: (-?\d+)$/m)?.[1]
   expect([orderOf('T-001-one.md'), orderOf('T-002-two.md'), orderOf('T-003-hot.md'), orderOf('T-004-hotter.md')]).toEqual(['0', '1', '0', '-1'])
 
-  await $.tool.call({ tool: 'mcp__supermanager__task_update', tool_use_id: 'u1', id: 'T-003', when: 'this-sprint' })
+  await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u1', id: 'T-003', when: 'this-sprint' })
   expect(orderOf('T-003-hot.md')).toBe('2')
-  const list = String((await $.tool.call({ tool: 'mcp__supermanager__task_list', tool_use_id: 'l1' })).result)
+  const list = String((await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1' })).result)
   expect(list.split('\n').map(line => line.split(' ')[0])).toEqual(['T-004', 'T-001', 'T-002', 'T-003'])
 })
 
@@ -427,7 +427,7 @@ test('changing the sprint length mid-sprint keeps every task, on a boundary', as
   await clock.advance(60_000)
   expect(host.files.get(`${TASKS}/T-001-this-week.md`)).toContain('sprint: 2026-09-28')
   expect(host.files.get(`${TASKS}/T-002-next-week.md`)).toContain('sprint: 2026-10-12')
-  const list = String((await $.tool.call({ tool: 'mcp__supermanager__task_list', tool_use_id: 'l1', sprint: 'all' })).result)
+  const list = String((await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1', sprint: 'all' })).result)
   expect(list).toBe('T-001 [todo] This week · this sprint\nT-002 [todo] Next week · next sprint')
 })
 
@@ -440,7 +440,7 @@ test('the user-facing name of the now section is "Currently working on"', async 
   expect(refused.deny ?? refused.text).toContain('"Start now (currently working on)" / This sprint / Next sprint / Backlog')
   await $.prompt.submit(prompt('start it now'))
   await $.tool.call(create)
-  const list = String((await $.tool.call({ tool: 'mcp__supermanager__task_list', tool_use_id: 'l1' })).result)
+  const list = String((await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1' })).result)
   expect(list).toBe('T-001 [todo] Fix login · currently working on')
   const entered = await $.prompt.submit(prompt('hi'))
   expect(entered.context?.at(-1)).toContain('Currently working on, not started yet: T-001 Fix login.')

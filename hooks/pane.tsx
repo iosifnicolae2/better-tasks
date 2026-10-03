@@ -20,10 +20,10 @@ import { isOpen, listTasks, placeOf, saveTask, today, whenOf } from './tasks'
 import { isActive } from './team'
 import { overridePath, starterFiles } from './texts'
 
-// The Supermanager pane: /supermanager opens the board, /supermanager config its settings page. This file holds `$`.
+// The better-tasks pane: /better-tasks opens the board, /better-tasks config its settings page. This file holds `$`.
 // (/tasks is Claude Code's own command, so the pane cannot take that name.)
 
-const PANE = 'supermanager-sprint'
+const PANE = 'better-tasks-sprint'
 const REFRESH_MS = 30_000
 const FOCUS_RETRY_MS = 150
 const PANE_OPEN = { id: PANE, title: 'Sprint', focus: true, columns: 76 } as const
@@ -33,23 +33,23 @@ const OPEN_KEY = 'pane.open'
 const CLOSED_KEY = 'pane.closedOpen'
 /** $.store key: the settings row the focus ring is on, for its description line. */
 const CONFIG_ROW_KEY = 'pane.configRow'
-const NATIVE_PREFIX = 'Supermanager: '
+const NATIVE_PREFIX = 'Better Tasks: '
 
 type Page = 'board' | 'config' | 'session'
 
 /** register.tsx registers these at session start; this file answers them. */
 export const PANE_COMMANDS: CommandSpec[] = [
-  { name: 'supermanager', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
+  { name: 'better-tasks', description: 'Show the sprint board in a pane', argumentHint: '[config]' },
 ]
 
 // The values the pane draws from; the validator wants them declared in the file that uses them.
-const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as Task[])
-const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
-const selectedState = atom({ plugin: 'supermanager', key: 'selected' } as const, '')
-const pageState = atom({ plugin: 'supermanager', key: 'page' } as const, 'board' as Page)
-const viewingState = atom({ plugin: 'supermanager', key: 'viewing' } as const, '')
-const movingState = atom({ plugin: 'supermanager', key: 'moving' } as const, '')
-const actingState = atom({ plugin: 'supermanager', key: 'acting' } as const, '')
+const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as Task[])
+const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
+const selectedState = atom({ plugin: 'better-tasks', key: 'selected' } as const, '')
+const pageState = atom({ plugin: 'better-tasks', key: 'page' } as const, 'board' as Page)
+const viewingState = atom({ plugin: 'better-tasks', key: 'viewing' } as const, '')
+const movingState = atom({ plugin: 'better-tasks', key: 'moving' } as const, '')
+const actingState = atom({ plugin: 'better-tasks', key: 'acting' } as const, '')
 
 // ---- With $ ----
 
@@ -83,7 +83,7 @@ async function openFile($: EngineInterface, editor: Editor, file: string): Promi
 }
 
 async function setConfig($: EngineInterface, field: string, value: ConfigValue): Promise<void> {
-  await $.config.set({ key: `supermanager.${field}`, value })
+  await $.config.set({ key: `better-tasks.${field}`, value })
 }
 
 
@@ -212,7 +212,7 @@ async function reopenIfOpenBefore($: EngineInterface, options: PluginOptions): P
   const open = ((await $.store.get(OPEN_KEY)) ?? {}) as Record<string, boolean>
   if (open[await $.session.root()] !== true) return
   if (!(await isFullscreenLayout($))) {
-    $.ui.log('supermanager: the board was open last time: type /supermanager')
+    $.ui.log('better-tasks: the board was open last time: type /better-tasks')
     return
   }
   const files = filesOf($, options)
@@ -253,7 +253,7 @@ async function showNewTask($: EngineInterface, options: PluginOptions, id: strin
   await update($, selectedState, () => id)
   if ((await $.ui.panes()).some(pane => pane.id === PANE)) return
   if (!(await isFullscreenLayout($))) {
-    $.ui.log(`supermanager: task ${id} created · type /supermanager to see the board`)
+    $.ui.log(`better-tasks: task ${id} created · type /better-tasks to see the board`)
     return
   }
   await leaveModes($)
@@ -289,20 +289,20 @@ function dockTip(presentation: CommandPresentation): string {
 
 export function registerPane(on: On, options: PluginOptions): void {
 
-  on('command.run', { command: 'supermanager' }, async ($, e) => {
+  on('command.run', { command: 'better-tasks' }, async ($, e) => {
     const page = e.args.trim() === 'config' ? 'config' : 'board'
     await openPane($, options, page)
     return { text: `Sprint board opened. If its keys do nothing, ctrl+x tab gives it the keyboard.${dockTip(e.presentation)}` }
   })
 
-  // In Claude Code's own /config menu our rows read "Supermanager: …", so they are easy to find.
-  on('config.describe', { key: /^supermanager\./ }, async ($, e, next) => {
+  // In Claude Code's own /config menu our rows read "Better Tasks: …", so they are easy to find.
+  on('config.describe', { key: /^better-tasks\./ }, async ($, e, next) => {
     const described = await next(e)
     return described.label.startsWith(NATIVE_PREFIX) ? described : { ...described, label: NATIVE_PREFIX + described.label }
   })
 
   // A closed pane needs no refresh; the spinners stop with their rows.
-  on('tool.call', { tool: 'mcp__supermanager__task_create' }, async ($, e, next) => {
+  on('tool.call', { tool: 'mcp__better-tasks__task_create' }, async ($, e, next) => {
     const ran = await next(e)
     const id = typeof ran.result === 'string' ? ran.result.match(/^Created (\S+)/)?.[1] : undefined
     // Showing it is a courtesy: a failure here must never fail the model's tool call.

@@ -15,7 +15,7 @@ const COLUMNS = 62
 const ROWS = 30
 const PANE = {
   component: 'Pane',
-  requestId: 'supermanager-sprint',
+  requestId: 'better-tasks-sprint',
   props: { title: 'Sprint', isFocused: true, bodyColumns: COLUMNS, placement: 'dock', scroll: { offset: 0, bodyRows: ROWS }, view: {} },
 } as const
 
@@ -87,13 +87,13 @@ async function demo($: Engine, on: On): Promise<void> {
     const usage = { input_tokens: 630, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'm' }
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
   })
-  await $.command.run({ command: 'supermanager', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
+  await $.command.run({ command: 'better-tasks', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
   for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'm', messageCount: 1, agentId: 'a1' })) void chunk
   await $.tool.call({ tool: 'Edit', tool_use_id: 'e1', agentId: 'a1', file_path: '/demo/src/auth.ts', old_string: 'a', new_string: 'b' } as never)
 }
 
 const arrowTo = ($: Engine, element: string) =>
-  $.ui.focus({ component: 'Pane', requestId: 'supermanager-sprint', plugin: 'supermanager', element, origin: { kind: 'person' } })
+  $.ui.focus({ component: 'Pane', requestId: 'better-tasks-sprint', plugin: 'better-tasks', element, origin: { kind: 'person' } })
 
 async function shoot(name: string, ui: { drawn: () => Promise<unknown> }, focus?: string): Promise<void> {
   const tree = await ui.drawn()
@@ -103,13 +103,13 @@ async function shoot(name: string, ui: { drawn: () => Promise<unknown> }, focus?
 
 test('screenshot: the board', async ($, on) => {
   await demo($, on)
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await shoot('board', ui, 'task-T-007')
 })
 
 test('screenshot: actions', async ($, on) => {
   await demo($, on)
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'task-T-001' })
   await ui.press({ key: 'task-T-001' })
   await shoot('actions', ui, 'start')
@@ -117,7 +117,7 @@ test('screenshot: actions', async ($, on) => {
 
 test('screenshot: moving', async ($, on) => {
   await demo($, on)
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'task-T-004' })
   await ui.press({ key: 'task-T-004' })
   await ui.press({ key: 'move' })
@@ -127,7 +127,7 @@ test('screenshot: moving', async ($, on) => {
 
 test('screenshot: settings', async ($, on) => {
   await demo($, on)
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'config' })
   await arrowTo($, 'cfg-contextLimit')
   await shoot('settings', ui, 'cfg-contextLimit')
@@ -135,7 +135,7 @@ test('screenshot: settings', async ($, on) => {
 
 test('screenshot: a teammate session', async ($, on) => {
   await demo($, on)
-  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   await ui.press({ key: 'view' })
   await shoot('session', ui)
 })

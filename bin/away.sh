@@ -3,7 +3,7 @@
 # first status line ("black" or "failed: why"). Used by hooks/screen.ts for /away.
 # Usage: away.sh [safetySeconds]
 script="$(dirname "$0")/blackout.js"
-status="$(mktemp -t supermanager-blackout)"
+status="$(mktemp -t better-tasks-blackout)"
 
 # caffeinate -d keeps the displays awake, so the Mac never locks; the restore
 # step puts the brightness back however the blackout ended.

@@ -25,13 +25,13 @@ import { runTool, TOOLS } from './tools'
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
 
-const tasksState = atom({ plugin: 'supermanager', key: 'tasks' } as const, [] as Task[])
-const teamState = atom({ plugin: 'supermanager', key: 'team' } as const, [] as Teammate[])
-const tokensState = atom({ plugin: 'supermanager', key: 'tokens' } as const, {} as Record<string, number>)
-const activityState = atom({ plugin: 'supermanager', key: 'activity' } as const, {} as Record<string, Activity>)
-const noticeState = atom({ plugin: 'supermanager', key: 'notice' } as const, '')
-const footerState = atom({ plugin: 'supermanager', key: 'footer' } as const, '')
-const turnState = atom({ plugin: 'supermanager', key: 'turn' } as const, { asked: false, namedTime: false } as TurnFacts)
+const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as Task[])
+const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
+const tokensState = atom({ plugin: 'better-tasks', key: 'tokens' } as const, {} as Record<string, number>)
+const activityState = atom({ plugin: 'better-tasks', key: 'activity' } as const, {} as Record<string, Activity>)
+const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
+const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
+const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, namedTime: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
   pluginOptions = options
@@ -124,12 +124,12 @@ export const register: Register = (on, options) => {
     return result
   })
 
-  on('tool.call', { tool: 'mcp__supermanager__task_create' }, ($, e) => serveTool($, e, 'task_create'))
-  on('tool.call', { tool: 'mcp__supermanager__task_update' }, ($, e) => serveTool($, e, 'task_update'))
-  on('tool.call', { tool: 'mcp__supermanager__task_list' }, ($, e) => serveTool($, e, 'task_list'))
-  on('tool.call', { tool: 'mcp__supermanager__sprint_goal' }, ($, e) => serveTool($, e, 'sprint_goal'))
-  on('tool.call', { tool: 'mcp__supermanager__team_status' }, ($, e) => serveTool($, e, 'team_status'))
-  on('tool.call', { tool: 'mcp__supermanager__project_init' }, ($, e) => serveTool($, e, 'project_init'))
+  on('tool.call', { tool: 'mcp__better-tasks__task_create' }, ($, e) => serveTool($, e, 'task_create'))
+  on('tool.call', { tool: 'mcp__better-tasks__task_update' }, ($, e) => serveTool($, e, 'task_update'))
+  on('tool.call', { tool: 'mcp__better-tasks__task_list' }, ($, e) => serveTool($, e, 'task_list'))
+  on('tool.call', { tool: 'mcp__better-tasks__sprint_goal' }, ($, e) => serveTool($, e, 'sprint_goal'))
+  on('tool.call', { tool: 'mcp__better-tasks__team_status' }, ($, e) => serveTool($, e, 'team_status'))
+  on('tool.call', { tool: 'mcp__better-tasks__project_init' }, ($, e) => serveTool($, e, 'project_init'))
 }
 
 /** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */
@@ -144,7 +144,7 @@ async function declareAll($: EngineInterface): Promise<void> {
 
 function logFailure($: EngineInterface, what: string, error: unknown): void {
   const reason = error instanceof Error ? error.message : String(error)
-  $.ui.log(`supermanager: ${what} failed: ${reason}`)
+  $.ui.log(`better-tasks: ${what} failed: ${reason}`)
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {
@@ -159,7 +159,7 @@ async function setUpTeams($: EngineInterface): Promise<boolean> {
     $.ui.status(RESTART_TEXT)
   }
   if (state === 'missing') {
-    $.ui.status('supermanager: agent teams are off')
+    $.ui.status('better-tasks: agent teams are off')
     void $.prompt.submit({ text: SETUP_PROMPT })
   }
   return state === 'on'
@@ -194,7 +194,7 @@ async function logConfigProblems($: EngineInterface): Promise<void> {
   const text = problems.join('; ')
   if (text === loggedProblems) return
   loggedProblems = text
-  if (text) $.ui.log(`supermanager: config.json: ${text}. Using the other settings.`)
+  if (text) $.ui.log(`better-tasks: config.json: ${text}. Using the other settings.`)
 }
 
 async function serveTool($: EngineInterface, e: ToolCallInput, name: string) {

@@ -44,7 +44,7 @@ test('/away starts the detached blackout', async ($, on) => {
 
 test('the screen_off tool does what /away does', async ($, on) => {
   const spawned = fakeHost(on)
-  await $.tool.call({ tool: 'mcp__supermanager__screen_off', tool_use_id: 't1' })
+  await $.tool.call({ tool: 'mcp__better-tasks__screen_off', tool_use_id: 't1' })
   expect(spawned.filter(isAway)).toHaveLength(1)
 })
 
@@ -77,7 +77,7 @@ test('keepAwake: publishing a running team starts caffeinate', async ($, on) => 
   on('session.id', () => ({ value: 'lead' }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000, percent: 10 }, rateLimits: [] } }))
   on('agent.list', () => ({ value: [{ id: 'a1', name: 'ui', description: 'ui', type: 'teammate', status: 'running' }] }))
-  on('tool.register', ($, e) => ({ value: { tool: `mcp__supermanager__${e.name}` } }))
+  on('tool.register', ($, e) => ({ value: { tool: `mcp__better-tasks__${e.name}` } }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))

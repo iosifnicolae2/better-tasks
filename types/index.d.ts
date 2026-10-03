@@ -38,7 +38,7 @@ export type TurnFacts = { asked: boolean; namedTime: boolean }
 
 declare module 'claude-code' {
   interface PluginState {
-    supermanager: {
+    'better-tasks': {
       tasks: Task[]
       team: Teammate[]
       tokens: Record<string, number>

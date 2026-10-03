@@ -10,7 +10,7 @@ export type ConfigValue = string | number | boolean
 /** A setting: what it is called, what it does, its values in order, and how it is stored. */
 export type Field = {
   group: 'team' | 'sprint'
-  /** The userConfig field, written as `supermanager.<field>`. */
+  /** The userConfig field, written as `better-tasks.<field>`. */
   field: string
   label: string
   describe: string
@@ -193,7 +193,7 @@ function describeRow(rowKey: string, fromProject: readonly string[], project: Pr
     return `${file}: ${FILE_ABOUT[file] ?? ''} ⏎ ${exists ? 'opens it' : 'creates it from the shipped text, then opens it'}.`
   }
   if (rowKey === 'cfg-sprints') return 'Sprint goals & reviews: opens sprints.md, one section per sprint.'
-  if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Supermanager: …”."
+  if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Better Tasks: …”."
   return 'Values are saved as soon as they change · • differs from the default · ◆ set by this project'
 }
 

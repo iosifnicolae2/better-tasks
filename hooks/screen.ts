@@ -32,10 +32,10 @@ export function registerScreen(on: On, options: PluginOptions): void {
   let heldAt = -Infinity
 
   on('command.run', { command: 'away' }, async $ => ({ text: await screenOff($) }))
-  on('tool.call', { tool: 'mcp__supermanager__screen_off' }, async $ => ({ result: await screenOff($) }))
+  on('tool.call', { tool: 'mcp__better-tasks__screen_off' }, async $ => ({ result: await screenOff($) }))
 
   // Each publish of the team renews a short hold while anyone runs.
-  on('state.set', { plugin: 'supermanager', key: 'team' }, async ($, e, next) => {
+  on('state.set', { plugin: 'better-tasks', key: 'team' }, async ($, e, next) => {
     const written = await next(e)
     const now = await $.clock.now()
     if (holdIsDue({ keepAwake, team: e.value as Teammate[], now, heldAt })) {

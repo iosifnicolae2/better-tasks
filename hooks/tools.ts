@@ -11,7 +11,7 @@ import { createTask, findTask, isOpen, listTasks, taskLine, today } from './task
 import { mateLine, refreshTeam } from './team'
 import { initProject } from './texts'
 
-// The tools the model gets, listed as mcp__supermanager__<name>.
+// The tools the model gets, listed as mcp__better-tasks__<name>.
 
 const WHEN = { type: 'string', enum: ['now', 'this-sprint', 'next-sprint', 'backlog'] }
 const STATUS = { type: 'string', enum: ['todo', 'doing', 'done', 'cancelled'] }
@@ -63,7 +63,7 @@ export const TOOLS: readonly ToolSpec[] = [
     name: 'project_init',
     description:
       'Write starter override files for this project in .claude/manager/ (config.json, coordinator.md, teammate.md, ' +
-      'task-template.md, tips.md). Existing files are kept. Use when the user wants to customize supermanager here.',
+      'task-template.md, tips.md). Existing files are kept. Use when the user wants to customize better-tasks here.',
   },
   {
     name: 'team_status',

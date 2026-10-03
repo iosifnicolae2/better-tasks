@@ -10,7 +10,7 @@ import { projectText } from './texts'
 
 export function tipsLines(label: string, goal: string, open: number, tips: string): string[] {
   const lines = tips.split('\n').map(line => line.trimEnd()).filter(Boolean)
-  return [`supermanager · ${label} · goal: ${goal || 'not set'} · ${open} open`, ...lines]
+  return [`better-tasks · ${label} · goal: ${goal || 'not set'} · ${open} open`, ...lines]
 }
 
 export async function startupTips(io: Io, settings: Settings): Promise<string[]> {

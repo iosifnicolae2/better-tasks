@@ -1,12 +1,12 @@
 {
-  "name": "supermanager",
-  "description": "supermanager: plan and track tasks inside Claude Code.",
+  "name": "better-tasks",
+  "description": "better-tasks: plan and track tasks inside Claude Code.",
   "owner": {
     "name": "Iosif Nicolae"
   },
   "plugins": [
     {
-      "name": "supermanager",
+      "name": "better-tasks",
       "source": "./",
       "description": "Plan and track tasks inside Claude Code, kept as plain Markdown files in your project, with weekly sprints, a sprint board and agent teammates."
     }
