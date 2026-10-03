@@ -24,8 +24,21 @@ Restart Claude Code.
 
 ## 🔄 Update / uninstall
 
-- **Update:** `claude plugin marketplace update better-tasks && claude plugin update better-tasks@better-tasks`, then restart.
-- **Uninstall:** `claude plugin uninstall better-tasks@better-tasks && claude plugin marketplace remove better-tasks`.
+**Update:**
+
+```sh
+claude plugin marketplace update better-tasks
+claude plugin update better-tasks@better-tasks
+```
+
+Then restart Claude Code.
+
+**Uninstall:**
+
+```sh
+claude plugin uninstall better-tasks@better-tasks
+claude plugin marketplace remove better-tasks
+```
 
 ## 🧩 More
 
