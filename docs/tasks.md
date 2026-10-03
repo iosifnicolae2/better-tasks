@@ -3,3 +3,4 @@ One row per finished task; grep it, don't read it: `grep -i <word> docs/tasks.md
 
 date | teammate | task | summary | commits | session
 --- | --- | --- | --- | --- | ---
+2026-10-03 | coordinator-rules | T-002 Coordinator goal: finish tasks, monitor, fast builds and tests | Coordinator rules now state the goal: finish every task fast; monitor, ask questions, clear blockers such as slow/broken builds and tests (also in Status checks). | 9fadfff, 7ea68e6 | session abdb217d-e16f-4909-9ee0-a7c3f68b38d6 teammate coordinator-rules
