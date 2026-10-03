@@ -17,6 +17,7 @@ git fetch -q origin main --tags
 git rev-parse -q --verify "refs/tags/$version" >/dev/null && fail "$version already exists"
 
 previous=$(git describe --tags --abbrev=0 main 2>/dev/null || true)
+[ -z "$previous" ] || [ "$(git rev-parse "$previous^{commit}")" != "$(git rev-parse main)" ] || fail "nothing new since $previous"
 
 commit_notes() {
   echo "## Changes"
