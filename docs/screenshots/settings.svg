@@ -83,7 +83,7 @@
 <rect x="696.4" y="16" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="704.8" y="16" width="9" height="19" fill="rgb(55,55,55)"/>
 <text x="24.4" y="30.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">&gt; </text>
-<text x="41.2" y="30.25" fill="rgb(255,255,255)" textLength="168.0" xml:space="preserve">/supermanager config</text>
+<text x="41.2" y="30.25" fill="rgb(255,255,255)" textLength="168.0" xml:space="preserve">/better-tasks config</text>
 <text x="721.6" y="30.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="730.0" y="30.25" fill="rgb(255,255,255)" font-weight="bold" textLength="67.2" xml:space="preserve"> Sprint </text>
 <text x="24.4" y="49.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
@@ -206,12 +206,12 @@
 <text x="990.4" y="144.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">on</text>
 <text x="721.6" y="163.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="24.4" y="182.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
-<text x="41.2" y="182.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">supermanager - task_create (MCP)</text>
+<text x="41.2" y="182.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - task_create (MCP)</text>
 <text x="310.0" y="182.25" fill="rgb(255,255,255)" textLength="302.4" xml:space="preserve">(title: "Fix the login redirect", …)</text>
 <text x="721.6" y="182.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="182.25" fill="rgb(80,80,80)" font-weight="bold" textLength="50.4" xml:space="preserve">Sprint</text>
 <text x="24.4" y="201.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
-<text x="66.4" y="201.25" fill="rgb(153,153,153)" textLength="512.4" xml:space="preserve">Created T-001 in This sprint · .claude/manager/tasks/T-001.md</text>
+<text x="66.4" y="201.25" fill="rgb(153,153,153)" textLength="445.2" xml:space="preserve">Created T-001 in This sprint · .claude/tasks/T-001.md</text>
 <text x="721.6" y="201.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="746.8" y="201.25" fill="rgb(255,255,255)" textLength="243.6" xml:space="preserve"> Sprint length               </text>
 <text x="990.4" y="201.25" fill="rgb(80,80,80)" textLength="50.4" xml:space="preserve">1 week</text>

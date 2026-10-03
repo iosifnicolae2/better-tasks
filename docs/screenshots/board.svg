@@ -171,12 +171,12 @@
 <text x="1192.0" y="106.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">▱▱▱▱</text>
 <text x="1234.0" y="106.25" fill="rgb(80,80,80)" textLength="25.2" xml:space="preserve">1/4</text>
 <text x="24.4" y="125.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
-<text x="41.2" y="125.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">supermanager - task_create (MCP)</text>
+<text x="41.2" y="125.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - task_create (MCP)</text>
 <text x="310.0" y="125.25" fill="rgb(255,255,255)" textLength="302.4" xml:space="preserve">(title: "Fix the login redirect", …)</text>
 <text x="721.6" y="125.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="125.25" fill="rgb(80,80,80)" textLength="226.8" xml:space="preserve">  ◎ Ship the new login flow</text>
 <text x="24.4" y="144.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
-<text x="66.4" y="144.25" fill="rgb(153,153,153)" textLength="512.4" xml:space="preserve">Created T-001 in This sprint · .claude/manager/tasks/T-001.md</text>
+<text x="66.4" y="144.25" fill="rgb(153,153,153)" textLength="445.2" xml:space="preserve">Created T-001 in This sprint · .claude/tasks/T-001.md</text>
 <text x="721.6" y="144.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="144.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">·</text>
 <text x="763.6" y="144.25" fill="rgb(255,255,255)" textLength="478.8" xml:space="preserve"> T-001  Fix the login redirect                           </text>
@@ -279,7 +279,7 @@
 <text x="763.6" y="220.25" fill="rgb(255,255,255)" textLength="504.0" xml:space="preserve"> T-009  Dark mode for settings                              </text>
 <text x="721.6" y="239.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="24.4" y="258.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
-<text x="41.2" y="258.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">supermanager - team_status (MCP)</text>
+<text x="41.2" y="258.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - team_status (MCP)</text>
 <text x="721.6" y="258.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="258.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">○ </text>
 <text x="755.2" y="258.25" fill="rgb(255,255,255)" font-weight="bold" textLength="58.8" xml:space="preserve">Backlog</text>

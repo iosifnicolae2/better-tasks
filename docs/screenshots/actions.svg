@@ -91,7 +91,7 @@
 <text x="755.2" y="49.25" fill="rgb(255,255,255)" font-weight="bold" textLength="168.0" xml:space="preserve">Currently working on</text>
 <text x="923.2" y="49.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve"> 1</text>
 <text x="24.4" y="68.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
-<text x="41.2" y="68.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">supermanager - team_status (MCP)</text>
+<text x="41.2" y="68.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - team_status (MCP)</text>
 <text x="721.6" y="68.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="68.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">✻</text>
 <text x="772.0" y="68.25" fill="rgb(80,80,80)" textLength="327.6" xml:space="preserve">T-007  Login loops after password reset</text>
@@ -273,7 +273,7 @@
 <rect x="696.4" y="206" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="704.8" y="206" width="9" height="19" fill="rgb(55,55,55)"/>
 <text x="24.4" y="220.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">&gt; </text>
-<text x="41.2" y="220.25" fill="rgb(255,255,255)" textLength="109.2" xml:space="preserve">/supermanager</text>
+<text x="41.2" y="220.25" fill="rgb(255,255,255)" textLength="109.2" xml:space="preserve">/better-tasks</text>
 <text x="721.6" y="220.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="220.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">·</text>
 <text x="772.0" y="220.25" fill="rgb(80,80,80)" textLength="243.6" xml:space="preserve">T-009  Dark mode for settings</text>
