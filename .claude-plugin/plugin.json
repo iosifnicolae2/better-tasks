@@ -1,6 +1,5 @@
 {
   "name": "supermanager",
-  "version": "0.1.0",
   "description": "Turns the main session into a coordinator of agent teammates, with weekly sprints, task files and a Tasks pane.",
   "author": {
     "name": "Iosif Nicolae",
