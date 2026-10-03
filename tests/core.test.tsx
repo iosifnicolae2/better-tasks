@@ -240,7 +240,7 @@ test('agent teams on: no setup prompt, no restart toast', async ($, on) => {
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await clock.advance(0)
-  expect(host.pluginPrompts).toEqual([])
+  expect(host.pluginPrompts.filter(text => text.includes('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'))).toEqual([])
   expect(host.toasts).toEqual([])
 })
 
@@ -634,4 +634,42 @@ test('a message left unfiled gets one gentle line next time; a status question d
   expect((await $.prompt.submit(prompt('put it in the backlog'))).context?.at(-1)).toContain(reminder)
   await $.tool.call({ ...create, when: 'backlog', tool_use_id: 'c9' })
   expect((await $.prompt.submit(prompt('next one'))).context?.at(-1)).not.toContain(reminder)
+})
+
+const GLOBAL_RULES = '/home/me/.claude/CLAUDE.md'
+const pointers = (host: Host) => host.pluginPrompts.filter(text => text.includes('global instructions'))
+
+test('the global CLAUDE.md is pointed at our team rules: asked once, never when the marker is there', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [GLOBAL_RULES]: '# Me\n\n## Agent teams\n- Route every message.\n' })
+  host.env.set('HOME', '/home/me')
+  await $.session.start(SESSION)
+  expect(pointers(host)).toHaveLength(1)
+  expect(pointers(host)[0]).toContain(`Edit ${GLOBAL_RULES} with the Edit tool`)
+  expect(pointers(host)[0]).toContain('```markdown\n## Agent teams\n<!-- better-tasks -->\nWhen better-tasks is enabled')
+  expect(host.files.get(GLOBAL_RULES)).toBe('# Me\n\n## Agent teams\n- Route every message.\n')
+
+  await $.session.start(SESSION)
+  expect(pointers(host)).toHaveLength(1)
+})
+
+test('no CLAUDE.md pointer prompt when the marker is already there', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [GLOBAL_RULES]: '## Agent teams\n<!-- better-tasks -->\nFollow better-tasks.\n' })
+  host.env.set('HOME', '/home/me')
+  await $.session.start(SESSION)
+  expect(pointers(host)).toEqual([])
+})
+
+test('no CLAUDE.md yet: Claude is asked to create it with only our section; not in a -p run', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  host.env.set('HOME', '/home/me')
+  await $.session.start({ ...SESSION, isInteractive: false })
+  expect(pointers(host)).toEqual([])
+  await $.session.start(SESSION)
+  expect(pointers(host)[0]).toContain(`Create ${GLOBAL_RULES} with the Write tool`)
 })

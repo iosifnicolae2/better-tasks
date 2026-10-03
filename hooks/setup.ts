@@ -26,3 +26,34 @@ export function waitingLine(state: TeamsState): string {
     ? `[better-tasks] off until restart: ${TEAMS_FLAG}=1 is in settings but not in this session.`
     : `[better-tasks] off: agent teams are not set up (${TEAMS_FLAG}=1).`
 }
+
+// ---- The user's global CLAUDE.md points to our team rules (asked once per machine) ----
+
+export const POINTER_MARKER = '<!-- better-tasks -->'
+
+export const POINTER_SECTION = `## Agent teams
+${POINTER_MARKER}
+When better-tasks is enabled, follow its coordinator and teammate rules (the plugin injects them); they take precedence over anything below about agent teams.`
+
+export const hasPointer = (text: string) => text.includes(POINTER_MARKER)
+
+/** What Claude is asked to do, with the user approving the edit. */
+export function pointerPrompt(path: string, exists: boolean): string {
+  const section = '```markdown\n' + POINTER_SECTION + '\n```'
+  if (!exists) {
+    return (
+      `better-tasks: one-time setup of the user's global instructions. Create ${path} with the Write tool ` +
+      `(the user approves it), holding only this section:\n\n${section}\n\nThen do nothing else.`
+    )
+  }
+  return (
+    `better-tasks: one-time setup of the user's global instructions. Edit ${path} with the Edit tool, so the user sees ` +
+    'and approves the change:\n' +
+    `1. Add this section; keep the marker line exactly:\n\n${section}\n\n` +
+    '2. If the file has its own rules about agent teams, a coordinator or teammates that better-tasks now covers ' +
+    '(routing, one owner per area, spawning, stopping teammates, task logs), replace them with this section. ' +
+    'Keep the rules it does not cover (for example how builds are installed and reviewed) as short bullets under it. ' +
+    'Leave every other section as it is.\n' +
+    '3. Then do nothing else.'
+  )
+}

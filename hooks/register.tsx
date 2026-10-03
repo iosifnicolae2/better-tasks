@@ -10,7 +10,7 @@ import { contextBlock, footerText, isPerson, isQuestion, namesTime, unfiledLine,
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
-import { RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine } from './setup'
+import { hasPointer, pointerPrompt, RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine } from './setup'
 import { projectSettings, readOverrides } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
@@ -51,6 +51,7 @@ export const register: Register = (on, options) => {
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
+    if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
     await tick($).catch(error => logFailure($, 'the first refresh', error))
     $.clock.every(60_000, () => tick($))
     const tips = await startupTips(ioOf($), await settingsNow($)).catch(() => [])
@@ -193,6 +194,17 @@ async function teamsOn($: EngineInterface): Promise<boolean> {
 }
 
 /** Once per session: true when agent teams are on; else asks Claude to set them up, or says to restart. */
+/** Once per machine: ask Claude to point the user's global CLAUDE.md at our team rules (the user approves the edit). */
+async function pointUserRules($: EngineInterface): Promise<void> {
+  if (await $.store.get('claudeMdAsked')) return
+  const home = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
+  const path = `${home}/CLAUDE.md`
+  const text = await $.fs.read(path).catch(() => undefined)
+  if (text !== undefined && hasPointer(text)) return
+  await $.store.set('claudeMdAsked', true)
+  void $.prompt.submit({ text: pointerPrompt(path, text !== undefined) }).catch(() => undefined)
+}
+
 async function setUpTeams($: EngineInterface): Promise<boolean> {
   const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
   if (state === 'restart') {
