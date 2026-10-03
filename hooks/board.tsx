@@ -356,18 +356,35 @@ function KeyLine({ ui, hasKeys, isMoving, actions }: KeyLineProps) {
   )
 }
 
-type HeaderProps = { ui: Ui; label: string; goal: string; done: number; total: number }
+/** The sprint as the header shows it; the pane fills it from mod-core's label helpers. */
+export type SprintFacts = {
+  /** "Sprint 41 · Week 41" */
+  name: string
+  /** "Mon Oct 5 – Sun Oct 11" */
+  dates: string
+  /** "3 days left", or "last day" */
+  left: string
+  isLastDay: boolean
+}
 
-/** ✻ Sprint · dates, a progress bar on the right, the goal under them. */
-export function Header({ ui, label, goal, done, total }: HeaderProps) {
+type HeaderProps = { ui: Ui; sprint: SprintFacts; goal: string; done: number; total: number }
+
+/**
+ * Two lines, always: ✻ sprint, week and days left with the progress bar on the right; then the
+ * dates and the goal. Each line is cut to the width, never wrapped, so nothing below moves.
+ */
+export function Header({ ui, sprint, goal, done, total }: HeaderProps) {
   const { Box, Text } = ui
   const filled = filledCells(done, total)
   return (
     <Box flexDirection="column">
-      <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
+      <Box flexDirection="row" justifyContent="space-between" columnGap={2} height={1} overflow="hidden">
         <Box flexDirection="row" columnGap={1} flexShrink={1}>
           <Text color="claude">✻</Text>
-          <Text bold wrap="truncate-end">{label}</Text>
+          <Text wrap="truncate-end">
+            <Text bold>{sprint.name}</Text>
+            <Text color={sprint.isLastDay ? 'warning' : 'subtle'}> · {sprint.left}</Text>
+          </Text>
         </Box>
         <Box flexDirection="row" columnGap={1} flexShrink={0}>
           <Text>
@@ -377,8 +394,11 @@ export function Header({ ui, label, goal, done, total }: HeaderProps) {
           <Text color={total > 0 && done === total ? 'success' : 'subtle'}>{done}/{total}</Text>
         </Box>
       </Box>
-      <Box paddingLeft={2}>
-        <Text color="subtle" italic={goal === ''} wrap="truncate-end">{goal === '' ? 'No sprint goal yet' : goal}</Text>
+      <Box paddingLeft={2} height={1} overflow="hidden">
+        <Text wrap="truncate-end">
+          <Text color="subtle">{sprint.dates} · </Text>
+          <Text color="subtle" italic={goal === ''}>{goal === '' ? 'no sprint goal yet' : goal}</Text>
+        </Text>
       </Box>
     </Box>
   )

@@ -480,7 +480,8 @@ test("the pane follows the project's config.json, and its settings page says whi
   files.set(`${ROOT}/.claude/manager/config.json`, JSON.stringify({ sprintWeeks: '2', editor: 'code', sprintsFile: 'docs/sprints.md' }))
   await $.command.run(sprintCommand())
   const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
-  expect(await ui.find({ type: 'Text', text: 'Sprint 40 · Sep 28–Oct 11' })).toBeDefined()
+  expect((await ui.find({ type: 'Text', text: /^Sprint \d+ · Weeks/ }))?.text).toBe('Sprint 20 · Weeks 40–41 · 5 days left')
+  expect(await ui.find({ type: 'Text', text: /^Mon Sep 28 – Sun Oct 11 · / })).toBeDefined()
   await ui.press({ key: 'open' })
   expect(commands.at(-1)).toEqual(['code', `${DIR}/T-001-fix-login.md`])
 
@@ -514,3 +515,24 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: '✓ All starter files are in place' })).toBeDefined()
   })
 }
+
+for (const surface of SURFACES) {
+  test(`the header names the sprint, its week, dates and days left in two fixed lines (${surface})`, async ($, on) => {
+    fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'supermanager', surface, ...PANE })
+    expect((await ui.find({ type: 'Text', text: /^Sprint 41/ }))?.text).toBe('Sprint 41 · Week 41 · 5 days left')
+    expect((await ui.find({ type: 'Text', text: /^Mon Oct 5/ }))?.text).toBe('Mon Oct 5 – Sun Oct 11 · no sprint goal yet')
+
+    await ui.press({ key: 'config' })
+    expect(await ui.find({ type: 'Text', text: 'Sprint' })).toBeDefined()
+    expect((await ui.find({ type: 'Text', text: /^Now: / }))?.text).toBe('Now: Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11')
+  })
+}
+
+test('a 4-week sprint shows its weeks in the settings preview', { options: { sprintWeeks: '4' } }, async ($, on) => {
+  fakeProject(on)
+  await $.command.run(sprintCommand('config'))
+  const ui = await $.ui.mount({ plugin: 'supermanager', surface: 'terminal', ...PANE })
+  expect((await ui.find({ type: 'Text', text: /^Now: / }))?.text).toMatch(/^Now: Sprint \d+ · Weeks \d+–\d+ · /)
+})

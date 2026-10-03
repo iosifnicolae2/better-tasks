@@ -6,6 +6,8 @@ import type { Settings } from './settings'
 export type ConfigValue = string | number | boolean
 
 type Base = {
+  /** Which group of the page it sits in. */
+  group: 'team' | 'sprint'
   /** The userConfig field, written as `supermanager.<field>`. */
   field: string
   label: string
@@ -44,6 +46,7 @@ const valuesOf = (values: readonly string[]) => values.map(value => ({ value }))
 export const FIELDS: readonly Field[] = [
   {
     kind: 'choice',
+    group: 'team',
     field: 'editor',
     label: 'Editor',
     hint: 'auto: the IDE Claude runs in',
@@ -54,6 +57,7 @@ export const FIELDS: readonly Field[] = [
   },
   {
     kind: 'toggle',
+    group: 'team',
     field: 'worktree',
     label: 'Worktrees',
     hint: 'a git worktree per teammate',
@@ -62,6 +66,7 @@ export const FIELDS: readonly Field[] = [
   },
   {
     kind: 'stepper',
+    group: 'team',
     field: 'contextLimit',
     label: 'Context limit',
     hint: 'no new work above this',
@@ -74,6 +79,7 @@ export const FIELDS: readonly Field[] = [
   },
   {
     kind: 'toggle',
+    group: 'team',
     field: 'keepAwake',
     label: 'Keep Mac awake',
     hint: 'while teammates run',
@@ -82,16 +88,18 @@ export const FIELDS: readonly Field[] = [
   },
   {
     kind: 'choice',
+    group: 'sprint',
     field: 'sprintWeeks',
     label: 'Sprint length',
     hint: 'weeks per sprint',
     value: settings => String(settings.sprint.weeks),
     initial: '1',
-    options: [{ value: '1', label: '1 week' }, { value: '2', label: '2 weeks' }],
+    options: ['1', '2', '3', '4'].map(value => ({ value, label: value === '1' ? '1 week' : `${value} weeks` })),
     stored: value => value,
   },
   {
     kind: 'choice',
+    group: 'sprint',
     field: 'sprintStart',
     label: 'Sprint starts',
     hint: 'first day of a sprint',
@@ -118,6 +126,8 @@ type OnChange = (field: string, value: ConfigValue) => void
 export type ConfigPageProps = {
   ui: Ui
   settings: Settings
+  /** The current sprint as the settings make it: "Sprint 41 · Week 41 · Mon Oct 5 – Sun Oct 11". */
+  sprintPreview: string
   /** The fields this project's config.json sets; those win over /config. */
   fromProject: readonly string[]
   project: ProjectFacts
@@ -127,14 +137,23 @@ export type ConfigPageProps = {
   onBack: () => void
 }
 
-export function ConfigPage({ ui, settings, fromProject, project, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
+export function ConfigPage({ ui, settings, sprintPreview, fromProject, project, onChange, onOpenNative, onOpenSprints, onBack }: ConfigPageProps) {
   const { Box, Button, Text } = ui
   return (
     <Box flexDirection="column">
-      <Text bold>Settings</Text>
-      {FIELDS.map(field => (
+      <Text bold>Team</Text>
+      {FIELDS.filter(field => field.group === 'team').map(field => (
         <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
       ))}
+      <Box marginTop={1}>
+        <Text bold>Sprint</Text>
+      </Box>
+      {FIELDS.filter(field => field.group === 'sprint').map(field => (
+        <FieldRow ui={ui} field={field} settings={settings} isFromProject={fromProject.includes(field.field)} onChange={onChange} />
+      ))}
+      <Box paddingLeft={2} height={1} overflow="hidden">
+        <Text color="suggestion" wrap="truncate-end">Now: {sprintPreview}</Text>
+      </Box>
       <Text dimColor>• changed from the default · saved at once</Text>
       <ProjectSection ui={ui} fromProject={fromProject} project={project} />
       <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>

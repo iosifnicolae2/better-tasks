@@ -3,7 +3,7 @@ import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptio
 
 import type { Task, Teammate, When } from '../types'
 import { Board, Header, sectionsOf, shifted, stepId } from './board'
-import type { BoardActions, Section } from './board'
+import type { BoardActions, Section, SprintFacts } from './board'
 import { ConfigPage } from './configpage'
 import { SessionView, linesOf } from './sessionview'
 import type { ConfigValue, ProjectFacts } from './configpage'
@@ -13,7 +13,7 @@ import type { Files } from './io'
 import { CONFIG_FILE, projectSettings, readOverrides, settingsFrom } from './settings'
 import type { Editor } from './settings'
 import { goalOf, readSprints } from './sprintlog'
-import { sprintLabel, sprintStart } from './sprints'
+import { datesLabel, daysLeft, daysLeftLabel, sprintLabel, sprintNumber, sprintStart, weekLabel } from './sprints'
 import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
 import { listTasks, placeOf, saveTask, today, whenOf } from './tasks'
@@ -189,6 +189,15 @@ async function reopenIfOpenBefore($: EngineInterface, options: PluginOptions): P
   await $.ui.open({ id: PANE, title: 'Sprint', columns: 76 })
 }
 
+function sprintFacts(day: string, start: string, config: SprintConfig): SprintFacts {
+  return {
+    name: `Sprint ${sprintNumber(start, config)} · ${weekLabel(start, config)}`,
+    dates: datesLabel(start, config),
+    left: daysLeftLabel(day, start, config),
+    isLastDay: daysLeft(day, start, config) <= 1,
+  }
+}
+
 let refreshTimer: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface, options: PluginOptions, page: Page): Promise<void> {
@@ -322,10 +331,11 @@ export function registerPane(on: On, options: PluginOptions): void {
 
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Header ui={ui} label={sprintLabel(current, settings.sprint)} goal={goal} done={doneCount} total={inSprint.length} />
+        <Header ui={ui} sprint={sprintFacts(day, current, settings.sprint)} goal={goal} done={doneCount} total={inSprint.length} />
         {page === 'config' ? (
           <Box marginTop={1}>
-            <ConfigPage ui={ui} settings={settings} {...await projectFacts($, files, settings.editor)}
+            <ConfigPage ui={ui} settings={settings} sprintPreview={sprintLabel(current, settings.sprint)}
+              {...await projectFacts($, files, settings.editor)}
               onChange={(field, value) => void setConfig($, field, value)}
               onOpenNative={() => void $.command.run({ command: 'config' })}
               onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
