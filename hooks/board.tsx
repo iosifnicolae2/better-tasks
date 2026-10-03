@@ -587,6 +587,17 @@ function ClosedLines({ ui, task, actions }: { ui: Ui; task: Task; actions: Board
   )
 }
 
+/** "↑↓: select": the key in the accent colour, as Claude Code draws a Button's hotkey, then what it does, dim. */
+export function KeyHint({ ui, keys, word }: { ui: Ui; keys: string; word: string }) {
+  const { Text } = ui
+  return (
+    <Text>
+      <Text color="claude">{keys}</Text>
+      <Text dimColor>: {word}</Text>
+    </Text>
+  )
+}
+
 type KeyLineProps = { ui: Ui; hasKeys: boolean; selected?: Selected; actions: BoardActions }
 
 /** The keys of each mode, as the key line shows them: the key, then what it does. */
@@ -614,12 +625,7 @@ function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
   const isLocked = selected?.isMoving === true || selected?.isActing === true
   return (
     <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
-      {hints.map(([keys, word]) => (
-        <Text>
-          <Text color="claude">{keys}</Text>
-          <Text dimColor>: {word}</Text>
-        </Text>
-      ))}
+      {hints.map(([keys, word]) => <KeyHint ui={ui} keys={keys} word={word} />)}
       {!isLocked && <Button key="search" plain dimColor hotkey="f" label="search" onPress={actions.openSearch} />}
       {!isLocked && <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />}
     </Box>

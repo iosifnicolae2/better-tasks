@@ -511,7 +511,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /^Context limit: No new work goes to a teammate/ })).toBeDefined()
     await arrowTo($, 'file-teammate.md')
     expect(await ui.find({ type: 'Text', text: /^teammate\.md: .*creates it/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '↑↓ choose · ⏎ change' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '↑↓: choose' })).toBeDefined()
     await ui.press({ key: 'board' })
     expect(await ui.find({ key: 'task-T-001' })).toBeDefined()
   })

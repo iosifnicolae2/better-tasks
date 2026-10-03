@@ -1,3 +1,4 @@
+import { KeyHint } from './board'
 import type { Ui } from './board'
 import type { Settings } from './settings'
 
@@ -187,7 +188,8 @@ export function ConfigPage(props: ConfigPageProps) {
           <Text color="subtle" wrap="truncate-end">{describe}</Text>
         </Box>
         <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
-          <Text color="subtle">↑↓ choose · ⏎ change</Text>
+          <KeyHint ui={ui} keys="↑↓" word="choose" />
+          <KeyHint ui={ui} keys="⏎" word="change" />
           <Button key="board" plain dimColor hotkey="b" label="board" onPress={onBack} />
         </Box>
       </Box>
