@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { ghProblem } from '../hooks/pullrequest'
+import { ghProblem, ghUpdateVerdict } from '../hooks/pullrequest'
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
@@ -16,5 +16,14 @@ describe('PR per task', () => {
     expect(ghProblem('gh version 2.98.0 (2026-08-20)')).toBe("PR per task: gh 2.98.0 can't put the video in the PR; brew upgrade gh (2.99 or newer)")
     expect(ghProblem('gh version 1.150.0 (2020-01-01)')).toContain('brew upgrade gh')
     expect(ghProblem(undefined)).toBe('PR per task needs the GitHub CLI: brew install gh, then gh auth login')
+  })
+
+  test("the gh update's last line says how it went, checked against the version it reports", () => {
+    expect(ghUpdateVerdict('==> Upgrading gh\nready gh version 2.102.0 (2026-09-30)\n')).toEqual({ isReady: true, text: 'GitHub CLI updated (2.102.0): PRs carry their video.' })
+    expect(ghUpdateVerdict('login gh version 2.102.0 (2026-09-30)')).toEqual({ isReady: false, text: 'GitHub CLI updated (2.102.0): PRs carry their video. Sign in once: gh auth login.' })
+    expect(ghUpdateVerdict('failed: no Homebrew to update gh with; update it by hand: https://github.com/cli/cli#installation').text)
+      .toBe('better-tasks: failed: no Homebrew to update gh with; update it by hand: https://github.com/cli/cli#installation. PRs still work, without the video.')
+    expect(ghUpdateVerdict('ready gh version 2.98.0 (2026-08-20)').isReady).toBe(false) // another, older gh comes first on PATH
+    expect(ghUpdateVerdict('').isReady).toBe(false)
   })
 })

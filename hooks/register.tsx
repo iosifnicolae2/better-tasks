@@ -8,7 +8,7 @@ import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
-import { ghProblem, PR_COORDINATOR_RULES, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
+import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, PR_COORDINATOR_RULES, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -34,6 +34,7 @@ const FILING_TOOLS = ['task_create', 'task_update', 'task_note']
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
 let voiceSetup: Promise<void> | undefined
+let ghUpdate: Promise<void> | undefined
 
 const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as Task[])
 const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
@@ -278,13 +279,29 @@ async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === PR_SETTING_KEY) await checkGh($)
 }
 
-/** PR per task needs gh, 2.99 or newer for the video: says so once if not. */
+/** PR per task needs gh, 2.99 or newer for the video: updates it when it is missing or older (bin/gh-update.sh). */
 async function checkGh($: EngineInterface): Promise<void> {
   const version = await $.process.run(['gh', '--version']).then(done => done.stdout, () => undefined)
-  const problem = ghProblem(version)
-  if (!problem) return
-  $.ui.toast(problem, { timeoutMs: 8000 })
-  $.ui.log(`better-tasks: ${problem}`)
+  if (ghProblem(version)) await updateGh($)
+}
+
+/** One gh update at a time: turning the setting on while startup's runs joins it. */
+function updateGh($: EngineInterface): Promise<void> {
+  ghUpdate ??= runGhUpdate($)
+    .catch(error => logFailure($, 'the gh update', error))
+    .finally(() => (ghUpdate = undefined))
+  return ghUpdate
+}
+
+async function runGhUpdate($: EngineInterface): Promise<void> {
+  $.ui.toast(GH_UPDATE_TOAST, { timeoutMs: 8000 })
+  let output = ''
+  for await (const piece of $.process.spawn({ argv: ghUpdateArgv($.plugin.root) })) {
+    if ('stream' in piece && piece.stream === 'stdout') output += piece.text
+  }
+  const verdict = ghUpdateVerdict(output)
+  $.ui.toast(verdict.text, { timeoutMs: 8000 })
+  if (!verdict.isReady) $.ui.log(verdict.text)
 }
 
 /** One Kokoro setup at a time (bin/kokoro-setup.sh): turning videos on twice joins the running one. */

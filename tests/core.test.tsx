@@ -841,3 +841,14 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
 })
+
+test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on) // its gh --version prints nothing: gh missing
+  host.spawnOutput = 'ready gh version 2.102.0 (2026-09-30)\n'
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(host.spawnedArgv.filter(argv => argv.at(-1)?.endsWith('/bin/gh-update.sh'))).toHaveLength(1)
+  expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
+})

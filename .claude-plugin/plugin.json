@@ -55,7 +55,7 @@
     "pullRequests": {
       "type": "boolean",
       "title": "PR per task",
-      "description": "Each teammate works in its own worktree and finishes with a GitHub pull request (with its before/after video); the manager merges it when you approve. Needs gh 2.99 or newer.",
+      "description": "Each teammate works in its own worktree and finishes with a GitHub pull request (with its before/after video); the manager merges it when you approve. Updates gh (Homebrew) when it is too old for the video.",
       "default": false
     },
     "sprintWeeks": {

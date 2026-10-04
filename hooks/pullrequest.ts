@@ -1,6 +1,6 @@
 // PR per task (setting pullRequests): each teammate works in its own worktree and finishes with a GitHub
 // pull request, its before/after video (demovideo.ts) playing in it; the lead merges once the user approves.
-// The parts that need `$` (the gh check) are in register.tsx.
+// The parts that need `$` (the gh check and update) are in register.tsx; bin/gh-update.sh does the update.
 
 export const PR_SETTING_KEY = 'better-tasks.pullRequests'
 
@@ -15,6 +15,24 @@ export function ghProblem(versionOutput: string | undefined): string | undefined
   const index = version.findIndex((part, at) => part !== ATTACH_SINCE[at])
   const isOld = index !== -1 && (version[index] ?? 0) < ATTACH_SINCE[index]!
   return isOld ? `PR per task: gh ${version.join('.')} can't put the video in the PR; brew upgrade gh (2.99 or newer)` : undefined
+}
+
+export const GH_UPDATE_TOAST = 'Updating the GitHub CLI so PRs can carry their video: once, about a minute.'
+
+export const ghUpdateArgv = (root: string) => ['/bin/sh', `${root}/bin/gh-update.sh`]
+
+/** gh-update.sh's verdict, from its last line, checked again against the version it reports. */
+export function ghUpdateVerdict(output: string): { isReady: boolean; text: string } {
+  const last = output.trim().split('\n').pop() ?? ''
+  const [word = '', ...rest] = last.split(' ')
+  const version = rest.join(' ')
+  if (word === 'failed:') return { isReady: false, text: `better-tasks: ${last}. PRs still work, without the video.` }
+  const problem = ghProblem(version)
+  if (problem || !['ready', 'login'].includes(word)) {
+    return { isReady: false, text: `better-tasks: ${problem ?? 'the gh update said nothing'}. PRs still work, without the video.` }
+  }
+  const login = word === 'login' ? ' Sign in once: gh auth login.' : ''
+  return { isReady: word === 'ready', text: `GitHub CLI updated (${version.split(' ')[2] ?? version}): PRs carry their video.${login}` }
 }
 
 export const PR_TEAMMATE_RULES = `## Pull request per task (on in this project)
