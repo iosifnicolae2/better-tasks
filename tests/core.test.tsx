@@ -2,6 +2,7 @@ import type { AgentInfo, On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -23,6 +24,9 @@ type Host = {
   registered: string[]
   spawned: string[]
   descriptions: string[]
+  /** Each process.spawn's argv; spawnOutput is what each one prints. */
+  spawnedArgv: string[][]
+  spawnOutput: string
   env: Map<string, string>
   composer: string
 }
@@ -36,7 +40,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], env: new Map(), composer: '' }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], spawnedArgv: [], spawnOutput: '', env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -113,7 +117,9 @@ function fakeHost(
     if (e.origin.kind === 'plugin') host.pluginPrompts.push(e.text)
     return { text: e.text, context: e.context }
   })
-  on('process.spawn', async function* () {
+  on('process.spawn', async function* ($, e) {
+    host.spawnedArgv.push([...e.argv])
+    if (host.spawnOutput) yield { stream: 'stdout', text: host.spawnOutput }
     return { value: { code: 0, signal: null } }
   })
   return host
@@ -780,4 +786,45 @@ test('a task the user resolved is named to the lead until it is closed', async (
   await $.tool.call({ ...updateT1, status: 'doing' } as never) // reopened later: not closed again
   expect((await $.prompt.submit(prompt('it broke again'))).context?.at(-1)).not.toContain('marked T-001 resolved')
   expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('status: doing')
+})
+
+test('startup asks once about before/after videos; Enable turns them on and sets up the voice', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  let asked = 0
+  on('tool.call', { tool: 'AskUserQuestion' }, () => {
+    asked += 1
+    return { result: { answers: { [QUESTION]: ENABLE_OPTION } } }
+  })
+  const set: unknown[] = []
+  on('config.set', ($, e) => {
+    set.push([e.key, e.value])
+    return { value: e.value }
+  })
+  const host = fakeHost(on)
+  host.spawnOutput = 'ready /home/.local/share/better-tasks/kokoro\n'
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toBe(1)
+  expect(set).toEqual([['better-tasks.demoVideos', true]])
+  expect(host.spawnedArgv.some(argv => argv.at(-1)?.endsWith('/bin/kokoro-setup.sh'))).toBe(true)
+  expect(host.toasts).toContain('Kokoro voice ready: before/after videos are on.')
+
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toBe(1)
+})
+
+test('with before/after videos on, teammates get the video rules and the lead the showing rules', { options: { demoVideos: true } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const teams = { env: { ...TEAMS_ON, HOME: '/home' }, settingsEnv: TEAMS_ON }
+  const host = fakeHost(on, [], { '/home/.local/share/better-tasks/kokoro/.ready': '' }, teams)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(host.spawned[0]).toContain('/bin/demo-video.sh spec.json')
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections.at(-1)?.text).toContain('Demo video: <path>')
+  expect(host.toasts).toEqual([])
 })

@@ -81,6 +81,16 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
+    group: 'team',
+    field: 'demoVideos',
+    label: 'Before/after videos',
+    describe: 'Finished work comes with a short narrated video: the bug, then the fix, marked in red. Sets up the Kokoro voice once.',
+    options: ON_OFF,
+    value: settings => (settings.demoVideos ? 'on' : 'off'),
+    initial: 'off',
+    stored: isOn,
+  },
+  {
     group: 'sprint',
     field: 'sprintWeeks',
     label: 'Sprint length',

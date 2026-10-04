@@ -95,6 +95,8 @@ declare module 'claude-code' {
       moving: string
       /** The Tasks pane's page. */
       page: 'board' | 'config'
+      /** Bumped when the settings page turns before/after videos on, so the voice gets set up. */
+      voiceRequest: number
     }
   }
 }

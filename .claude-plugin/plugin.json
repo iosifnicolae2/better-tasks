@@ -46,6 +46,12 @@
       "description": "Holds caffeinate while any teammate runs.",
       "default": true
     },
+    "demoVideos": {
+      "type": "boolean",
+      "title": "Before/after videos",
+      "description": "Teammates record the bug and the fix as one short video: BEFORE/AFTER labels, red boxes and arrows, subtitles read aloud by Kokoro (set up once per machine).",
+      "default": false
+    },
     "sprintWeeks": {
       "type": "string",
       "title": "Sprint length (weeks)",

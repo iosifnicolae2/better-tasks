@@ -7,6 +7,7 @@ import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
+import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -31,6 +32,7 @@ const FILING_TOOLS = ['task_create', 'task_update', 'task_note']
 
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
+let voiceSetup: Promise<void> | undefined
 
 const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as Task[])
 const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
@@ -56,6 +58,7 @@ export const register: Register = (on, options) => {
     if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
     if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
+    if (e.isInteractive) void startVideos($).catch(error => logFailure($, 'before/after videos', error))
     const startedAt = await $.clock.now()
     await update($, statusState, () => ({ ...NO_CHECK, activeAt: startedAt }))
     await tick($).catch(error => logFailure($, 'the first refresh', error))
@@ -73,7 +76,21 @@ export const register: Register = (on, options) => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (!(await teamsOn($))) return composed
-    return { sections: withRules(composed.sections, e.traits, e.tools, await projectText(ioOf($), 'coordinator')) }
+    const videos = (await settingsNow($)).demoVideos ? COORDINATOR_RULES : ''
+    const rules = [await projectText(ioOf($), 'coordinator'), videos].filter(Boolean).join('\n\n')
+    return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
+  })
+
+  // Before/after videos turned on in /config (composer) or on our settings page (voiceRequest): set up the voice.
+  on('config.set', { key: SETTING_KEY }, async ($, e, next) => {
+    const written = await next(e)
+    if (written.value === true) void setUpVoice($)
+    return written
+  })
+  on('state.set', { plugin: 'better-tasks', key: 'voiceRequest' }, async ($, e, next) => {
+    const written = await next(e)
+    void setUpVoice($)
+    return written
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -113,7 +130,8 @@ export const register: Register = (on, options) => {
     const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
     const teammate = await projectText(ioOf($), 'teammate')
     const handover = await handoverOf($, e.name)
-    const prompt = [named.prompt, handover, teammate].filter(Boolean).join('\n\n')
+    const videos = settings.demoVideos ? teammateRules($.plugin.root) : ''
+    const prompt = [named.prompt, handover, teammate, videos].filter(Boolean).join('\n\n')
     const isWorktree = settings.worktree && !e.isolation
     return next({ ...e, description: named.description, prompt, ...(isWorktree ? { isolation: 'worktree' as const } : {}) })
   })
@@ -231,6 +249,50 @@ async function pointUserRules($: EngineInterface): Promise<void> {
   if (text !== undefined && hasPointer(text)) return
   await $.store.set('claudeMdAsked', true)
   void $.prompt.submit({ text: pointerPrompt(path, text !== undefined) }).catch(() => undefined)
+}
+
+/** At startup: asks once whether to turn on before/after videos (recommending it); when on, makes sure the voice is set up. */
+async function startVideos($: EngineInterface): Promise<void> {
+  if ((await settingsNow($)).demoVideos) {
+    if (!(await isVoiceReady($))) await setUpVoice($)
+    return
+  }
+  if (await $.store.get(ASKED_KEY)) return
+  const answer = await $.ui.ask(QUESTION, { options: [ENABLE_OPTION, 'Not now'], header: 'Videos' }).catch(() => undefined)
+  if (answer === undefined) return // dismissed: asked again next session
+  await $.store.set(ASKED_KEY, true)
+  if (answer !== ENABLE_OPTION) return
+  const { deny } = await $.config.set({ key: SETTING_KEY, value: true })
+  if (deny) $.ui.log(`better-tasks: could not turn on before/after videos: ${deny}`)
+  else await setUpVoice($)
+}
+
+/** One Kokoro setup at a time (bin/kokoro-setup.sh): turning videos on twice joins the running one. */
+function setUpVoice($: EngineInterface): Promise<void> {
+  voiceSetup ??= runVoiceSetup($)
+    .catch(error => logFailure($, 'the Kokoro voice setup', error))
+    .finally(() => (voiceSetup = undefined))
+  return voiceSetup
+}
+
+async function runVoiceSetup($: EngineInterface): Promise<void> {
+  $.ui.toast(SETUP_TOAST, { timeoutMs: 8000 })
+  let output = ''
+  for await (const piece of $.process.spawn({ argv: setupArgv($.plugin.root) })) {
+    if ('stream' in piece && piece.stream === 'stdout') output += piece.text
+  }
+  const verdict = setupVerdict(output)
+  $.ui.toast(verdict.text, { timeoutMs: 8000 })
+  if (!verdict.isReady) $.ui.log(verdict.text)
+}
+
+async function isVoiceReady($: EngineInterface): Promise<boolean> {
+  const dir = voiceDir({
+    custom: await $.env.get('BETTER_TASKS_KOKORO'),
+    dataHome: await $.env.get('XDG_DATA_HOME'),
+    home: await $.env.get('HOME'),
+  })
+  return $.fs.read(`${dir}/.ready`).then(() => true, () => false)
 }
 
 async function setUpTeams($: EngineInterface): Promise<boolean> {

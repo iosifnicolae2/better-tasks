@@ -35,6 +35,8 @@ export type Settings = {
   /** Minutes of quiet before a status check; 0 = off. */
   statusEvery: number
   keepAwake: boolean
+  /** Teammates make a narrated before/after video of finished work. */
+  demoVideos: boolean
   sprint: SprintConfig
   tasks: TaskNaming
   paths: Paths
@@ -52,6 +54,7 @@ export const FIELDS: Record<string, Field> = {
   longCache: { kind: 'boolean' },
   statusEvery: { kind: 'number' },
   keepAwake: { kind: 'boolean' },
+  demoVideos: { kind: 'boolean' },
   sprintWeeks: { kind: 'string', values: ['1', '2', '3', '4'] },
   sprintStart: { kind: 'string', values: WEEKDAYS },
   taskPrefix: { kind: 'string' },
@@ -69,6 +72,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   longCache: true,
   statusEvery: 10,
   keepAwake: true,
+  demoVideos: false,
   sprintWeeks: '1',
   sprintStart: 'monday',
   taskPrefix: 'T-',
@@ -88,6 +92,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     longCache: value('longCache') !== false,
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
     keepAwake: value('keepAwake') !== false,
+    demoVideos: value('demoVideos') === true,
     sprint: {
       weeks: Math.min(4, Math.max(1, Number(value('sprintWeeks')) || 1)),
       startDay: Math.max(0, WEEKDAYS.indexOf(String(value('sprintStart')))),
@@ -139,7 +144,7 @@ export function parseOverrides(text: string): Overrides {
   return { values, problems }
 }
 
-export async function readOverrides(files: Files): Promise<Overrides> {
+export async function readOverrides(files: Pick<Files, 'root' | 'read'>): Promise<Overrides> {
   const text = await files.read(`${await files.root()}/${CONFIG_FILE}`).catch(() => undefined)
   return text === undefined ? { values: {}, problems: [] } : parseOverrides(text)
 }
