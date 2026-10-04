@@ -95,8 +95,8 @@ declare module 'claude-code' {
       moving: string
       /** The Tasks pane's page. */
       page: 'board' | 'config'
-      /** Bumped when the settings page turns before/after videos on, so the voice gets set up. */
-      voiceRequest: number
+      /** The last setting the settings page turned on, counted, so register.tsx can set it up. */
+      turnedOn: { field: string; count: number }
     }
   }
 }

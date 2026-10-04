@@ -34,6 +34,7 @@ Restart Claude Code.
 - **"start T-001"**: a teammate takes the task; the board shows what it's doing.
 - **`/away`**: screens off, the Mac keeps working.
 - **Before/after videos** (asked at first start; `/better-tasks config`): finished work comes with a short video, the bug then the fix, marked in red, subtitles read aloud by [Kokoro](https://github.com/hexgrad/kokoro). Needs `ffmpeg` and `uv` (`brew install ffmpeg uv`); the voice installs once under `~/.local/share/better-tasks/`.
+- **PR per task** (`/better-tasks config`): each teammate works in its own worktree and finishes with a GitHub pull request, its before/after video playing inside; approving the task merges it. Needs `gh` 2.99 or newer.
 
 ## 🔄 Update / uninstall
 

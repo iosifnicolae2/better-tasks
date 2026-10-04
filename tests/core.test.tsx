@@ -828,3 +828,16 @@ test('with before/after videos on, teammates get the video rules and the lead th
   expect(composed.sections.at(-1)?.text).toContain('shows that link exactly, on a line of its own')
   expect(host.toasts).toEqual([])
 })
+
+test('with PR per task on, every named teammate gets its own worktree and the PR rules; the lead merges on approval', { options: { pullRequests: true } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(named.result).toEqual({ isolation: 'worktree' })
+  expect(host.spawned[0]).toContain('git push -u origin HEAD:task/T-004')
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
+})

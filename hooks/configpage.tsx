@@ -91,6 +91,16 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
+    group: 'team',
+    field: 'pullRequests',
+    label: 'PR per task',
+    describe: 'Each teammate works in its own worktree and finishes with a GitHub PR; approving the task merges it.',
+    options: ON_OFF,
+    value: settings => (settings.pullRequests ? 'on' : 'off'),
+    initial: 'off',
+    stored: isOn,
+  },
+  {
     group: 'sprint',
     field: 'sprintWeeks',
     label: 'Sprint length',

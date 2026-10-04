@@ -37,6 +37,8 @@ export type Settings = {
   keepAwake: boolean
   /** Teammates make a narrated before/after video of finished work. */
   demoVideos: boolean
+  /** A teammate's finished work goes up as a GitHub pull request, merged when the user approves. */
+  pullRequests: boolean
   sprint: SprintConfig
   tasks: TaskNaming
   paths: Paths
@@ -55,6 +57,7 @@ export const FIELDS: Record<string, Field> = {
   statusEvery: { kind: 'number' },
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
+  pullRequests: { kind: 'boolean' },
   sprintWeeks: { kind: 'string', values: ['1', '2', '3', '4'] },
   sprintStart: { kind: 'string', values: WEEKDAYS },
   taskPrefix: { kind: 'string' },
@@ -73,6 +76,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   statusEvery: 10,
   keepAwake: true,
   demoVideos: false,
+  pullRequests: false,
   sprintWeeks: '1',
   sprintStart: 'monday',
   taskPrefix: 'T-',
@@ -93,6 +97,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
+    pullRequests: value('pullRequests') === true,
     sprint: {
       weeks: Math.min(4, Math.max(1, Number(value('sprintWeeks')) || 1)),
       startDay: Math.max(0, WEEKDAYS.indexOf(String(value('sprintStart')))),

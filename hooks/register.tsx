@@ -8,6 +8,7 @@ import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
+import { ghProblem, PR_COORDINATOR_RULES, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -59,6 +60,7 @@ export const register: Register = (on, options) => {
     if (!(await setUpTeams($))) return started
     if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
     if (e.isInteractive) void startVideos($).catch(error => logFailure($, 'before/after videos', error))
+    if ((await settingsNow($)).pullRequests) void checkGh($)
     const startedAt = await $.clock.now()
     await update($, statusState, () => ({ ...NO_CHECK, activeAt: startedAt }))
     await tick($).catch(error => logFailure($, 'the first refresh', error))
@@ -76,20 +78,22 @@ export const register: Register = (on, options) => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (!(await teamsOn($))) return composed
-    const videos = (await settingsNow($)).demoVideos ? COORDINATOR_RULES : ''
-    const rules = [await projectText(ioOf($), 'coordinator'), videos].filter(Boolean).join('\n\n')
+    const settings = await settingsNow($)
+    const videos = settings.demoVideos ? COORDINATOR_RULES : ''
+    const prs = settings.pullRequests ? PR_COORDINATOR_RULES : ''
+    const rules = [await projectText(ioOf($), 'coordinator'), videos, prs].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
-  // Before/after videos turned on in /config (composer) or on our settings page (voiceRequest): set up the voice.
-  on('config.set', { key: SETTING_KEY }, async ($, e, next) => {
+  // A setting turned on in /config (composer) or on our settings page (turnedOn): set up what it needs.
+  on('config.set', { key: /^better-tasks\./ }, async ($, e, next) => {
     const written = await next(e)
-    if (written.value === true) void setUpVoice($)
+    if (written.value === true) void setUpTurnedOn($, e.key)
     return written
   })
-  on('state.set', { plugin: 'better-tasks', key: 'voiceRequest' }, async ($, e, next) => {
+  on('state.set', { plugin: 'better-tasks', key: 'turnedOn' }, async ($, e, next) => {
     const written = await next(e)
-    void setUpVoice($)
+    void setUpTurnedOn($, `better-tasks.${(e.value as { field: string }).field}`)
     return written
   })
 
@@ -131,8 +135,9 @@ export const register: Register = (on, options) => {
     const teammate = await projectText(ioOf($), 'teammate')
     const handover = await handoverOf($, e.name)
     const videos = settings.demoVideos ? teammateRules($.plugin.root) : ''
-    const prompt = [named.prompt, handover, teammate, videos].filter(Boolean).join('\n\n')
-    const isWorktree = settings.worktree && !e.isolation
+    const prs = settings.pullRequests ? PR_TEAMMATE_RULES : ''
+    const prompt = [named.prompt, handover, teammate, videos, prs].filter(Boolean).join('\n\n')
+    const isWorktree = (settings.worktree || settings.pullRequests) && !e.isolation
     return next({ ...e, description: named.description, prompt, ...(isWorktree ? { isolation: 'worktree' as const } : {}) })
   })
 
@@ -265,6 +270,21 @@ async function startVideos($: EngineInterface): Promise<void> {
   const { deny } = await $.config.set({ key: SETTING_KEY, value: true })
   if (deny) $.ui.log(`better-tasks: could not turn on before/after videos: ${deny}`)
   else await setUpVoice($)
+}
+
+/** What a setting needs once turned on: the voice for videos, a recent gh for PRs. */
+async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
+  if (key === SETTING_KEY) await setUpVoice($)
+  if (key === PR_SETTING_KEY) await checkGh($)
+}
+
+/** PR per task needs gh, 2.99 or newer for the video: says so once if not. */
+async function checkGh($: EngineInterface): Promise<void> {
+  const version = await $.process.run(['gh', '--version']).then(done => done.stdout, () => undefined)
+  const problem = ghProblem(version)
+  if (!problem) return
+  $.ui.toast(problem, { timeoutMs: 8000 })
+  $.ui.log(`better-tasks: ${problem}`)
 }
 
 /** One Kokoro setup at a time (bin/kokoro-setup.sh): turning videos on twice joins the running one. */

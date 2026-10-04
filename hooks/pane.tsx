@@ -52,8 +52,8 @@ const movingState = atom({ plugin: 'better-tasks', key: 'moving' } as const, '')
 const actingState = atom({ plugin: 'better-tasks', key: 'acting' } as const, '')
 const searchState = atom({ plugin: 'better-tasks', key: 'search' } as const, { isOpen: false, query: '' } as SearchState)
 const listScrollState = atom({ plugin: 'better-tasks', key: 'listScroll' } as const, { start: 0, selectedId: '' })
-/** Bumped when the settings page turns before/after videos on: register.tsx sets up the voice (our own $.config.set reaches no hook of ours). */
-const voiceRequestState = atom({ plugin: 'better-tasks', key: 'voiceRequest' } as const, 0)
+/** The settings page turned a setting on: register.tsx sets it up (our own $.config.set reaches no hook of ours). */
+const turnedOnState = atom({ plugin: 'better-tasks', key: 'turnedOn' } as const, { field: '', count: 0 })
 
 /** The board's list as last drawn; the wheel moves its window from there. */
 let drawnList: DrawnList | undefined
@@ -91,7 +91,7 @@ async function openFile($: EngineInterface, editor: Editor, file: string): Promi
 
 async function setConfig($: EngineInterface, field: string, value: ConfigValue): Promise<void> {
   const { deny } = await $.config.set({ key: `better-tasks.${field}`, value })
-  if (!deny && field === 'demoVideos' && value === true) await update($, voiceRequestState, count => count + 1)
+  if (!deny && value === true) await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
 }
 
 
