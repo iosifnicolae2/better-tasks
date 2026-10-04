@@ -6,6 +6,7 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
+import { leadModelRules, TEAMMATE_TYPE, teammateModelRules, teammateTypes } from './models'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_ASKED_KEY, PR_COORDINATOR_RULES, PR_QUESTION, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
@@ -45,6 +46,8 @@ const statusState = atom({ plugin: 'better-tasks', key: 'statusCheck' } as const
 const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
 const resolvedState = atom({ plugin: 'better-tasks', key: 'resolved' } as const, [] as string[])
+/** The teammate agent types as last registered (JSON of their specs); '' until they are (models.ts). */
+const typesState = atom({ plugin: 'better-tasks', key: 'teammateTypes' } as const, '')
 const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, filed: false, question: false, prompted: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
@@ -59,6 +62,8 @@ export const register: Register = (on, options) => {
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
+    await update($, typesState, () => '')
+    await syncTeammateTypes($, await settingsNow($)).catch(error => logFailure($, 'the teammate agent types', error))
     if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
     if (e.isInteractive) void startQuestions($).catch(error => logFailure($, 'the startup questions', error))
     const startedAt = await $.clock.now()
@@ -81,7 +86,8 @@ export const register: Register = (on, options) => {
     const settings = await settingsNow($)
     const videos = settings.demoVideos ? COORDINATOR_RULES : ''
     const prs = settings.pullRequests ? PR_COORDINATOR_RULES : ''
-    const rules = [await projectText(ioOf($), 'coordinator'), videos, prs].filter(Boolean).join('\n\n')
+    const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
+    const rules = [await projectText(ioOf($), 'coordinator'), models, videos, prs].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
@@ -111,6 +117,7 @@ export const register: Register = (on, options) => {
     const reminder = unfiledLine(await read($, turnState))
     await update($, turnState, () => ({ asked: false, filed: false, question: isQuestion(e.text), prompted: true }))
     const settings = await settingsNow($)
+    await syncTeammateTypes($, settings).catch(() => undefined)
     const notices = [await read($, noticeState), unclosedLine(await unclosedIds($)), reminder].filter(Boolean).join('\n')
     const block = await contextBlock(ioOf($), settings, notices)
     await update($, noticeState, () => '')
@@ -134,11 +141,20 @@ export const register: Register = (on, options) => {
     const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
     const teammate = await projectText(ioOf($), 'teammate')
     const handover = await handoverOf($, e.name)
+    const hasTypes = (await read($, typesState)) !== ''
+    const type = e.subagent_type ?? (hasTypes ? TEAMMATE_TYPE : undefined)
+    const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const videos = settings.demoVideos ? teammateRules($.plugin.root) : ''
     const prs = settings.pullRequests ? PR_TEAMMATE_RULES : ''
-    const prompt = [named.prompt, handover, teammate, videos, prs].filter(Boolean).join('\n\n')
+    const prompt = [named.prompt, handover, teammate, stuck, videos, prs].filter(Boolean).join('\n\n')
     const isWorktree = (settings.worktree || settings.pullRequests) && !e.isolation
-    return next({ ...e, description: named.description, prompt, ...(isWorktree ? { isolation: 'worktree' as const } : {}) })
+    return next({
+      ...e,
+      description: named.description,
+      prompt,
+      ...(type === undefined ? {} : { subagent_type: type }),
+      ...(isWorktree ? { isolation: 'worktree' as const } : {}),
+    })
   })
 
   on('tool.call', async ($, e, next) => {
@@ -192,6 +208,15 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__better-tasks__project_init' }, ($, e) => serveTool($, e, 'project_init'))
   on('tool.call', { tool: 'mcp__better-tasks__task_note' }, ($, e) => serveTool($, e, 'task_note'))
   on('tool.call', { tool: 'mcp__better-tasks__task_search' }, ($, e) => serveTool($, e, 'task_search'))
+}
+
+/** The teammate agent types follow the settings: registered again when they change, in force from the next turn (models.ts). */
+async function syncTeammateTypes($: EngineInterface, settings: Settings): Promise<void> {
+  const types = teammateTypes(settings.models)
+  const key = JSON.stringify(types)
+  if (key === (await read($, typesState))) return
+  for (const type of types) await $.agent.register(type)
+  await update($, typesState, () => key)
 }
 
 /** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */

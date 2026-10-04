@@ -25,6 +25,12 @@ type Host = {
   registered: string[]
   spawned: string[]
   descriptions: string[]
+  /** The subagent_type each Agent call went out with (undefined: none). */
+  subagentTypes: (string | undefined)[]
+  /** The agent types the plugin registered, in order. */
+  agentTypes: { name: string; model?: string; effort?: string | number }[]
+  /** Set it and every agent.register is refused with this reason. */
+  agentDeny?: string
   /** Each process.spawn's argv; spawnOutput is what each one prints. */
   spawnedArgv: string[][]
   spawnOutput: string
@@ -43,7 +49,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, env: new Map(), composer: '' }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -63,6 +69,11 @@ function fakeHost(
   on('session.id', () => ({ value: 'lead-session' }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: WINDOW, percent: 10 }, rateLimits: [] } }))
   on('agent.list', () => ({ value: agents }))
+  on('agent.register', ($, e) => {
+    if (host.agentDeny) return { deny: host.agentDeny }
+    host.agentTypes.push({ name: e.name, model: e.model, effort: e.effort })
+    return { value: { agent: `better-tasks:${e.name}` } }
+  })
   on('tool.register', ($, e) => {
     host.registered.push(e.name)
     return { value: { tool: `mcp__better-tasks__${e.name}` } }
@@ -115,6 +126,7 @@ function fakeHost(
   on('tool.call', { tool: 'Agent' }, ($, e) => {
     host.spawned.push(e.prompt)
     host.descriptions.push(e.description)
+    host.subagentTypes.push(e.subagent_type)
     return { result: { isolation: e.isolation ?? 'none' } }
   })
   on('prompt.submit', ($, e) => {
@@ -390,7 +402,7 @@ test('a project customizes numbering, files, the task template and teammate inst
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'Fix BUG-01.', name: 'auth' })
   expect(host.spawned.at(-1)).toContain('Fix BUG-01.\n\n# You are a better-tasks teammate')
-  expect(host.spawned.at(-1)).toMatch(/Run `make check` before you report\.$/)
+  expect(host.spawned.at(-1)).toContain('Run `make check` before you report.')
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find X.' })
   expect(host.spawned.at(-1)).toBe('Find X.')
 })
@@ -915,4 +927,108 @@ test('without a GitHub remote startup does not ask about PRs, and asks in a late
   await $.session.start(SESSION)
   await clock.advance(0)
   expect(asked).toEqual([QUESTION, PR_QUESTION])
+})
+
+// ---- Teammate models: Sonnet xhigh by default, Opus high for hard tasks and escalation (models.ts) ----
+
+const AS_SET = (name: string, model: string, effort: string) => ({ name, model, effort })
+
+test('at start the two teammate agent types are registered with the settings, so a spawn sets model and effort', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  expect(host.agentTypes).toEqual([AS_SET('teammate', 'sonnet', 'xhigh'), AS_SET('teammate-hard', 'opus', 'high')])
+})
+
+test('the plugin options and the project config.json choose the models and efforts', { options: { teammateModel: 'haiku', hardEffort: 'max' } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ hardModel: 'fable', teammateEffort: 'low' }) })
+  await $.session.start(SESSION)
+  expect(host.agentTypes).toEqual([AS_SET('teammate', 'haiku', 'low'), AS_SET('teammate-hard', 'fable', 'max')])
+})
+
+test('a setting changed mid-session registers the types again at the next message, and only then', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('hello'))
+  expect(host.agentTypes).toHaveLength(2)
+  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ hardEffort: 'xhigh' }))
+  await $.prompt.submit(prompt('hello again'))
+  expect(host.agentTypes.slice(2)).toEqual([AS_SET('teammate', 'sonnet', 'xhigh'), AS_SET('teammate-hard', 'opus', 'xhigh')])
+})
+
+test('the lead is told which type to spawn for easy, hard and stuck work, from the settings', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const composed = await $.prompt.compose({ ...COMPOSE_BASE })
+  const lead = composed.sections.at(-1)?.text ?? ''
+  expect(lead).toContain('Easy and normal tasks, and when unsure: `better-tasks:teammate` (sonnet at xhigh effort)')
+  expect(lead).toContain('Hard tasks (deep debugging, security work, changes across several areas): `better-tasks:teammate-hard` (opus at high effort)')
+  expect(lead).toContain('its successor ("login-2") gets `better-tasks:teammate-hard`')
+  expect(lead).toContain('never pass `model`')
+})
+
+test('with escalation off the lead is told a successor keeps its predecessor’s type', { options: { escalate: false } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const lead = (await $.prompt.compose({ ...COMPOSE_BASE })).sections.at(-1)?.text ?? ''
+  expect(lead).toContain('Escalation is off: a successor keeps its predecessor')
+  expect(lead).not.toContain('gets `better-tasks:teammate-hard`')
+})
+
+test('a named teammate gets the default type unless the lead chose one; a scout is left alone', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-hard' })
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'ci', subagent_type: 'task-teammate' })
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a4', description: 'd', prompt: 'p' })
+  expect(host.subagentTypes).toEqual(['better-tasks:teammate', 'better-tasks:teammate-hard', 'task-teammate', undefined])
+})
+
+test('a teammate on a type below the hard one is told to report being stuck, while escalation is on', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-hard' })
+  expect(host.spawned[0]).toContain('## Stuck?')
+  expect(host.spawned[1]).not.toContain('## Stuck?')
+})
+
+test('with escalation off a teammate is not asked to report being stuck', { options: { escalate: false } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(host.spawned[0]).not.toContain('## Stuck?')
+})
+
+test('if the types cannot be registered, nothing points at them: no rules, no rewritten spawn, one log line', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  host.agentDeny = 'not now'
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  expect(host.notices.filter(line => line.includes('the teammate agent types failed'))).toHaveLength(1)
+  const lead = (await $.prompt.compose({ ...COMPOSE_BASE })).sections.at(-1)?.text ?? ''
+  expect(lead).not.toContain('Teammate models')
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(host.subagentTypes).toEqual([undefined])
+  expect(host.spawned[0]).not.toContain('## Stuck?')
 })

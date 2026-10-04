@@ -79,6 +79,8 @@ declare module 'claude-code' {
       /** Task ids the user answered "Mark as resolved" for, until each is closed. */
       resolved: string[]
       turn: TurnFacts
+      /** The teammate agent types as last registered (JSON of their specs); '' until they are. */
+      teammateTypes: string
       /** Where the wheel left the board's list window; it holds while that task stays selected. */
       listScroll: { start: number; selectedId: string }
       /** The board's search box: shown or not, and its text. */
