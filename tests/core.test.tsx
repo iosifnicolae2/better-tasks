@@ -191,6 +191,17 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
+test("the lead puts every question's links above the question too, where the mobile app makes them clickable", async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
+  expect(lead).toContain('in the question and also in your reply text right before the AskUserQuestion call')
+  expect(lead).toContain("links in the question aren't clickable in the Claude mobile app")
+})
+
 test('with worktree on, a named teammate is spawned in a worktree', { options: { worktree: true } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
@@ -830,6 +841,7 @@ test('with before/after videos on, teammates get the video rules and the lead th
   expect(host.spawned[0]).toContain('/bin/demo-video.sh spec.json')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('file://<project root>/.claude/tasks_videos/<task id>.mp4 on a line of its own')
+  expect(composed.sections.at(-1)?.text).toContain('Like every link, it also goes above the question')
   expect(host.toasts).toEqual([])
 })
 
@@ -844,6 +856,7 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   expect(host.spawned[0]).toContain('git push -u origin HEAD:task/T-004')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
+  expect(composed.sections.at(-1)?.text).toContain('Like every link, it also goes above the question')
 })
 
 test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {

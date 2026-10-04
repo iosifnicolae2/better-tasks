@@ -56,5 +56,5 @@ Finished work that shows on screen comes with one short narrated video. Nothing 
 }
 
 export const COORDINATOR_RULES = `## Before/after videos (on)
-- A finished task with a video has a "Video:" line in its task file. In Finishing, the question shows file://<project root>/${VIDEOS_FOLDER}/<task id>.mp4 on a line of its own with nothing else on it (no quotes, backticks or punctuation), so a click opens it. Only without a PR: with one (PR per task), the PR link replaces it, the video plays in the PR.
+- A finished task with a video has a "Video:" line in its task file. In Finishing, the question shows file://<project root>/${VIDEOS_FOLDER}/<task id>.mp4 on a line of its own with nothing else on it (no quotes, backticks or punctuation), so a click opens it. Only without a PR: with one (PR per task), the PR link replaces it, the video plays in the PR. Like every link, it also goes above the question (Finishing).
 - Work that shows on screen but has no video: ask its teammate for one before asking the user.`
