@@ -43,7 +43,7 @@ claude plugin marketplace update better-tasks
 claude plugin update better-tasks@better-tasks
 ```
 
-Then restart Claude Code.
+Then restart Claude Code. Updates bring the latest [release](https://github.com/iosifnicolae2/better-tasks/releases), not every commit on main; `claude plugin list` shows the installed version.
 
 **Uninstall:**
 
