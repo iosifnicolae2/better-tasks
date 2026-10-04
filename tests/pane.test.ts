@@ -336,6 +336,18 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /^T-002 {2}Dark mode$/ })).toBeDefined()
   })
 
+  test(`a task with a before/after video gets a Video action that plays it; others don't (${surface})`, async ($, on) => {
+    const { files, commands } = fakeProject(on)
+    files.set(`${ROOT}/.claude/tasks_videos/T-004.mp4`, '')
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    expect(await ui.find({ key: 'video' })).toBeUndefined()
+    await arrowTo($, 'task-T-004')
+    expect((await ui.find({ key: 'video' }))?.props).toMatchObject({ label: 'Video', hotkey: 'v' })
+    await ui.press({ key: 'video' })
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks_videos/T-004.mp4`])
+  })
+
   test(`a board without the keys looks it and cannot act on a chord from the prompt (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())

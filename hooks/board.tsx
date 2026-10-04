@@ -158,6 +158,8 @@ export type BoardActions = {
   shift: (task: Task, step: -1 | 1) => void
   move: (task: Task, to: When) => void
   open: (task: Task) => void
+  /** Plays the task's before/after video. */
+  playVideo: (path: string) => void
   start: (task: Task) => void
   done: (task: Task) => void
   reopen: (task: Task) => void
@@ -178,7 +180,7 @@ type Ranges = readonly (readonly [number, number])[]
 export type Hit = { task: Task; where: string; titleMatches: Ranges; snippet: string; snippetMatches: Ranges }
 
 /** The selected task: its section (none for a closed one) and the mode the keys are in. */
-export type Selected = { task: Task; when?: When; mate?: Teammate; isMoving?: boolean; isActing?: boolean }
+export type Selected = { task: Task; when?: When; mate?: Teammate; isMoving?: boolean; isActing?: boolean; /** Its before/after video's path. */ video?: string }
 
 /** A sprint section's facts for its heading: "Week 40 · Sep 28–Oct 4 · 3 days left". */
 export type SprintFacts = { details: string; isLastDay?: boolean; done?: number; total?: number; goal?: string }
@@ -511,7 +513,7 @@ function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps,
           <Text color="subtle">{statusWords(task)}</Text>
         )}
       </DetailLine>
-      {selected.isMoving ? <MovingLines ui={ui} /> : when ? <ActionLines ui={ui} selected={selected} when={when} hasKeys={hasKeys} actions={actions} /> : <ClosedLines ui={ui} task={task} actions={actions} />}
+      {selected.isMoving ? <MovingLines ui={ui} /> : when ? <ActionLines ui={ui} selected={selected} when={when} hasKeys={hasKeys} actions={actions} /> : <ClosedLines ui={ui} task={task} video={selected.video} actions={actions} />}
     </>
   )
 }
@@ -544,6 +546,7 @@ function ActionLines({ ui, selected, when, hasKeys, actions }: ActionProps) {
     <>
       <DetailLine ui={ui}>
         <Button key="open" plain hotkey="o" label="Open" onPress={() => actions.open(task)} />
+        {selected.video && <Button key="video" plain hotkey="v" label="Video" onPress={() => actions.playVideo(selected.video ?? '')} />}
         {task.status === 'todo' && <Button key="start" plain hotkey="s" label="Start" onPress={() => actions.start(task)} />}
         <Button key="done" plain hotkey="d" label="Done" onPress={() => actions.done(task)} />
         <Button key="move" plain hotkey="m" label="Move" onPress={() => actions.startMoving(task)} />
@@ -571,13 +574,14 @@ function ActionLines({ ui, selected, when, hasKeys, actions }: ActionProps) {
 }
 
 /** A closed task can be reopened into this sprint, or its file opened. */
-function ClosedLines({ ui, task, actions }: { ui: Ui; task: Task; actions: BoardActions }) {
+function ClosedLines({ ui, task, video, actions }: { ui: Ui; task: Task; video?: string; actions: BoardActions }) {
   const { Button, Text } = ui
   return (
     <>
       <DetailLine ui={ui}>
         <Button key="reopen" plain hotkey="r" label="Reopen" onPress={() => actions.reopen(task)} />
         <Button key="open" plain hotkey="o" label="Open" onPress={() => actions.open(task)} />
+        {video && <Button key="video" plain hotkey="v" label="Video" onPress={() => actions.playVideo(video)} />}
       </DetailLine>
       <DetailLine ui={ui}><Text color="subtle">Reopen puts it back into this sprint.</Text></DetailLine>
     </>

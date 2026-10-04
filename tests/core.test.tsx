@@ -825,7 +825,7 @@ test('with before/after videos on, teammates get the video rules and the lead th
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(host.spawned[0]).toContain('/bin/demo-video.sh spec.json')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain('shows that link exactly, on a line of its own')
+  expect(composed.sections.at(-1)?.text).toContain('file://<project root>/.claude/tasks_videos/<task id>.mp4 on a line of its own')
   expect(host.toasts).toEqual([])
 })
 

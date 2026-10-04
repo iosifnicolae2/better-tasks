@@ -1,8 +1,8 @@
 """Makes a narrated before/after demo video from screen recordings or screenshots.
 
 Run through bin/demo-video.sh (it picks Kokoro's Python). Usage: demo-video.sh spec.json
-The video goes to ~/Movies/better-tasks/<name> ($BETTER_TASKS_VIDEOS overrides the folder): a short
-path that survives reboots, so its file:// link, printed last, fits on one terminal row and opens on click.
+The video goes to <project>/.claude/tasks_videos/<name> (the main checkout's, also from a worktree;
+$BETTER_TASKS_VIDEOS overrides the folder), which git ignores; its file:// link is printed last.
 Each clip gets its BEFORE/AFTER label top-left, red boxes and arrows, burned-in subtitles
 and the subtitles read aloud by Kokoro. Overlays are drawn with Pillow, so ffmpeg needs no
 libass or freetype. The spec (paths relative to the spec file):
@@ -71,8 +71,18 @@ def main(spec_path: str) -> None:
 
 def videos_dir() -> Path:
     custom = os.environ.get('BETTER_TASKS_VIDEOS')
-    home = Path.home()
-    return Path(custom) if custom else home / ('Movies' if sys.platform == 'darwin' else 'Videos') / 'better-tasks'
+    folder = Path(custom) if custom else project_root() / '.claude' / 'tasks_videos'
+    folder.mkdir(parents=True, exist_ok=True)
+    ignore = folder / '.gitignore'
+    if not ignore.exists():
+        ignore.write_text('# Before/after videos (better-tasks): kept out of git.\n*\n')
+    return folder
+
+
+def project_root() -> Path:
+    """The main checkout, also from a teammate's worktree (its git dir is shared); else the current folder."""
+    done = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], capture_output=True, text=True)
+    return Path(done.stdout.strip()).parent if done.returncode == 0 else Path.cwd()
 
 
 # ---- Sizes ----

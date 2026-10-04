@@ -7,6 +7,7 @@ import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } 
 import { searchTasks } from './search'
 import { ConfigPage } from './configpage'
 import type { ConfigValue, ProjectFacts } from './configpage'
+import { VIDEOS_FOLDER } from './demovideo'
 
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
@@ -87,6 +88,13 @@ async function hostOf($: EngineInterface, editor: Editor): Promise<HostApp> {
 
 async function openFile($: EngineInterface, editor: Editor, file: string): Promise<void> {
   await $.process.run(openCommand(editor, file, await hostOf($, editor)))
+}
+
+/** The task's before/after video (demovideo.ts), when bin/demo-video.sh made one. */
+async function videoOf($: EngineInterface, id: string): Promise<string | undefined> {
+  const folder = `${await $.session.root()}/${VIDEOS_FOLDER}`
+  const names = (await $.fs.list(folder).catch(() => [])).map(entry => entry.name)
+  return names.includes(`${id}.mp4`) ? `${folder}/${id}.mp4` : undefined
 }
 
 async function setConfig($: EngineInterface, field: string, value: ConfigValue): Promise<void> {
@@ -434,6 +442,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       mate: team.find(one => one.name === selectedTask.owner),
       isMoving: selectedTask.id === movingId,
       isActing: selectedTask.id === actingId,
+      video: await videoOf($, selectedTask.id),
     }
     const sprints: Partial<Record<When, SprintFacts>> = {
       'this-sprint': { details: sprintDetails(current, settings.sprint, day), isLastDay: daysLeft(day, current, settings.sprint) <= 1, done: doneCount, total: inSprint.length, goal },
@@ -453,6 +462,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       shift: (task, step) => void shift(task, step),
       move: (task: Task, to: When) => void leave().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
       open: task => void leave().then(() => openFile($, settings.editor, task.file)).then(keepFocus(task.id)),
+      playVideo: path => void openFile($, 'default', path),
       start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task) })).then(keepFocus(task.id)),
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
