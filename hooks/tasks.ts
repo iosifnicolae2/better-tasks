@@ -5,6 +5,7 @@ import type { SprintConfig } from './sprints'
 import { settingsFrom, settingsOf } from './settings'
 import type { TaskNaming } from './settings'
 import { fill, projectText, SHIPPED } from './texts'
+import { oneLine, readYamlValue, yamlValue } from './yaml'
 
 const DEFAULT_NAMING = settingsOf({}).tasks
 
@@ -15,7 +16,7 @@ const STATUSES: readonly TaskStatus[] = ['todo', 'doing', 'done', 'cancelled']
 
 export function parseTask(text: string, file: string): Task {
   const [, head = '', body = ''] = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/) ?? []
-  const field = (name: string) => head.match(new RegExp(`^${name}:[ \\t]*(.*)$`, 'm'))?.[1]?.trim() ?? ''
+  const field = (name: string) => readYamlValue(head.match(new RegExp(`^${name}:[ \\t]*(.*)$`, 'm'))?.[1] ?? '')
   const status = field('status') as TaskStatus
   return {
     id: field('id'),
@@ -33,7 +34,11 @@ export function parseTask(text: string, file: string): Task {
 }
 
 export function formatTask(task: Task): string {
-  const head = FIELDS.map(name => `${name}: ${task[name]}`.trimEnd()).join('\n')
+  const value = (name: (typeof FIELDS)[number]) => {
+    const raw = task[name]
+    return typeof raw === 'string' ? yamlValue(oneLine(raw)) : String(raw)
+  }
+  const head = FIELDS.map(name => `${name}: ${value(name)}`.trimEnd()).join('\n')
   return `---\n${head}\n---\n${task.body}`
 }
 
@@ -169,7 +174,7 @@ export async function createTask(files: Files, input: NewTask): Promise<Task> {
   const day = await today(files)
   const tasks = await listTasks(files)
   const id = nextId(tasks, settings.tasks)
-  const title = input.title.trim()
+  const title = oneLine(input.title)
   const template = await projectText(files, 'task-template')
   const place = placeOf(input.when, day, settings.sprint)
   const task: Task = {
