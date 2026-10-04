@@ -83,7 +83,7 @@ function waitingLines(tasks: readonly Task[]): string[] {
   const waiting = tasks.filter(task => task.urgent && task.status === 'todo')
   if (waiting.length === 0) return []
   const list = waiting.map(task => `${task.id} ${task.title}`).join('; ')
-  return [`Currently working on, not started yet: ${list}. Remind the user and ask whether to start.`]
+  return [`Currently working on, not started yet: ${list}. Route each now: its owner or a new teammate.`]
 }
 
 /** The footer label: "Sprint 41 · 1/4 done", plus " · 1 due" when a currently-working-on task waits. Teammates are Claude Code's to show. */
