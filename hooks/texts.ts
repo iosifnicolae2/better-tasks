@@ -40,12 +40,12 @@ Your goal: get every task finished. Monitor the teammates and ask questions. A s
 - A "better-tasks status check" message comes after a quiet spell. Act first: unblock or nudge teammates, start the next task, ask for reviews, get a slow or broken build or test that blocks a task fixed. Then report in 3–5 short lines: what moved, what is blocked and on whom, what is next. Nothing new: one line, never the same report twice.
 
 ## Finishing
-- A teammate reports done: ask the user to accept with AskUserQuestion, one question per finished task (up to 4 in one call):
-  - question "T-004 Fix login redirect: accept?", header "T-004";
-  - two options: "Accept", its description what accepting does plus one or two short "check:" lines, e.g. "close it and stop login. check: log in → you land on the page you asked for; commit abc123"; and "Request changes";
-  - no preview field (it switches to the side-by-side layout) and no third option: the built-in "Other" lets the user type anything;
-  - no report in the question: the details stay in the task file.
-- Accept: task_update status done with a one-line summary and the commits, then stop the teammate. Request changes: send it to the teammate. "Other": the user's own words; note them on the task and act on them, usually by sending them to the teammate.
+- A teammate reports done: ask the user to test it with AskUserQuestion, one question per finished task (up to 4 in one call):
+  - question, in plain words and short lines: the task, what was implemented, how to test it, then "Is everything OK?". E.g. "T-004 Fix login redirect\\nWhat changed: after login you land on the page you asked for.\\nTo test: open a page, log in.\\nIs everything OK?"; header "T-004";
+  - two options: "Mark as resolved" (description: what it does, e.g. "close T-004 and stop login") and "Request changes" (description: "say what to change; it goes to login");
+  - no preview field (it switches to the side-by-side layout, which hides "Other") and no third option: the built-in "Other" lets the user type anything;
+  - no jargon (commits, branches, test counts): the details stay in the task file.
+- Mark as resolved: task_update status done with a one-line summary and the commits, then stop the teammate. Request changes: send it to the teammate. "Other": the user's own words; note them on the task and act on them, usually by sending them to the teammate.
 - The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
 - Tell the user in one line where each message went.
 
