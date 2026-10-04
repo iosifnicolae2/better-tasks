@@ -43,4 +43,4 @@ claude plugin marketplace remove better-tasks
 ## 🧩 More
 
 - **Per project:** ask "set up better-tasks for this project", then edit the files in `.claude/tasks/`.
-- **Development:** `claude --plugin-dir .` runs this copy; `claude plugin test .` runs the tests.
+- **Development:** `claude --plugin-dir .` runs this copy; `claude plugin test .` runs the tests; `bun scripts/yaml-check.ts [tasks folder]` checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML).
