@@ -35,10 +35,6 @@ Restart Claude Code.
 - **`/away`**: screens off, the Mac keeps working.
 - **Before/after videos** (asked at first start; `/better-tasks config`): finished work comes with a short video, the bug then the fix, marked in red, subtitles read aloud by [Kokoro](https://github.com/hexgrad/kokoro). Needs `ffmpeg` and `uv` (`brew install ffmpeg uv`); the voice installs once under `~/.local/share/better-tasks/`.
 
-  <a href="docs/videos/before-after.mp4"><img src="docs/screenshots/before-after.png" alt="A before/after video: the settings page without, then with, the Before/after videos row, marked in red, with subtitles"></a>
-
-  A real one, made by the tool for this feature (28 s, with sound): click to play.
-
 ## 🔄 Update / uninstall
 
 **Update:**
