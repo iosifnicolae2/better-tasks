@@ -43,12 +43,12 @@ export function statusPrompt(idleMinutes: number): string {
   return (
     `better-tasks status check: no activity for ${idleMinutes} min. Move the work forward.\n` +
     '1. Call team_status.\n' +
-    '2. For each task currently working on or in this sprint, see where it stands and act:\n' +
+    '2. For each task currently working on or in this sprint, act:\n' +
     '   - teammate working: leave it;\n' +
-    '   - finished: ask the user to review it (the short accept question);\n' +
-    '   - waiting for the user: ask one short AskUserQuestion, only if it truly blocks;\n' +
-    '   - stuck (no activity for long, an error, going in circles): nudge or unblock it with SendMessage;\n' +
-    '   - owner busy or worked a lot (high context, cold cache): a fresh teammate, by the routing rules;\n' +
+    '   - teammate reported done: ask the user to test it (the Finishing question);\n' +
+    '   - teammate idle but the task still open: check whether the work is done; if not, tell it to go on;\n' +
+    '   - stuck (an error, going in circles): unblock it with SendMessage, or a fresh teammate by the routing rules;\n' +
+    '   - waiting for the user: one short AskUserQuestion, only if it truly blocks;\n' +
     '   - nothing running and the user said go: start the next this-sprint task.\n' +
     '3. Then tell the user in 3–5 short lines: what moved, what is blocked and on whom, what is next. Nothing new since the last report: one line.'
   )
