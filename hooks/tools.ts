@@ -21,7 +21,8 @@ export const TOOLS: readonly ToolSpec[] = [
     name: 'task_create',
     description:
       'Create a task file. By default it goes to "currently working on" (when: now) and you route it at once. ' +
-      'Only when the user names a sprint or the backlog, pass when: this-sprint, next-sprint or backlog; then nothing starts.',
+      'Only when the user names a sprint or the backlog, pass when: this-sprint, next-sprint or backlog; then nothing starts. ' +
+      "Put the user's words and decisions in goal: written once here, the teammate reads them from the file.",
     inputSchema: {
       type: 'object',
       properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN },
@@ -52,7 +53,7 @@ export const TOOLS: readonly ToolSpec[] = [
     name: 'task_note',
     description:
       'Add a dated note to an existing task: what the user just said about it (an observation, a bug, a wish). ' +
-      'Use it instead of task_create when the message refers to a task. The result names the owner to forward it to.',
+      'Use it instead of task_create when the message refers to a task. The result names the owner to point to the note.',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' }, note: { type: 'string' } },
@@ -187,7 +188,8 @@ async function ownerHint(io: Io, task: Task): Promise<string> {
   const mate = findMate(await refreshTeam(io), task.owner)
   if (!mate) return `Owner ${task.owner} is not running: tell it with SendMessage (it resumes) or route the task anew.`
   const facts = [cacheText(mate), mate.percent === undefined ? undefined : `${mate.percent} %`].filter(Boolean).join(', ')
-  return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: forward the note with SendMessage, or to a fresh teammate by the routing rules.`
+  const pointer = `"${task.id}: new note in ${task.file}"`
+  return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: send it one line with SendMessage, ${pointer}, or route to a fresh teammate by the routing rules.`
 }
 
 async function taskSearch(io: Io, query: string, limit: number | undefined, settings: Settings): Promise<string> {

@@ -568,7 +568,7 @@ test('every named teammate is spawned with the teammate rules; a scout is not', 
 
 const OWNED = `---\nid: T-003\ntitle: Login redirect\nsprint: 2026-10-05\nstatus: doing\nowner: auth\n---\n## Goal\nLand where you were going.\n\n## Notes\n`
 
-test('a message about an existing task: the note goes on it, and the owner is named to forward to', async ($, on) => {
+test('a message about an existing task: the note goes on it, and the owner is named to point to it', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on, [mate('a1', 'auth')], { [`${TASKS}/T-003-login-redirect.md`]: OWNED })
@@ -580,7 +580,9 @@ test('a message about an existing task: the note goes on it, and the owner is na
   expect(entered.context?.at(-1)).toContain('Open tasks (match the message against these):\n- T-003 Login redirect · this sprint · auth')
 
   const noted = await $.tool.call({ tool: 'mcp__better-tasks__task_note', tool_use_id: 'n1', id: 'T-003', note: 'Still loops on Safari.' } as never)
-  expect(String(noted.result)).toBe('Noted on T-003 Login redirect.\nOwner auth (cache warm 55m, 10 %): forward the note with SendMessage, or to a fresh teammate by the routing rules.')
+  expect(String(noted.result)).toBe(
+    `Noted on T-003 Login redirect.\nOwner auth (cache warm 55m, 10 %): send it one line with SendMessage, "T-003: new note in ${TASKS}/T-003-login-redirect.md", or route to a fresh teammate by the routing rules.`,
+  )
   expect(host.files.get(`${TASKS}/T-003-login-redirect.md`)).toContain('## Notes\n- 2026-10-05: Still loops on Safari.\n')
   expect([...host.files.keys()].filter(path => path.startsWith(`${TASKS}/T-`))).toEqual([`${TASKS}/T-003-login-redirect.md`])
 
