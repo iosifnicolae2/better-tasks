@@ -184,9 +184,12 @@ def draw_mark(draw: ImageDraw.ImageDraw, mark: dict, fit: Fit, unit: float) -> N
     width = max(3, round(6 * unit))
     if 'box' in mark:
         x, y, w, h = mark['box']
-        corners = (*fit.point(x, y), *fit.point(x + w, y + h))
-        draw.rounded_rectangle(corners, radius=6 * unit, outline=WHITE, width=width + 4)
-        draw.rounded_rectangle(corners, radius=6 * unit, outline=RED, width=width)
+        (left, top), (right, bottom) = fit.point(x, y), fit.point(x + w, y + h)
+        line = max(3, min(width, round(min(right - left, bottom - top) / 5)))  # thin around a small target
+        rim = line + max(2, line // 2)
+        corners = (left - rim, top - rim, right + rim, bottom + rim)  # around the target, never over it
+        draw.rounded_rectangle(corners, radius=6 * unit, outline=WHITE, width=rim)
+        draw.rounded_rectangle(corners, radius=6 * unit, outline=RED, width=line)
     if 'arrow' in mark:
         x1, y1, x2, y2 = mark['arrow']
         start, tip = fit.point(x1, y1), fit.point(x2, y2)
