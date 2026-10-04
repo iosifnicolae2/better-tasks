@@ -26,6 +26,6 @@ describe('before/after videos', () => {
     const rules = teammateRules('/plugins/better-tasks')
     expect(rules).toContain('/plugins/better-tasks/bin/demo-video.sh spec.json')
     expect(rules).toContain('/plugins/better-tasks/bin/demo_video.py')
-    expect(rules).toContain('Demo video: <absolute path>')
+    expect(rules).toContain('Demo video: <the file:// link it printed>')
   })
 })

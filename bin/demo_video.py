@@ -1,13 +1,15 @@
 """Makes a narrated before/after demo video from screen recordings or screenshots.
 
 Run through bin/demo-video.sh (it picks Kokoro's Python). Usage: demo-video.sh spec.json
+The video goes to ~/Movies/better-tasks/<name> ($BETTER_TASKS_VIDEOS overrides the folder): a short
+path that survives reboots, so its file:// link, printed last, fits on one terminal row and opens on click.
 Each clip gets its BEFORE/AFTER label top-left, red boxes and arrows, burned-in subtitles
 and the subtitles read aloud by Kokoro. Overlays are drawn with Pillow, so ffmpeg needs no
 libass or freetype. The spec (paths relative to the spec file):
 
 {
   "title": "T-004 Fix login redirect",          optional opening card
-  "output": "T-004-demo.mp4",
+  "name": "T-004.mp4",                          the task id: a new video for the task replaces the old
   "voice": "af_heart",                          optional Kokoro voice
   "clips": [
     {"label": "BEFORE", "video": "before.mp4",  or leave out "video" and give each step an "image"
@@ -23,6 +25,7 @@ libass or freetype. The spec (paths relative to the spec file):
 """
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -54,7 +57,7 @@ def main(spec_path: str) -> None:
     spec_file = Path(spec_path).resolve()
     spec = json.loads(spec_file.read_text())
     base = spec_file.parent
-    output = base / spec['output']
+    output = videos_dir() / Path(spec['name']).name
     clips = spec['clips']
     canvas = canvas_size(source_size(base, clips[0]))
     voice = Voice(spec.get('voice', 'af_heart'))
@@ -63,7 +66,13 @@ def main(spec_path: str) -> None:
         parts = [title_card(work, canvas, spec['title'])] if spec.get('title') else []
         parts += [render_clip(work / f'clip{i}', base, clip, canvas, voice) for i, clip in enumerate(clips)]
         join(work, parts, output)
-    print(output)
+    print(output.as_uri())
+
+
+def videos_dir() -> Path:
+    custom = os.environ.get('BETTER_TASKS_VIDEOS')
+    home = Path.home()
+    return Path(custom) if custom else home / ('Movies' if sys.platform == 'darwin' else 'Videos') / 'better-tasks'
 
 
 # ---- Sizes ----
