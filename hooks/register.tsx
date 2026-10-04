@@ -6,7 +6,7 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
-import { contextBlock, footerText, isPerson, isQuestion, unfiledLine, withRules } from './coordinator'
+import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -40,6 +40,7 @@ const cacheStepsState = atom({ plugin: 'better-tasks', key: 'cacheSteps' } as co
 const statusState = atom({ plugin: 'better-tasks', key: 'statusCheck' } as const, NO_CHECK as StatusCheck)
 const noticeState = atom({ plugin: 'better-tasks', key: 'notice' } as const, '')
 const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
+const resolvedState = atom({ plugin: 'better-tasks', key: 'resolved' } as const, [] as string[])
 const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, filed: false, question: false, prompted: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
@@ -77,7 +78,10 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', async ($, e, next) => {
     const isOwnCheck = e.origin.kind === 'plugin' && e.origin.name === 'better-tasks'
-    if (isOwnCheck) return next({ ...e, context: [...(e.context ?? []), await contextBlock(ioOf($), await settingsNow($), '')] })
+    if (isOwnCheck) {
+      const unclosed = unclosedLine(await unclosedIds($))
+      return next({ ...e, context: [...(e.context ?? []), await contextBlock(ioOf($), await settingsNow($), unclosed)] })
+    }
     if (!isPerson(e.origin)) return next(e)
     const now = await $.clock.now()
     await update($, statusState, check => ({ ...check, activeAt: now, quiet: 0 }))
@@ -86,7 +90,7 @@ export const register: Register = (on, options) => {
     const reminder = unfiledLine(await read($, turnState))
     await update($, turnState, () => ({ asked: false, filed: false, question: isQuestion(e.text), prompted: true }))
     const settings = await settingsNow($)
-    const notices = [await read($, noticeState), reminder].filter(Boolean).join('\n')
+    const notices = [await read($, noticeState), unclosedLine(await unclosedIds($)), reminder].filter(Boolean).join('\n')
     const block = await contextBlock(ioOf($), settings, notices)
     await update($, noticeState, () => '')
     await showStatus($, settings)
@@ -95,7 +99,10 @@ export const register: Register = (on, options) => {
 
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
     const answered = await next(e)
-    if (e.agentId === undefined) await update($, turnState, facts => ({ ...facts, asked: true }))
+    if (e.agentId !== undefined) return answered
+    await update($, turnState, facts => ({ ...facts, asked: true }))
+    const resolved = resolvedIn((answered.result as { answers?: unknown } | undefined)?.answers, (await settingsNow($)).tasks.prefix)
+    if (resolved.length > 0) await update($, resolvedState, ids => [...new Set([...ids, ...resolved])])
     return answered
   })
 
@@ -320,10 +327,18 @@ async function checkStatus($: EngineInterface, settings: Settings): Promise<void
     check,
     hasWork: tasks.length > 0 || team.length > 0,
     composerText: (await $.prompt.read().catch(() => ({ text: '' }))).text,
-    fingerprint: fingerprintOf(tasks, team),
+    fingerprint: fingerprintOf(tasks, team, await unclosedIds($)),
   })
   await update($, statusState, () => next)
   if (fire) void $.prompt.submit({ text: statusPrompt(Math.round((now - check.activeAt) / 60_000)) }).catch(() => undefined)
+}
+
+/** The tasks the user resolved that are still open; closed ones leave the list, so a reopened task is not closed again. */
+async function unclosedIds($: EngineInterface): Promise<string[]> {
+  const open = new Set((await listTasks(ioOf($))).filter(isOpen).map(task => task.id))
+  const ids = (await read($, resolvedState)).filter(id => open.has(id))
+  await update($, resolvedState, () => ids)
+  return ids
 }
 
 /** Keeps every task on a sprint boundary when the sprint length or start day changes. */

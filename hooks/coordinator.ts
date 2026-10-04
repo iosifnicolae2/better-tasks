@@ -3,6 +3,7 @@ import type { PromptComposeSection, PromptComposeTrait, PromptOrigin } from 'cla
 import type { Task, TurnFacts } from '../types'
 import type { Io } from './io'
 import type { Settings } from './settings'
+import { taskIdIn } from './spawn'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintNumber, sprintStart, sprintTitle } from './sprints'
 import type { SprintConfig } from './sprints'
@@ -77,6 +78,27 @@ export const isQuestion = (text: string) => QUESTION.test(text)
 export function unfiledLine(last: TurnFacts): string | undefined {
   if (!last.prompted || last.filed || last.asked || last.question) return undefined
   return 'Your last message was not filed. If it was work or an observation, file it: task_create, or task_note on the task it refers to.'
+}
+
+/** The Finishing question's option that closes a task (texts.ts). */
+export const RESOLVE_OPTION = 'Mark as resolved'
+
+/** The task ids an AskUserQuestion answer resolved: each question naming a task, answered "Mark as resolved". */
+export function resolvedIn(answers: unknown, prefix: string): string[] {
+  if (!answers || typeof answers !== 'object') return []
+  return Object.entries(answers)
+    .filter(([, answer]) => answer === RESOLVE_OPTION)
+    .map(([question]) => taskIdIn(question, prefix))
+    .filter((id): id is string => id !== undefined)
+}
+
+/** One line while a task the user resolved is still open: the lead closes it now. */
+export function unclosedLine(ids: readonly string[]): string {
+  if (ids.length === 0) return ''
+  return (
+    `The user marked ${ids.join(', ')} resolved, still open: close each now (task_update status done with a one-line ` +
+    'summary and the commits from the task file), then stop its teammate.'
+  )
 }
 
 function waitingLines(tasks: readonly Task[]): string[] {

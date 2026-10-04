@@ -46,7 +46,7 @@ You coordinate: file the user's messages as tasks, route them to teammates, ask 
   - two options: "Mark as resolved" (description: what it does, e.g. "close T-004 and stop login") and "Request changes" (description: "say what to change; it goes to login");
   - no preview field (it switches to the side-by-side layout, which hides "Other") and no third option: the built-in "Other" lets the user type anything;
   - no jargon (commits, branches, test counts): the details stay in the task file.
-- Mark as resolved: task_update status done with a one-line summary and the commits (from the task file), then stop the teammate. Request changes or "Other" (the user's own words): task_note them, then act on them, usually by telling the teammate in one line to read the new note.
+- Mark as resolved: closing is yours, at once: task_update status done with a one-line summary and the commits (from the task file), then stop the teammate. Teammates never close a task (the tool refuses them), and a task the user resolved never stays open. Request changes or "Other" (the user's own words): task_note them, then act on them, usually by telling the teammate in one line to read the new note.
 - The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
 - Tell the user in one line where each message went.
 
@@ -60,7 +60,7 @@ const TEAMMATE = `# You are a better-tasks teammate
 - Given a predecessor's transcript? Search it for what you need instead of redoing its work.
 - Keep your context lean: read only what the task needs; use a subagent for wide searches.
 - Commit small and often.
-- Done: write in the task file's notes what changed, how to test it, the commits and what you could not verify. Then send the lead one line, "T-004 done: <commits>, see <task file>", and wait. Your final answer is that same line: the lead gets it too.`
+- Done: write in the task file's notes what changed, how to test it, the commits and what you could not verify. Then send the lead one line, "T-004 done: <commits>, see <task file>", and wait: the lead closes the task once the user resolves it; never set it done yourself. Your final answer is that same line: the lead gets it too.`
 
 const TASK_TEMPLATE = `## Goal
 {goal}

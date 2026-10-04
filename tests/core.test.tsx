@@ -745,3 +745,39 @@ test('nothing changed: no repeat, the wait grows; a change brings the next check
   await clock.advance(60_000)
   expect(statusPrompts(host)).toHaveLength(2)
 })
+
+const updateT1 = { tool: 'mcp__better-tasks__task_update', tool_use_id: 'u1', id: 'T-001' } as const
+
+test('only the lead closes a task: a teammate setting done or cancelled is refused', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [mate('a1', 'login')], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  await $.session.start(SESSION)
+  const done = await $.tool.call({ ...updateT1, status: 'done', agentId: 'a1' } as never)
+  expect(done.deny).toContain('Only the lead closes T-001, once the user marks it resolved.')
+  expect((await $.tool.call({ ...updateT1, status: 'cancelled', agentId: 'a1' } as never)).deny).toBeDefined()
+  expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('status: doing')
+
+  expect((await $.tool.call({ ...updateT1, note: 'half way', agentId: 'a1' } as never)).deny).toBeUndefined()
+  await $.tool.call({ ...updateT1, status: 'done', note: 'Works', commits: 'abc123' } as never)
+  expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('status: done')
+})
+
+test('a task the user resolved is named to the lead until it is closed', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const finishing = { 'T-001 Fix login\nWhat changed: no loop.\nIs everything OK?': 'Mark as resolved', 'T-002 Other\nIs everything OK?': 'Request changes' }
+  on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: finishing } })) // before fakeHost: the first answer wins
+  const host = fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('T-001 is ready'))
+  await $.tool.call({ tool: 'AskUserQuestion', tool_use_id: 'q1', questions: [] } as never)
+  const reminded = await $.prompt.submit(prompt('anything else?'))
+  expect(reminded.context?.at(-1)).toContain('The user marked T-001 resolved, still open: close each now')
+
+  await $.tool.call({ ...updateT1, status: 'done', note: 'Works', commits: 'abc123' } as never)
+  expect((await $.prompt.submit(prompt('thanks'))).context?.at(-1)).not.toContain('marked T-001 resolved')
+  await $.tool.call({ ...updateT1, status: 'doing' } as never) // reopened later: not closed again
+  expect((await $.prompt.submit(prompt('it broke again'))).context?.at(-1)).not.toContain('marked T-001 resolved')
+  expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('status: doing')
+})

@@ -33,6 +33,7 @@ export const TOOLS: readonly ToolSpec[] = [
     name: 'task_update',
     description:
       'Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note. ' +
+      'Only the lead closes a task (status done or cancelled), once the user resolves it. ' +
       'status "done" also logs it in docs/tasks.md (pass a summary as note, and the commits).',
     inputSchema: {
       type: 'object',
@@ -127,6 +128,7 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
   if (run.name === 'task_update') {
     const task = await findTask(io, input.id ?? '')
     if (!task) return { deny: `No task ${input.id}.` }
+    if (isClosing(input.status) && run.agentId !== undefined) return { deny: leadCloses(task) }
     const changed = await changeTask(io, task, input, config)
     const line = taskLine(changed, await today(io), config)
     return { result: input.note ? `${line}\n${await ownerHint(io, changed)}` : line }
@@ -143,6 +145,16 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
   if (run.name === 'team_status') return { result: await teamStatus(io) }
   if (run.name === 'project_init') return { result: await projectInit(io) }
   return { deny: `Unknown tool ${run.name}.` }
+}
+
+const isClosing = (status: TaskStatus | undefined) => status === 'done' || status === 'cancelled'
+
+/** Why a teammate may not close a task, and what it does instead. */
+function leadCloses(task: Task): string {
+  return (
+    `Only the lead closes ${task.id}, once the user marks it resolved. Write in the task file's notes what changed, ` +
+    `how to test it and the commits, send the lead "${task.id} done: <commits>, see ${task.file}", and wait.`
+  )
 }
 
 async function taskList(io: Io, which: string, settings: Settings): Promise<string> {

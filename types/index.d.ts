@@ -76,6 +76,8 @@ declare module 'claude-code' {
       /** The last request per agent id, for cache warmth. */
       cacheSteps: Record<string, CacheStep>
       notice: string
+      /** Task ids the user answered "Mark as resolved" for, until each is closed. */
+      resolved: string[]
       turn: TurnFacts
       /** Where the wheel left the board's list window; it holds while that task stays selected. */
       listScroll: { start: number; selectedId: string }

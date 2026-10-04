@@ -12,11 +12,11 @@ export function waitMinutes(every: number, quiet: number): number {
   return Math.min(MAX_MINUTES, every * 2 ** Math.max(0, quiet - 1))
 }
 
-/** The open work and the teammates, as one comparable string: a change means there is something new to look at. */
-export function fingerprintOf(tasks: readonly Task[], team: readonly Teammate[]): string {
+/** The open work, the teammates and the tasks resolved but still open, as one comparable string: a change means there is something new to look at. */
+export function fingerprintOf(tasks: readonly Task[], team: readonly Teammate[], unclosed: readonly string[] = []): string {
   const work = tasks.map(task => `${task.id}:${task.status}:${task.owner}:${task.body.length}`)
   const mates = team.map(mate => `${mate.name}:${mate.status}:${mate.activity ?? ''}`)
-  return [...work, ...mates].join('|')
+  return [...work, ...mates, ...unclosed.map(id => `resolved:${id}`)].join('|')
 }
 
 export type StatusFacts = {
@@ -44,6 +44,7 @@ export function statusPrompt(idleMinutes: number): string {
     `better-tasks status check: no activity for ${idleMinutes} min. Move the work forward.\n` +
     '1. Call team_status.\n' +
     '2. For each task currently working on or in this sprint, act:\n' +
+    '   - the user marked it resolved but it is still open: close it now (task_update status done, summary, commits), stop the teammate;\n' +
     '   - teammate working: leave it;\n' +
     '   - teammate reported done: read its task file notes, then ask the user to test it (the Finishing question);\n' +
     '   - teammate idle but the task still open: check whether the work is done; if not, tell it to go on;\n' +
