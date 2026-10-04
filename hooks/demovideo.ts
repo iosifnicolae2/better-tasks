@@ -36,9 +36,9 @@ Finished work that shows on screen comes with one short narrated video. Nothing 
 - AFTER: the same steps on your change.
 - Spec: a JSON file (format at the top of ${root}/bin/demo_video.py): a BEFORE clip and an AFTER clip, 1–4 steps each. Per step one short, plain sentence (shown and read aloud), a red box around what matters and an arrow pointing at it, in the pixels of the image or video.
 - Make it: \`${root}/bin/demo-video.sh spec.json\`. Inputs and video stay in your scratchpad, never in the project. Check a frame or two (\`ffmpeg -ss <second> -i video.mp4 -frames:v 1 frame.png\`): the boxes and arrows land on target.
-- Your notes get the line "Demo video: <path>".`
+- Your notes get the line "Demo video: <absolute path>" (no spaces in it, so it stays one clickable link).`
 }
 
 export const COORDINATOR_RULES = `## Before/after videos (on)
-- A finished task's notes hold "Demo video: <path>". In Finishing, open it for the user first (Bash \`open <path>\`), then ask; the question says "Video: opened, <path>".
+- A finished task's notes hold "Demo video: <absolute path>". In Finishing, the question shows it on a line of its own, as file://<absolute path> and nothing else on that line (no quotes, backticks or punctuation), so the user clicks it and the video opens.
 - Work that shows on screen but has no video: ask its teammate for one before asking the user.`
