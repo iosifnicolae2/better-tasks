@@ -3,6 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
+import { PR_QUESTION } from '../hooks/pullrequest'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -27,6 +28,8 @@ type Host = {
   /** Each process.spawn's argv; spawnOutput is what each one prints. */
   spawnedArgv: string[][]
   spawnOutput: string
+  /** What process.run prints, by its argv joined with spaces. */
+  runOutput: Record<string, string>
   env: Map<string, string>
   composer: string
 }
@@ -40,7 +43,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], spawnedArgv: [], spawnOutput: '', env: new Map(), composer: '' }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -104,7 +107,8 @@ function fakeHost(
         host.files.set(to + path.slice(from.length), text)
       }
     }
-    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    const stdout = host.runOutput[e.argv.join(' ')] ?? ''
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'Now' } } }))
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
@@ -851,4 +855,51 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
   await clock.advance(0)
   expect(host.spawnedArgv.filter(argv => argv.at(-1)?.endsWith('/bin/gh-update.sh'))).toHaveLength(1)
   expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
+})
+
+test('in a GitHub project startup asks about videos, then PR per task; Enable on both sets each up', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    asked.push(question)
+    return { result: { answers: { [question]: ENABLE_OPTION } } }
+  })
+  const set: unknown[] = []
+  on('config.set', ($, e) => {
+    set.push([e.key, e.value])
+    return { value: e.value }
+  })
+  const host = fakeHost(on)
+  host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toEqual([QUESTION, PR_QUESTION])
+  expect(set).toEqual([['better-tasks.demoVideos', true], ['better-tasks.pullRequests', true]])
+  const scripts = host.spawnedArgv.map(argv => argv.at(-1)?.split('/').pop())
+  expect(scripts).toEqual(['kokoro-setup.sh', 'gh-update.sh']) // gh --version printed nothing: gh missing
+
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toHaveLength(2)
+})
+
+test('without a GitHub remote startup does not ask about PRs, and asks in a later GitHub project', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    asked.push(question)
+    return { result: { answers: { [question]: 'Not now' } } }
+  })
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toEqual([QUESTION])
+  host.runOutput['git remote -v'] = 'origin\thttps://github.com/someone/app.git (fetch)\n'
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toEqual([QUESTION, PR_QUESTION])
 })

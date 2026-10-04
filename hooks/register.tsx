@@ -8,7 +8,7 @@ import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
-import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, PR_COORDINATOR_RULES, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
+import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_ASKED_KEY, PR_COORDINATOR_RULES, PR_QUESTION, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -60,8 +60,7 @@ export const register: Register = (on, options) => {
     if (moved) $.ui.log(moved)
     if (!(await setUpTeams($))) return started
     if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
-    if (e.isInteractive) void startVideos($).catch(error => logFailure($, 'before/after videos', error))
-    if ((await settingsNow($)).pullRequests) void checkGh($)
+    if (e.isInteractive) void startQuestions($).catch(error => logFailure($, 'the startup questions', error))
     const startedAt = await $.clock.now()
     await update($, statusState, () => ({ ...NO_CHECK, activeAt: startedAt }))
     await tick($).catch(error => logFailure($, 'the first refresh', error))
@@ -257,20 +256,37 @@ async function pointUserRules($: EngineInterface): Promise<void> {
   void $.prompt.submit({ text: pointerPrompt(path, text !== undefined) }).catch(() => undefined)
 }
 
-/** At startup: asks once whether to turn on before/after videos (recommending it); when on, makes sure the voice is set up. */
-async function startVideos($: EngineInterface): Promise<void> {
-  if ((await settingsNow($)).demoVideos) {
+/**
+ * At startup, one after the other: asks once whether to turn on before/after videos, then PR per task
+ * (only in a project with a GitHub remote), each recommending it. A setting already on gets what it needs.
+ */
+async function startQuestions($: EngineInterface): Promise<void> {
+  const settings = await settingsNow($)
+  if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
-    return
+  } else {
+    await askToTurnOn($, { asked: ASKED_KEY, question: QUESTION, header: 'Videos', key: SETTING_KEY })
   }
-  if (await $.store.get(ASKED_KEY)) return
-  const answer = await $.ui.ask(QUESTION, { options: [ENABLE_OPTION, 'Not now'], header: 'Videos' }).catch(() => undefined)
-  if (answer === undefined) return // dismissed: asked again next session
-  await $.store.set(ASKED_KEY, true)
+  if (settings.pullRequests) await checkGh($)
+  else if (await hasGitHubRemote($)) await askToTurnOn($, { asked: PR_ASKED_KEY, question: PR_QUESTION, header: 'PRs', key: PR_SETTING_KEY })
+}
+
+type TurnOnQuestion = { asked: string; question: string; header: string; key: string }
+
+/** Asks once (again next session if dismissed); Enable turns the setting on as /better-tasks config does. */
+async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<void> {
+  if (await $.store.get(ask.asked)) return
+  const answer = await $.ui.ask(ask.question, { options: [ENABLE_OPTION, 'Not now'], header: ask.header }).catch(() => undefined)
+  if (answer === undefined) return
+  await $.store.set(ask.asked, true)
   if (answer !== ENABLE_OPTION) return
-  const { deny } = await $.config.set({ key: SETTING_KEY, value: true })
-  if (deny) $.ui.log(`better-tasks: could not turn on before/after videos: ${deny}`)
-  else await setUpVoice($)
+  const { deny } = await $.config.set({ key: ask.key, value: true })
+  if (deny) $.ui.log(`better-tasks: could not turn on ${ask.key}: ${deny}`)
+  else await setUpTurnedOn($, ask.key)
+}
+
+async function hasGitHubRemote($: EngineInterface): Promise<boolean> {
+  return $.process.run(['git', 'remote', '-v']).then(done => hasGitHub(done.stdout), () => false)
 }
 
 /** What a setting needs once turned on: the voice for videos, a recent gh for PRs. */

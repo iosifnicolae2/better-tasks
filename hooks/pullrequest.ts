@@ -3,6 +3,14 @@
 // The parts that need `$` (the gh check and update) are in register.tsx; bin/gh-update.sh does the update.
 
 export const PR_SETTING_KEY = 'better-tasks.pullRequests'
+export const PR_ASKED_KEY = 'pullRequestsAsked'
+
+export const PR_QUESTION =
+  'Open a GitHub pull request for each finished task? Each teammate works on its own branch and finishes ' +
+  'with a PR, its before/after video playing inside; approving the task merges it. Change it later in /better-tasks config.'
+
+/** `git remote -v` names a GitHub remote: only then is a PR per task possible. */
+export const hasGitHub = (remotes: string) => /github\.com[:/]/.test(remotes)
 
 /** `gh pr create --attach` uploads a video GitHub plays inline; it came in gh 2.99.0. */
 export const ATTACH_SINCE = [2, 99, 0] as const
@@ -38,6 +46,7 @@ export function ghUpdateVerdict(output: string): { isReady: boolean; text: strin
 export const PR_TEAMMATE_RULES = `## Pull request per task (on in this project)
 You work in your own git worktree, on its own branch; the project's main checkout stays as it is. This setting is the user's ask for branches and PRs.
 - Commit there as usual, small and often.
+- The project has no GitHub remote (\`git remote -v\`)? No PR: commit as usual and say so in your notes.
 - Done: push to a short branch named for the task, \`git push -u origin HEAD:task/T-004\`, then open the PR against the branch the project's main checkout is on (usually main):
   \`gh pr create --base main --head task/T-004 --title "T-004 <task title>" --body-file <scratchpad>/pr.md\`
   The body, in plain words: what changed, how to test it, the task file path. With a demo video, put \`![Before/after video](<its absolute path>)\` where it belongs and add \`--attach <its absolute path>\`: gh uploads it and GitHub shows a player there. gh older than 2.99 has no --attach: leave the video out and say so in your notes.
