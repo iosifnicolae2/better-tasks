@@ -6,7 +6,7 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { migrateFolder } from './migrate'
-import { leadModelRules, TEAMMATE_TYPE, teammateModelRules, teammateTypes } from './models'
+import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_ASKED_KEY, PR_COORDINATOR_RULES, PR_QUESTION, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
@@ -142,7 +142,7 @@ export const register: Register = (on, options) => {
     const teammate = await projectText(ioOf($), 'teammate')
     const handover = await handoverOf($, e.name)
     const hasTypes = (await read($, typesState)) !== ''
-    const type = e.subagent_type ?? (hasTypes ? TEAMMATE_TYPE : undefined)
+    const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const videos = settings.demoVideos ? teammateRules($.plugin.root) : ''
     const prs = settings.pullRequests ? PR_TEAMMATE_RULES : ''

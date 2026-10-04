@@ -929,24 +929,25 @@ test('without a GitHub remote startup does not ask about PRs, and asks in a late
   expect(asked).toEqual([QUESTION, PR_QUESTION])
 })
 
-// ---- Teammate models: Sonnet xhigh by default, Opus high for hard tasks and escalation (models.ts) ----
+// ---- Teammate models: Opus at low, medium and high effort for easy, normal and hard tasks (models.ts) ----
 
 const AS_SET = (name: string, model: string, effort: string) => ({ name, model, effort })
+const DEFAULT_TYPES = [AS_SET('teammate-easy', 'opus', 'low'), AS_SET('teammate-normal', 'opus', 'medium'), AS_SET('teammate-hard', 'opus', 'high')]
 
-test('at start the two teammate agent types are registered with the settings, so a spawn sets model and effort', async ($, on) => {
+test('at start the three teammate agent types are registered with the settings, so a spawn sets model and effort', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
   await $.session.start(SESSION)
-  expect(host.agentTypes).toEqual([AS_SET('teammate', 'sonnet', 'xhigh'), AS_SET('teammate-hard', 'opus', 'high')])
+  expect(host.agentTypes).toEqual(DEFAULT_TYPES)
 })
 
-test('the plugin options and the project config.json choose the models and efforts', { options: { teammateModel: 'haiku', hardEffort: 'max' } }, async ($, on) => {
+test('the plugin options and the project config.json choose the models and efforts', { options: { easyModel: 'haiku', hardEffort: 'max' } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ hardModel: 'fable', teammateEffort: 'low' }) })
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ hardModel: 'fable', normalEffort: 'high' }) })
   await $.session.start(SESSION)
-  expect(host.agentTypes).toEqual([AS_SET('teammate', 'haiku', 'low'), AS_SET('teammate-hard', 'fable', 'max')])
+  expect(host.agentTypes).toEqual([AS_SET('teammate-easy', 'haiku', 'low'), AS_SET('teammate-normal', 'opus', 'high'), AS_SET('teammate-hard', 'fable', 'max')])
 })
 
 test('a setting changed mid-session registers the types again at the next message, and only then', async ($, on) => {
@@ -955,13 +956,13 @@ test('a setting changed mid-session registers the types again at the next messag
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.prompt.submit(prompt('hello'))
-  expect(host.agentTypes).toHaveLength(2)
+  expect(host.agentTypes).toHaveLength(3)
   host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ hardEffort: 'xhigh' }))
   await $.prompt.submit(prompt('hello again'))
-  expect(host.agentTypes.slice(2)).toEqual([AS_SET('teammate', 'sonnet', 'xhigh'), AS_SET('teammate-hard', 'opus', 'xhigh')])
+  expect(host.agentTypes.slice(3)).toEqual([AS_SET('teammate-easy', 'opus', 'low'), AS_SET('teammate-normal', 'opus', 'medium'), AS_SET('teammate-hard', 'opus', 'xhigh')])
 })
 
-test('the lead is told which type to spawn for easy, hard and stuck work, from the settings', async ($, on) => {
+test('the lead is told which type to spawn for easy, normal, hard and stuck work, from the settings', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
@@ -969,9 +970,10 @@ test('the lead is told which type to spawn for easy, hard and stuck work, from t
   await $.session.start(SESSION)
   const composed = await $.prompt.compose({ ...COMPOSE_BASE })
   const lead = composed.sections.at(-1)?.text ?? ''
-  expect(lead).toContain('Easy and normal tasks, and when unsure: `better-tasks:teammate` (sonnet at xhigh effort)')
-  expect(lead).toContain('Hard tasks (deep debugging, security work, changes across several areas): `better-tasks:teammate-hard` (opus at high effort)')
-  expect(lead).toContain('its successor ("login-2") gets `better-tasks:teammate-hard`')
+  expect(lead).toContain('`better-tasks:teammate-easy`, opus at low effort')
+  expect(lead).toContain('`better-tasks:teammate-normal`, opus at medium effort')
+  expect(lead).toContain('Hard tasks (deep debugging, security work, changes across several areas): `better-tasks:teammate-hard`, opus at high effort')
+  expect(lead).toContain('its successor ("login-2") moves one level up, easy to `better-tasks:teammate-normal`, normal to `better-tasks:teammate-hard`')
   expect(lead).toContain('never pass `model`')
 })
 
@@ -983,10 +985,10 @@ test('with escalation off the lead is told a successor keeps its predecessor’s
   await $.session.start(SESSION)
   const lead = (await $.prompt.compose({ ...COMPOSE_BASE })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('Escalation is off: a successor keeps its predecessor')
-  expect(lead).not.toContain('gets `better-tasks:teammate-hard`')
+  expect(lead).not.toContain('moves one level up')
 })
 
-test('a named teammate gets the default type unless the lead chose one; a scout is left alone', async ($, on) => {
+test('a named teammate gets the normal type unless the lead chose one; a scout is left alone', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
@@ -995,18 +997,20 @@ test('a named teammate gets the default type unless the lead chose one; a scout 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-hard' })
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'ci', subagent_type: 'task-teammate' })
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a4', description: 'd', prompt: 'p' })
-  expect(host.subagentTypes).toEqual(['better-tasks:teammate', 'better-tasks:teammate-hard', 'task-teammate', undefined])
+  expect(host.subagentTypes).toEqual(['better-tasks:teammate-normal', 'better-tasks:teammate-hard', 'task-teammate', undefined])
 })
 
-test('a teammate on a type below the hard one is told to report being stuck, while escalation is on', async ($, on) => {
+test('a teammate below the hard level is told to report being stuck, while escalation is on', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-hard' })
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-easy' })
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'auth-3', subagent_type: 'better-tasks:teammate-hard' })
   expect(host.spawned[0]).toContain('## Stuck?')
-  expect(host.spawned[1]).not.toContain('## Stuck?')
+  expect(host.spawned[1]).toContain('## Stuck?')
+  expect(host.spawned[2]).not.toContain('## Stuck?')
 })
 
 test('with escalation off a teammate is not asked to report being stuck', { options: { escalate: false } }, async ($, on) => {

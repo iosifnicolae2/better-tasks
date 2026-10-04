@@ -23,12 +23,12 @@ export type TaskNaming = {
 /** What a teammate runs on: a model alias (the Agent tool's), and how hard it thinks. */
 export type ModelChoice = { model: string; effort: string }
 
-export type TeammateModels = {
-  /** Easy and normal tasks. */
-  normal: ModelChoice
-  /** Hard tasks: deep debugging, security, changes across several areas. */
-  hard: ModelChoice
-  /** A teammate that is not reaching the goal gets a successor on the hard-task model. */
+/** How hard a task is; each level has its own model and effort. */
+export const LEVELS = ['easy', 'normal', 'hard'] as const
+export type Level = (typeof LEVELS)[number]
+
+export type TeammateModels = Record<Level, ModelChoice> & {
+  /** A teammate that is not reaching the goal gets a successor one level up. */
   escalate: boolean
 }
 
@@ -74,8 +74,10 @@ export const FIELDS: Record<string, Field> = {
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
   pullRequests: { kind: 'boolean' },
-  teammateModel: { kind: 'string', values: MODELS },
-  teammateEffort: { kind: 'string', values: EFFORTS },
+  easyModel: { kind: 'string', values: MODELS },
+  easyEffort: { kind: 'string', values: EFFORTS },
+  normalModel: { kind: 'string', values: MODELS },
+  normalEffort: { kind: 'string', values: EFFORTS },
   hardModel: { kind: 'string', values: MODELS },
   hardEffort: { kind: 'string', values: EFFORTS },
   escalate: { kind: 'boolean' },
@@ -98,8 +100,10 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   keepAwake: true,
   demoVideos: false,
   pullRequests: false,
-  teammateModel: 'sonnet',
-  teammateEffort: 'xhigh',
+  easyModel: 'opus',
+  easyEffort: 'low',
+  normalModel: 'opus',
+  normalEffort: 'medium',
   hardModel: 'opus',
   hardEffort: 'high',
   escalate: true,
@@ -117,6 +121,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
 export function settingsOf(options: PluginOptions | Record<string, unknown>): Settings {
   const value = (key: string) => options[key] ?? DEFAULTS[key]
   const oneOf = (key: string, list: readonly string[]) => (list.includes(String(value(key))) ? String(value(key)) : String(DEFAULTS[key]))
+  const choiceOf = (level: Level): ModelChoice => ({ model: oneOf(`${level}Model`, MODELS), effort: oneOf(`${level}Effort`, EFFORTS) })
   return {
     editor: value('editor') as Editor,
     worktree: value('worktree') === true,
@@ -126,8 +131,9 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     demoVideos: value('demoVideos') === true,
     pullRequests: value('pullRequests') === true,
     models: {
-      normal: { model: oneOf('teammateModel', MODELS), effort: oneOf('teammateEffort', EFFORTS) },
-      hard: { model: oneOf('hardModel', MODELS), effort: oneOf('hardEffort', EFFORTS) },
+      easy: choiceOf('easy'),
+      normal: choiceOf('normal'),
+      hard: choiceOf('hard'),
       escalate: value('escalate') !== false,
     },
     sprint: {

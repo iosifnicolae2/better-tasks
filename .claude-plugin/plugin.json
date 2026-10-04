@@ -58,10 +58,10 @@
       "description": "Each teammate works in its own worktree and finishes with a GitHub pull request (with its before/after video); the manager merges it when you approve. Updates gh (Homebrew) when it is too old for the video.",
       "default": false
     },
-    "teammateModel": {
+    "easyModel": {
       "type": "string",
-      "title": "Teammate model",
-      "description": "The model teammates run on for easy and normal tasks. inherit: the manager's own model.",
+      "title": "Easy-task model",
+      "description": "The model teammates run on for quick, clear work: a typo, a text, a small fix. inherit: the manager's own model.",
       "options": [
         "sonnet",
         "opus",
@@ -69,11 +69,11 @@
         "haiku",
         "inherit"
       ],
-      "default": "sonnet"
+      "default": "opus"
     },
-    "teammateEffort": {
+    "easyEffort": {
       "type": "string",
-      "title": "Teammate effort",
+      "title": "Easy-task effort",
       "description": "How hard teammates think on those tasks.",
       "options": [
         "low",
@@ -82,12 +82,38 @@
         "xhigh",
         "max"
       ],
-      "default": "xhigh"
+      "default": "low"
+    },
+    "normalModel": {
+      "type": "string",
+      "title": "Normal-task model",
+      "description": "The model teammates run on for an ordinary feature or bug fix. inherit: the manager's own model.",
+      "options": [
+        "sonnet",
+        "opus",
+        "fable",
+        "haiku",
+        "inherit"
+      ],
+      "default": "opus"
+    },
+    "normalEffort": {
+      "type": "string",
+      "title": "Normal-task effort",
+      "description": "How hard teammates think on those tasks.",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default": "medium"
     },
     "hardModel": {
       "type": "string",
       "title": "Hard-task model",
-      "description": "The model for hard tasks (deep debugging, security, changes across several areas) and for a teammate that replaces one that got stuck. inherit: the manager's own model.",
+      "description": "The model teammates run on for deep debugging, security work, changes across several areas. inherit: the manager's own model.",
       "options": [
         "sonnet",
         "opus",
@@ -100,7 +126,7 @@
     "hardEffort": {
       "type": "string",
       "title": "Hard-task effort",
-      "description": "How hard teammates think on hard tasks.",
+      "description": "How hard teammates think on those tasks.",
       "options": [
         "low",
         "medium",
@@ -113,7 +139,7 @@
     "escalate": {
       "type": "boolean",
       "title": "Escalate when stuck",
-      "description": "A teammate that fails or goes in circles is replaced by one on the hard-task model and effort.",
+      "description": "A teammate that fails or goes in circles is replaced by one a level up: easy to normal, normal to hard.",
       "default": true
     },
     "sprintWeeks": {

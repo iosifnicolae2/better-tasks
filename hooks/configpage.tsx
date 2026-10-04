@@ -1,7 +1,7 @@
 import { KeyHint } from './board'
 import type { Ui } from './board'
-import { EFFORTS, MODELS } from './settings'
-import type { Settings } from './settings'
+import { EFFORTS, LEVELS, MODELS } from './settings'
+import type { Level, Settings } from './settings'
 
 // The settings page of the Sprint pane, in the manner of Claude Code's own /config: one row per
 // setting with its value in a fixed column; Enter (or a click) changes it in place; one line at the
@@ -29,6 +29,39 @@ const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satur
 const ON_OFF = ['on', 'off']
 const isOn = (value: string) => value === 'on'
 const asIs = (value: string) => value
+
+const LEVEL_ABOUT: Record<Level, { label: string; work: string; effort: string }> = {
+  easy: { label: 'Easy-task', work: 'quick, clear work: a typo, a text, a small fix', effort: 'low' },
+  normal: { label: 'Normal-task', work: 'an ordinary feature or bug fix', effort: 'medium' },
+  hard: { label: 'Hard-task', work: 'deep debugging, security work, changes across several areas', effort: 'high' },
+}
+
+/** A level's two rows: the model teammates run on, and how hard they think. */
+function modelFields(level: Level): Field[] {
+  const { label, work, effort } = LEVEL_ABOUT[level]
+  return [
+    {
+      group: 'models',
+      field: `${level}Model`,
+      label: `${label} model`,
+      describe: `The model teammates run on for ${work}. inherit: the manager’s own.`,
+      options: MODELS,
+      value: settings => settings.models[level].model,
+      initial: 'opus',
+      stored: asIs,
+    },
+    {
+      group: 'models',
+      field: `${level}Effort`,
+      label: `${label} effort`,
+      describe: `How hard teammates think on ${work}.`,
+      options: EFFORTS,
+      value: settings => settings.models[level].effort,
+      initial: effort,
+      stored: asIs,
+    },
+  ]
+}
 
 export const FIELDS: readonly Field[] = [
   {
@@ -101,51 +134,12 @@ export const FIELDS: readonly Field[] = [
     initial: 'off',
     stored: isOn,
   },
-  {
-    group: 'models',
-    field: 'teammateModel',
-    label: 'Teammate model',
-    describe: 'The model teammates run on for easy and normal tasks. inherit: the manager’s own.',
-    options: MODELS,
-    value: settings => settings.models.normal.model,
-    initial: 'sonnet',
-    stored: asIs,
-  },
-  {
-    group: 'models',
-    field: 'teammateEffort',
-    label: 'Teammate effort',
-    describe: 'How hard teammates think on easy and normal tasks.',
-    options: EFFORTS,
-    value: settings => settings.models.normal.effort,
-    initial: 'xhigh',
-    stored: asIs,
-  },
-  {
-    group: 'models',
-    field: 'hardModel',
-    label: 'Hard-task model',
-    describe: 'The model for hard tasks (deep debugging, security, several areas at once) and for escalation. inherit: the manager’s own.',
-    options: MODELS,
-    value: settings => settings.models.hard.model,
-    initial: 'opus',
-    stored: asIs,
-  },
-  {
-    group: 'models',
-    field: 'hardEffort',
-    label: 'Hard-task effort',
-    describe: 'How hard teammates think on hard tasks.',
-    options: EFFORTS,
-    value: settings => settings.models.hard.effort,
-    initial: 'high',
-    stored: asIs,
-  },
+  ...LEVELS.flatMap(modelFields),
   {
     group: 'models',
     field: 'escalate',
     label: 'Escalate when stuck',
-    describe: 'A teammate that fails or goes in circles is replaced by one on the hard-task model and effort.',
+    describe: 'A teammate that fails or goes in circles is replaced by one a level up: easy to normal, normal to hard.',
     options: ON_OFF,
     value: settings => (settings.models.escalate ? 'on' : 'off'),
     initial: 'on',

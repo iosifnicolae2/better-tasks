@@ -499,7 +499,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-teammateModel', 'cfg-teammateEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
@@ -508,8 +508,10 @@ for (const surface of SURFACES) {
       ['better-tasks.longCache', false],
       ['better-tasks.statusEvery', 20],
       ['better-tasks.keepAwake', false],
-      ['better-tasks.teammateModel', 'opus'],
-      ['better-tasks.teammateEffort', 'max'],
+      ['better-tasks.easyModel', 'fable'],
+      ['better-tasks.easyEffort', 'medium'],
+      ['better-tasks.normalModel', 'fable'],
+      ['better-tasks.normalEffort', 'high'],
       ['better-tasks.hardModel', 'fable'],
       ['better-tasks.hardEffort', 'xhigh'],
       ['better-tasks.escalate', false],
@@ -640,7 +642,7 @@ test('a task being worked on spins; the phone shows a still ✻', async ($, on) 
 
 // ---- Teammates ----
 
-const AUTH = { id: 'a1', name: 'auth', description: 'auth', type: 'teammate', status: 'running' }
+const AUTH = { id: 'a1', name: 'auth', description: 'auth', type: 'teammate', status: 'running' } as const
 
 /** The auth teammate running T-001, its context at 63 %, its session two messages long. */
 async function withTeammate($: Engine, on: On) {
