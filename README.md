@@ -55,6 +55,12 @@ Restart Claude Code.
 
 **Settings:** `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`.
 
+### 🎬 Demo: a before/after video
+
+A video better-tasks made of its own change: the settings page before and after the "Before/after videos" row. Turn the sound on: the subtitles are read aloud.
+
+https://github.com/user-attachments/assets/8a4dc144-ff65-4e8b-a2dd-c2dfd205ceac
+
 ## 🔄 Update / uninstall
 
 **Update:**
