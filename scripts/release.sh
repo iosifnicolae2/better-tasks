@@ -1,5 +1,6 @@
 #!/bin/sh
-# Cut a release: tag origin/main, push the tag, create the GitHub release.
+# Cut a release: pin the marketplace entry to the new tag in a "Release" commit, tag it,
+# push the tag and main, create the GitHub release. Installs and updates get only tagged releases.
 # Usage: scripts/release.sh v0.3.0 [notes.md]
 # Without notes.md, the notes are the commit subjects since the last tag.
 set -eu
@@ -39,6 +40,17 @@ if [ -z "$notes_file" ]; then
   commit_notes >"$notes_file"
 fi
 
+pin_marketplace() {
+  marketplace=.claude-plugin/marketplace.json
+  jq --arg ref "$version" --arg number "${version#v}" \
+    '.plugins[0].source.ref = $ref | .plugins[0].version = $number' "$marketplace" >"$marketplace.new"
+  mv "$marketplace.new" "$marketplace"
+  git add "$marketplace"
+  git commit -q -m "Release $version"
+}
+
+pin_marketplace
 git tag -a "$version" -m "$version" main
 git push -q origin "$version"
+git push -q origin main
 gh release create "$version" --verify-tag --title "$version" --notes-file "$notes_file"
