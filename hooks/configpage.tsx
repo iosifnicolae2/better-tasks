@@ -1,5 +1,6 @@
 import { KeyHint } from './board'
 import type { Ui } from './board'
+import { EFFORTS, MODELS } from './settings'
 import type { Settings } from './settings'
 
 // The settings page of the Sprint pane, in the manner of Claude Code's own /config: one row per
@@ -10,7 +11,7 @@ export type ConfigValue = string | number | boolean
 
 /** A setting: what it is called, what it does, its values in order, and how it is stored. */
 export type Field = {
-  group: 'team' | 'sprint'
+  group: 'team' | 'models' | 'sprint'
   /** The userConfig field, written as `better-tasks.<field>`. */
   field: string
   label: string
@@ -101,6 +102,56 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
+    group: 'models',
+    field: 'teammateModel',
+    label: 'Teammate model',
+    describe: 'The model teammates run on for easy and normal tasks. inherit: the manager’s own.',
+    options: MODELS,
+    value: settings => settings.models.normal.model,
+    initial: 'sonnet',
+    stored: asIs,
+  },
+  {
+    group: 'models',
+    field: 'teammateEffort',
+    label: 'Teammate effort',
+    describe: 'How hard teammates think on easy and normal tasks.',
+    options: EFFORTS,
+    value: settings => settings.models.normal.effort,
+    initial: 'xhigh',
+    stored: asIs,
+  },
+  {
+    group: 'models',
+    field: 'hardModel',
+    label: 'Hard-task model',
+    describe: 'The model for hard tasks (deep debugging, security, several areas at once) and for escalation. inherit: the manager’s own.',
+    options: MODELS,
+    value: settings => settings.models.hard.model,
+    initial: 'opus',
+    stored: asIs,
+  },
+  {
+    group: 'models',
+    field: 'hardEffort',
+    label: 'Hard-task effort',
+    describe: 'How hard teammates think on hard tasks.',
+    options: EFFORTS,
+    value: settings => settings.models.hard.effort,
+    initial: 'high',
+    stored: asIs,
+  },
+  {
+    group: 'models',
+    field: 'escalate',
+    label: 'Escalate when stuck',
+    describe: 'A teammate that fails or goes in circles is replaced by one on the hard-task model and effort.',
+    options: ON_OFF,
+    value: settings => (settings.models.escalate ? 'on' : 'off'),
+    initial: 'on',
+    stored: isOn,
+  },
+  {
     group: 'sprint',
     field: 'sprintWeeks',
     label: 'Sprint length',
@@ -176,6 +227,8 @@ export function ConfigPage(props: ConfigPageProps) {
     <Box flexDirection="column">
       <Heading ui={ui} title="Team" />
       {FIELDS.filter(field => field.group === 'team').map(fieldRow)}
+      <Heading ui={ui} title="Teammate models" />
+      {FIELDS.filter(field => field.group === 'models').map(fieldRow)}
       <Heading ui={ui} title="Sprint" />
       {FIELDS.filter(field => field.group === 'sprint').map(fieldRow)}
       <Box paddingLeft={4} height={1} overflow="hidden">

@@ -58,6 +58,64 @@
       "description": "Each teammate works in its own worktree and finishes with a GitHub pull request (with its before/after video); the manager merges it when you approve. Updates gh (Homebrew) when it is too old for the video.",
       "default": false
     },
+    "teammateModel": {
+      "type": "string",
+      "title": "Teammate model",
+      "description": "The model teammates run on for easy and normal tasks. inherit: the manager's own model.",
+      "options": [
+        "sonnet",
+        "opus",
+        "fable",
+        "haiku",
+        "inherit"
+      ],
+      "default": "sonnet"
+    },
+    "teammateEffort": {
+      "type": "string",
+      "title": "Teammate effort",
+      "description": "How hard teammates think on those tasks.",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default": "xhigh"
+    },
+    "hardModel": {
+      "type": "string",
+      "title": "Hard-task model",
+      "description": "The model for hard tasks (deep debugging, security, changes across several areas) and for a teammate that replaces one that got stuck. inherit: the manager's own model.",
+      "options": [
+        "sonnet",
+        "opus",
+        "fable",
+        "haiku",
+        "inherit"
+      ],
+      "default": "opus"
+    },
+    "hardEffort": {
+      "type": "string",
+      "title": "Hard-task effort",
+      "description": "How hard teammates think on hard tasks.",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default": "high"
+    },
+    "escalate": {
+      "type": "boolean",
+      "title": "Escalate when stuck",
+      "description": "A teammate that fails or goes in circles is replaced by one on the hard-task model and effort.",
+      "default": true
+    },
     "sprintWeeks": {
       "type": "string",
       "title": "Sprint length (weeks)",

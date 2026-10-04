@@ -20,6 +20,18 @@ export type TaskNaming = {
   folder: string
 }
 
+/** What a teammate runs on: a model alias (the Agent tool's), and how hard it thinks. */
+export type ModelChoice = { model: string; effort: string }
+
+export type TeammateModels = {
+  /** Easy and normal tasks. */
+  normal: ModelChoice
+  /** Hard tasks: deep debugging, security, changes across several areas. */
+  hard: ModelChoice
+  /** A teammate that is not reaching the goal gets a successor on the hard-task model. */
+  escalate: boolean
+}
+
 export type Paths = {
   /** The finished-task log, relative to the project root. */
   log: string
@@ -39,12 +51,16 @@ export type Settings = {
   demoVideos: boolean
   /** A teammate's finished work goes up as a GitHub pull request, merged when the user approves. */
   pullRequests: boolean
+  models: TeammateModels
   sprint: SprintConfig
   tasks: TaskNaming
   paths: Paths
 }
 
 const EDITORS = ['auto', 'default', 'code', 'idea', 'cursor', 'zed']
+/** "inherit": the model of the session that spawns the teammate (the lead). */
+export const MODELS = ['sonnet', 'opus', 'fable', 'haiku', 'inherit']
+export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 type Field = { kind: 'string' | 'number' | 'boolean'; values?: readonly string[] }
@@ -58,6 +74,11 @@ export const FIELDS: Record<string, Field> = {
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
   pullRequests: { kind: 'boolean' },
+  teammateModel: { kind: 'string', values: MODELS },
+  teammateEffort: { kind: 'string', values: EFFORTS },
+  hardModel: { kind: 'string', values: MODELS },
+  hardEffort: { kind: 'string', values: EFFORTS },
+  escalate: { kind: 'boolean' },
   sprintWeeks: { kind: 'string', values: ['1', '2', '3', '4'] },
   sprintStart: { kind: 'string', values: WEEKDAYS },
   taskPrefix: { kind: 'string' },
@@ -77,6 +98,11 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   keepAwake: true,
   demoVideos: false,
   pullRequests: false,
+  teammateModel: 'sonnet',
+  teammateEffort: 'xhigh',
+  hardModel: 'opus',
+  hardEffort: 'high',
+  escalate: true,
   sprintWeeks: '1',
   sprintStart: 'monday',
   taskPrefix: 'T-',
@@ -90,6 +116,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
 
 export function settingsOf(options: PluginOptions | Record<string, unknown>): Settings {
   const value = (key: string) => options[key] ?? DEFAULTS[key]
+  const oneOf = (key: string, list: readonly string[]) => (list.includes(String(value(key))) ? String(value(key)) : String(DEFAULTS[key]))
   return {
     editor: value('editor') as Editor,
     worktree: value('worktree') === true,
@@ -98,6 +125,11 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
     pullRequests: value('pullRequests') === true,
+    models: {
+      normal: { model: oneOf('teammateModel', MODELS), effort: oneOf('teammateEffort', EFFORTS) },
+      hard: { model: oneOf('hardModel', MODELS), effort: oneOf('hardEffort', EFFORTS) },
+      escalate: value('escalate') !== false,
+    },
     sprint: {
       weeks: Math.min(4, Math.max(1, Number(value('sprintWeeks')) || 1)),
       startDay: Math.max(0, WEEKDAYS.indexOf(String(value('sprintStart')))),
