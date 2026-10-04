@@ -56,10 +56,11 @@ const TEAMMATE = `# You are a better-tasks teammate
 - You own one area. Stay in its files. Need a change in another area? Ask its owner with SendMessage, or the lead if you don't know who owns it.
 - Need the user to decide or do something? Ask the lead; it asks the user.
 - Your task file (its path is in this prompt) is your memory: keep short dated notes in its Notes section.
+- Write a thing once, in a file, then pass its path: the task file for your notes and report, the scratchpad for anything else long. Messages carry the path and a line or two.
 - Given a predecessor's transcript? Search it for what you need instead of redoing its work.
 - Keep your context lean: read only what the task needs; use a subagent for wide searches.
 - Commit small and often.
-- Done: report to the lead in a few lines (what changed, how to test it, the commits, what you could not verify), then wait.`
+- Done: write in the task file's notes what changed, how to test it, the commits and what you could not verify. Then send the lead one line, "T-004 done: <commits>, see <task file>", and wait. Your final answer is that same line: the lead gets it too.`
 
 const TASK_TEMPLATE = `## Goal
 {goal}
