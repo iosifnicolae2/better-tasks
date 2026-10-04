@@ -10,10 +10,10 @@
       "source": {
         "source": "github",
         "repo": "iosifnicolae2/better-tasks",
-        "ref": "v0.5.2"
+        "ref": "v0.5.3"
       },
       "description": "Plan and track tasks inside Claude Code, kept as plain Markdown files in your project, with weekly sprints, a sprint board and agent teammates.",
-      "version": "0.5.2"
+      "version": "0.5.3"
     }
   ]
 }
