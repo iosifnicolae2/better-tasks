@@ -2,3 +2,5 @@
 .idea/
 # Laid in by Claude Code each time it loads the mod
 .claude-plugin/types/
+# Local Claude Code permissions, per machine
+.claude/settings.local.json
