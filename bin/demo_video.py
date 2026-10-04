@@ -43,6 +43,7 @@ LEAD_IN = 0.6
 GAP = 0.5
 TAIL = 0.8
 TITLE_SECONDS = 2.5
+LOUD_PEAK = 0.89  # -1 dBFS
 RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
 LABEL_COLORS = {'BEFORE': (180, 83, 9, 235), 'AFTER': (21, 128, 61, 235)}
@@ -327,6 +328,9 @@ def write_narration(path: Path, timed: list, length: float) -> None:
         at = int(start * RATE)
         end = min(len(track), at + len(audio))
         track[at:end] += audio[: end - at]
+    peak = float(np.abs(track).max())
+    if peak > 0:
+        track *= LOUD_PEAK / peak  # Kokoro speaks softly; the voice should be clear at normal volume
     sf.write(path, track, RATE)
 
 

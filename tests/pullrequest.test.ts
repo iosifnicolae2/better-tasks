@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { ghProblem, ghUpdateVerdict } from '../hooks/pullrequest'
+import { ghProblem, ghUpdateVerdict, PR_COORDINATOR_RULES } from '../hooks/pullrequest'
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
@@ -25,5 +25,9 @@ describe('PR per task', () => {
       .toBe('better-tasks: failed: no Homebrew to update gh with; update it by hand: https://github.com/cli/cli#installation. PRs still work, without the video.')
     expect(ghUpdateVerdict('ready gh version 2.98.0 (2026-08-20)').isReady).toBe(false) // another, older gh comes first on PATH
     expect(ghUpdateVerdict('').isReady).toBe(false)
+  })
+
+  test('with a PR the approval question shows only the PR link: the video plays in the PR', () => {
+    expect(PR_COORDINATOR_RULES).toContain('and no video link: the video plays in the PR')
   })
 })

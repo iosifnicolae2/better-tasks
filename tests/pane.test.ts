@@ -345,7 +345,9 @@ for (const surface of SURFACES) {
     await arrowTo($, 'task-T-004')
     expect((await ui.find({ key: 'video' }))?.props).toMatchObject({ label: 'Video', hotkey: 'v' })
     await ui.press({ key: 'video' })
-    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks_videos/T-004.mp4`])
+    expect(commands.at(-2)?.slice(0, 2)).toEqual(['osascript', '-e']) // QuickTime, playing with sound
+    expect(commands.at(-2)?.[2]).toContain(`open POSIX file "${ROOT}/.claude/tasks_videos/T-004.mp4"`)
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks_videos/T-004.mp4`]) // it failed here: the default player
   })
 
   test(`a board without the keys looks it and cannot act on a chord from the prompt (${surface})`, async ($, on) => {

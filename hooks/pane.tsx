@@ -7,7 +7,7 @@ import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } 
 import { searchTasks } from './search'
 import { ConfigPage } from './configpage'
 import type { ConfigValue, ProjectFacts } from './configpage'
-import { VIDEOS_FOLDER } from './demovideo'
+import { quickTimePlay, VIDEOS_FOLDER } from './demovideo'
 
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
@@ -88,6 +88,12 @@ async function hostOf($: EngineInterface, editor: Editor): Promise<HostApp> {
 
 async function openFile($: EngineInterface, editor: Editor, file: string): Promise<void> {
   await $.process.run(openCommand(editor, file, await hostOf($, editor)))
+}
+
+/** Plays at once with the sound on in QuickTime (macOS); else opens it in the default player. */
+async function playVideo($: EngineInterface, path: string): Promise<void> {
+  const played = await $.process.run(['osascript', '-e', quickTimePlay(path)]).then(done => done.exitCode === 0, () => false)
+  if (!played) await openFile($, 'default', path)
 }
 
 /** The task's before/after video (demovideo.ts), when bin/demo-video.sh made one. */
@@ -462,7 +468,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       shift: (task, step) => void shift(task, step),
       move: (task: Task, to: When) => void leave().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
       open: task => void leave().then(() => openFile($, settings.editor, task.file)).then(keepFocus(task.id)),
-      playVideo: path => void openFile($, 'default', path),
+      playVideo: path => void playVideo($, path),
       start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task) })).then(keepFocus(task.id)),
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),

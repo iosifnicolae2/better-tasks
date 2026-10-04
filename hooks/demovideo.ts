@@ -20,6 +20,20 @@ export function voiceDir(env: { custom?: string; dataHome?: string; home?: strin
 
 export const SETUP_TOAST = 'Setting up the Kokoro voice for before/after videos: once, a few minutes.'
 
+/** AppleScript that opens a video in QuickTime Player and plays it at once, sound on. */
+export function quickTimePlay(path: string): string {
+  const quoted = JSON.stringify(path) // a path's " and \\ escaped as AppleScript wants them
+  return [
+    'tell application "QuickTime Player"',
+    'activate',
+    `set movie to open POSIX file ${quoted}`,
+    'set muted of movie to false',
+    'set audio volume of movie to 1',
+    'play movie',
+    'end tell',
+  ].join('\n')
+}
+
 export const setupArgv = (root: string) => ['/bin/sh', `${root}/bin/kokoro-setup.sh`]
 
 /** The setup script's verdict: its last line, "ready <dir>" or "failed: why". */
@@ -42,5 +56,5 @@ Finished work that shows on screen comes with one short narrated video. Nothing 
 }
 
 export const COORDINATOR_RULES = `## Before/after videos (on)
-- A finished task with a video has a "Video:" line in its task file. In Finishing, the question shows file://<project root>/${VIDEOS_FOLDER}/<task id>.mp4 on a line of its own with nothing else on it (no quotes, backticks or punctuation), so a click opens it.
+- A finished task with a video has a "Video:" line in its task file. In Finishing, the question shows file://<project root>/${VIDEOS_FOLDER}/<task id>.mp4 on a line of its own with nothing else on it (no quotes, backticks or punctuation), so a click opens it. Only without a PR: with one (PR per task), the PR link replaces it, the video plays in the PR.
 - Work that shows on screen but has no video: ask its teammate for one before asking the user.`
