@@ -3,7 +3,8 @@
     "better-tasks": {
       "source": {
         "source": "github",
-        "repo": "iosifnicolae2/better-tasks"
+        "repo": "iosifnicolae2/better-tasks",
+        "ref": "v0.10.8"
       }
     }
   },

@@ -6,7 +6,9 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { OFF_LINE } from './projectsetup'
-import { AUTO_UPDATE_COMMIT, hasTeamInstall, lacksAutoUpdate, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
+import { addSource, hasTeamInstall, maySelfCommit, needsPin, pinCommit, pinnedTag, repoUrl, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, updateCommit, withTeamInstall } from './teaminstall'
+import { activeInstall, DECLINED_KEY, listArgv, lsRemoteArgv, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, restartLine, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updateQuestion } from './updatecheck'
+import type { Install } from './updatecheck'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
@@ -356,7 +358,8 @@ async function pointUserRules($: EngineInterface): Promise<void> {
 }
 
 /**
- * At startup, one after the other: asks once whether to turn on before/after videos, then which git flow
+ * At startup, one after the other: the team question (or pinning a shared install), a newer release, then
+ * asks once whether to turn on before/after videos, then which git flow
  * (only in a project with a GitHub remote, until one is saved in its config.json), then, with worktrees in an
  * IntelliJ project, whether IntelliJ may skip them. A setting already on gets what it needs.
  */
@@ -364,6 +367,7 @@ async function startQuestions($: EngineInterface): Promise<void> {
   if (await isOffHere($)) return
   await ignoreWorktrees($).catch(error => logFailure($, 'adding .claude/worktrees/ to .gitignore', error))
   await askTeamInstall($)
+  await checkForUpdate($).catch(error => logFailure($, 'the update check', error))
   const settings = await settingsNow($)
   if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
@@ -387,31 +391,113 @@ async function isGitRepo($: EngineInterface): Promise<boolean> {
 
 /**
  * In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project?
- * Shared before auto-update existed: turns it on (the team said yes to sharing then).
+ * Shared unpinned (before pinning, or with autoUpdate): pinned to a release now, without asking.
  */
 async function askTeamInstall($: EngineInterface): Promise<void> {
-  const shared = await $.fs.read(`${await $.session.root()}/${SHARED_SETTINGS}`).catch(() => undefined)
-  if (lacksAutoUpdate(shared)) return shareWithTeam($)
+  const shared = await readShared($)
+  if (needsPin(shared)) return pinShared($)
   if (hasTeamInstall(shared)) return
   if (await isGitRepo($)) await askToTurnOn($, { field: TEAM_SETTING, question: TEAM_QUESTION, header: 'Team', answers: [TEAM_YES, TEAM_NO] })
 }
 
-/** Adds better-tasks (auto-updating) to the project's shared settings and commits only that file (teaminstall.ts). */
+/** Adds better-tasks, pinned to a release, to the project's shared settings and commits only that file (teaminstall.ts). */
 async function shareWithTeam($: EngineInterface): Promise<void> {
-  const root = await $.session.root()
-  const path = `${root}/${SHARED_SETTINGS}`
-  const shared = await $.fs.read(path).catch(() => undefined)
-  const upgrade = lacksAutoUpdate(shared)
-  if (hasTeamInstall(shared) && !upgrade) return
-  const changed = withTeamInstall(shared)
+  const shared = await readShared($)
+  if (needsPin(shared)) return pinShared($)
+  if (hasTeamInstall(shared)) return
+  const tag = await pinTagOf($, shared)
+  if (tag === undefined) return $.ui.log(`better-tasks: could not find its latest release (offline?); not added to ${SHARED_SETTINGS} yet`)
+  const changed = withTeamInstall(shared, tag)
   if (changed === undefined) return $.ui.log(`better-tasks: ${SHARED_SETTINGS} is not one JSON object; better-tasks was not added to it`)
-  await $.fs.write(path, changed)
-  const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
+  await $.fs.write(await sharedPath($), changed)
+  const committed = await commitShared($, TEAM_COMMIT)
+  if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, pinned to ${tag}, and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
+  else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, pinned to ${tag}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
+}
+
+/** Shared unpinned: the marketplace pinned to the installed release, autoUpdate gone; committed when the git flow allows. */
+async function pinShared($: EngineInterface): Promise<void> {
+  const shared = await readShared($)
+  const tag = await pinTagOf($, shared)
+  const changed = tag === undefined ? undefined : withTeamInstall(shared, tag)
+  if (tag === undefined || changed === undefined) return
+  const hadEdits = await hasSharedEdits($)
+  await $.fs.write(await sharedPath($), changed)
+  const outcome = await selfCommit($, pinCommit(tag), hadEdits)
+  $.ui.log(`better-tasks: pinned to ${tag} in ${SHARED_SETTINGS}, no auto-update (it took every new release unchecked). ${outcome}`)
+}
+
+/**
+ * Startup: a release newer than the installed one or the project's pin is offered once per version (updatecheck.ts).
+ * Yes moves the pin (when the project has one), updates the plugin and says to restart; No is not asked again.
+ */
+async function checkForUpdate($: EngineInterface): Promise<void> {
+  const install = await installOf($)
+  if (install === undefined) return
+  const shared = await readShared($)
+  const pinned = hasTeamInstall(shared) ? pinnedTag(shared) : undefined
+  const offered = offeredRelease(await releasesOf($, shared), install.version, pinned, await $.store.get(DECLINED_KEY))
+  if (offered === undefined) return
+  const answer = await askSetup($, updateQuestion(offered), [UPDATE_YES, UPDATE_NO], UPDATE_HEADER)
+  if (answer === UPDATE_NO) await $.store.set(DECLINED_KEY, offered)
+  if (answer === UPDATE_YES) await updateTo($, offered, install)
+}
+
+async function updateTo($: EngineInterface, tag: string, install: Install): Promise<void> {
+  const shared = await readShared($)
+  const isPinnedHere = hasTeamInstall(shared) && pinnedTag(shared) !== undefined
+  const hadEdits = await hasSharedEdits($)
+  const run = async (argv: string[]) => $.process.run(argv, { cwd: await $.session.root(), timeoutMs: 180_000 })
+  const moved = await run(isPinnedHere ? repinArgv(addSource(shared), tag) : refreshArgv)
+  if (moved.exitCode !== 0) return $.ui.log(`better-tasks: could not fetch ${tag}: ${moved.stderr.trim()}`)
+  const pinNote = isPinnedHere ? ` ${SHARED_SETTINGS} now pins ${tag}. ${await selfCommit($, updateCommit(tag), hadEdits)}` : ''
+  const updated = await run(updateArgv(install.scope))
+  const now = await installOf($)
+  if (updated.exitCode !== 0 || now?.version !== tag.slice(1)) {
+    return $.ui.log(`better-tasks: could not update to ${tag}: ${(updated.stderr || updated.stdout).trim()}. Try: ${updateArgv(install.scope).join(' ')}`)
+  }
+  $.ui.log(`${restartLine(tag)}${pinNote}`)
+}
+
+const sharedPath = async ($: EngineInterface) => `${await $.session.root()}/${SHARED_SETTINGS}`
+const readShared = async ($: EngineInterface) => $.fs.read(await sharedPath($)).catch(() => undefined)
+
+/** The release to pin to: the installed one, or the repo's newest for a linked install (updatecheck.ts). */
+async function pinTagOf($: EngineInterface, shared: string | undefined): Promise<string | undefined> {
+  return pinTarget(await releasesOf($, shared), (await installOf($))?.version)
+}
+
+/** The release tags of the better-tasks repo the project uses (a fork's, when it names one); none offline. */
+async function releasesOf($: EngineInterface, shared: string | undefined): Promise<string[]> {
+  const listed = await $.process.run(lsRemoteArgv(repoUrl(shared)), { timeoutMs: 20_000 }).catch(() => undefined)
+  return listed?.exitCode === 0 ? releaseTags(listed.stdout) : []
+}
+
+/** The install this session runs; undefined for a linked install (the user's own checkout). */
+async function installOf($: EngineInterface): Promise<Install | undefined> {
+  const listed = await $.process.run(listArgv, { timeoutMs: 30_000 }).catch(() => undefined)
+  return listed?.exitCode === 0 ? activeInstall(listed.stdout, $.plugin.root, await $.session.root()) : undefined
+}
+
+async function hasSharedEdits($: EngineInterface): Promise<boolean> {
+  const diff = await $.process.run(['git', '-C', await $.session.root(), 'diff', '--quiet', 'HEAD', '--', SHARED_SETTINGS])
+  return diff.exitCode !== 0
+}
+
+/** Commits the shared settings alone. */
+async function commitShared($: EngineInterface, message: string): Promise<{ exitCode: number; stderr: string }> {
+  const git = async (...args: string[]) => $.process.run(['git', '-C', await $.session.root(), ...args])
   const added = await git('add', '--', SHARED_SETTINGS)
-  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', upgrade ? AUTO_UPDATE_COMMIT : TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
-  if (committed.exitCode === 0 && upgrade) $.ui.log(`better-tasks: turned on auto-update in ${SHARED_SETTINGS} and committed it. Push it; teammates then get new releases by themselves.`)
-  else if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
-  else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
+  return added.exitCode === 0 ? git('commit', '--quiet', '-m', message, '--only', '--', SHARED_SETTINGS) : added
+}
+
+/** A change better-tasks made on its own: committed when the git flow allows and the file had no other edits; returns the sentence saying which. */
+async function selfCommit($: EngineInterface, message: string, hadEdits: boolean): Promise<string> {
+  const settings = await settingsNow($)
+  const branch = (await $.process.run(['git', '-C', await $.session.root(), 'symbolic-ref', '--quiet', '--short', 'HEAD'])).stdout.trim()
+  if (hadEdits || !maySelfCommit(settings.gitFlow, branch, settings.devBranch)) return 'Commit it yourself.'
+  const committed = await commitShared($, message)
+  return committed.exitCode === 0 ? 'Committed; push it for your teammates.' : `Committing it failed: ${committed.stderr.trim()}. Commit it yourself.`
 }
 
 /** A git project's .gitignore gets .claude/worktrees/ once (ignoreworktrees.ts), committed alone; not from inside a worktree. */

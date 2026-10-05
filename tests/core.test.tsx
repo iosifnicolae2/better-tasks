@@ -3,7 +3,8 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
-import { AUTO_UPDATE_COMMIT, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
+import { pinCommit, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES, updateCommit } from '../hooks/teaminstall'
+import { DECLINED_KEY, updateQuestion } from '../hooks/updatecheck'
 import { IGNORE_COMMIT } from '../hooks/ignoreworktrees'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -39,6 +40,8 @@ type Host = {
   spawnOutput: string
   /** What process.run prints, by its argv joined with spaces. */
   runOutput: Record<string, string>
+  /** When set, what process.run prints for an argv, ahead of runOutput (undefined: not its command). */
+  answerRun?: (argv: readonly string[]) => string | undefined
   /** Each process.run's argv, joined with spaces. */
   ran: string[]
   env: Map<string, string>
@@ -124,7 +127,7 @@ function fakeHost(
         host.files.set(to + path.slice(from.length), text)
       }
     }
-    const stdout = host.runOutput[e.argv.join(' ')] ?? ''
+    const stdout = host.answerRun?.(e.argv) ?? host.runOutput[e.argv.join(' ')] ?? ''
     return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'Now' } } }))
@@ -1071,12 +1074,13 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
   mock.store(on)
   const team = answerTeam(on, TEAM_YES)
   const host = fakeHost(on, [], { [`${ROOT}/.claude/settings.json`]: JSON.stringify({ permissions: { allow: ['Bash(npm test)'] } }) })
+  host.runOutput[LS_REMOTE] = RELEASES
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
   expect(team.asked).toBe(1)
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '')).toEqual({
     permissions: { allow: ['Bash(npm test)'] },
-    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' }, autoUpdate: true } },
+    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks', ref: 'v0.10.8' } } },
     enabledPlugins: { 'better-tasks@better-tasks': true },
   })
   expect(host.ran).toContain(`git -C ${ROOT} add -- .claude/settings.json`)
@@ -1089,20 +1093,102 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
   expect(team.asked).toBe(1)
 })
 
-test('shared before auto-update existed: auto-update is turned on and that one file committed, without asking', async ($, on) => {
+const LS_REMOTE = 'git ls-remote --tags --refs https://github.com/iosifnicolae2/better-tasks.git'
+const RELEASES = 'a\trefs/tags/v0.10.7\nb\trefs/tags/v0.10.8'
+const SHARED = `${ROOT}/.claude/settings.json`
+/** The plugin under test runs from this checkout: its own folder, as Claude Code lists an install. */
+const PLUGIN_ROOT = new URL('..', (import.meta as unknown as { url: string }).url).pathname.replace(/\/$/, '')
+const unpinned = (marketplace: object) => JSON.stringify({ extraKnownMarketplaces: { 'better-tasks': marketplace }, enabledPlugins: { 'better-tasks@better-tasks': true } })
+const marketplaceIn = (host: Host) => JSON.parse(host.files.get(SHARED) ?? '').extraKnownMarketplaces['better-tasks']
+
+/** Claude Code's plugin commands: `claude plugin list` shows `installed` at the plugin's own folder; `claude plugin update` installs `next`. */
+function fakePluginCli(host: Host, installed: string, next: string): void {
+  host.answerRun = argv => {
+    if (argv[0] !== 'claude') return undefined
+    if (argv[2] === 'update') installed = next
+    const list = [{ id: 'better-tasks@better-tasks', version: installed, scope: 'user', installPath: PLUGIN_ROOT }]
+    return argv[2] === 'list' ? JSON.stringify(list) : ''
+  }
+}
+
+test('shared unpinned with auto-update: pinned to the installed release and committed, without asking', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const team = answerTeam(on, TEAM_YES)
-  const older = {
-    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } } },
-    enabledPlugins: { 'better-tasks@better-tasks': true },
-  }
-  const host = fakeHost(on, [], { [`${ROOT}/.claude/settings.json`]: JSON.stringify(older) })
+  const host = fakeHost(on, [], { [SHARED]: unpinned({ source: { source: 'github', repo: 'iosifnicolae2/better-tasks' }, autoUpdate: true }) })
+  fakePluginCli(host, '0.10.7', '0.10.7')
+  host.runOutput[LS_REMOTE] = RELEASES
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
   expect(team.asked).toBe(0)
-  expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '').extraKnownMarketplaces['better-tasks'].autoUpdate).toBe(true)
-  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${AUTO_UPDATE_COMMIT} --only -- .claude/settings.json`)
+  expect(marketplaceIn(host)).toEqual({ source: { source: 'github', repo: 'iosifnicolae2/better-tasks', ref: 'v0.10.7' } })
+  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${pinCommit('v0.10.7')} --only -- .claude/settings.json`)
+  expect(host.notices).toContain('better-tasks: pinned to v0.10.7 in .claude/settings.json, no auto-update (it took every new release unchecked). Committed; push it for your teammates.')
+})
+
+test('a worktree per task: the pin is written but left for the user to commit', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  answerTeam(on, TEAM_YES)
+  const host = fakeHost(on, [], {
+    [SHARED]: unpinned({ source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } }),
+    [`${TASKS}/config.json`]: '{ "gitFlow": "worktree-prs" }',
+  })
+  fakePluginCli(host, '0.10.7', '0.10.7')
+  host.runOutput[LS_REMOTE] = RELEASES
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(marketplaceIn(host).source.ref).toBe('v0.10.7')
+  expect(host.ran.some(command => command.includes(' commit '))).toBe(false)
+  expect(host.notices.some(line => line.startsWith('better-tasks: pinned to v0.10.7') && line.endsWith('Commit it yourself.'))).toBe(true)
+})
+
+test('a newer release: asked once; Yes moves the pin, updates the plugin, says to restart', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerSetup(on, { [updateQuestion('v0.10.8')]: 'Yes' })
+  const host = fakeHost(on, [], { [SHARED]: unpinned({ source: { source: 'github', repo: 'iosifnicolae2/better-tasks', ref: 'v0.10.7' } }) })
+  fakePluginCli(host, '0.10.7', '0.10.8')
+  host.runOutput[LS_REMOTE] = RELEASES
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked[0]).toBe(updateQuestion('v0.10.8'))
+  expect(host.ran).toContain('claude plugin marketplace add iosifnicolae2/better-tasks#v0.10.8 --scope project')
+  expect(host.ran).toContain('claude plugin update better-tasks@better-tasks --scope user')
+  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${updateCommit('v0.10.8')} --only -- .claude/settings.json`)
+  expect(host.notices).toContain('better-tasks: updated to v0.10.8. Restart Claude Code to use it. .claude/settings.json now pins v0.10.8. Committed; push it for your teammates.')
+})
+
+test('a newer release, No: not asked again for that release', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  const store = new Map<string, unknown>()
+  on('store.get', ($, e) => ({ value: store.get(e.key) }))
+  on('store.set', ($, e) => {
+    store.set(e.key, e.value)
+    return { value: undefined }
+  })
+  const asked = answerSetup(on, { [updateQuestion('v0.10.8')]: 'No' })
+  const host = fakeHost(on)
+  fakePluginCli(host, '0.10.7', '0.10.8')
+  host.runOutput[LS_REMOTE] = RELEASES
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked.filter(question => question === updateQuestion('v0.10.8')).length).toBe(1)
+  expect(store.get(DECLINED_KEY)).toBe('v0.10.8')
+  expect(host.ran.some(command => command.startsWith('claude plugin update'))).toBe(false)
+})
+
+test('a linked install (the user\'s own checkout): no update question', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerSetup(on, {})
+  const host = fakeHost(on)
+  host.runOutput[LS_REMOTE] = RELEASES
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked.some(question => question.includes('is out'))).toBe(false)
 })
 
 test('"Only me": nothing in the project changes, the answer is saved, and it is not asked again', async ($, on) => {

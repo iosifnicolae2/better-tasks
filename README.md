@@ -27,19 +27,19 @@ claude plugin install better-tasks@better-tasks
 
 Restart Claude Code. Optional tools: `brew install ffmpeg uv` for videos, `gh` for pull requests.
 
-Get new releases by themselves: `/plugin` → Marketplaces → better-tasks → Enable auto-update (Claude Code leaves it off for marketplaces outside Anthropic). Projects shared with the team have it on already.
+New release out? better-tasks asks at startup: *"better-tasks vX is out. Update?"* Yes updates it; restart Claude Code. No: not asked again for that release. Keep marketplace auto-update off: you pick each release.
 
 <details>
 <summary>Install for one project only</summary>
 
-Run inside the project folder:
+Run inside the project folder, `vX.Y.Z` being the [latest release](https://github.com/iosifnicolae2/better-tasks/releases):
 
 ```sh
-claude plugin marketplace add iosifnicolae2/better-tasks --scope project
+claude plugin marketplace add iosifnicolae2/better-tasks#vX.Y.Z --scope project
 claude plugin install better-tasks@better-tasks --scope project
 ```
 
-This is saved in `.claude/settings.json`: add `"autoUpdate": true` to its `better-tasks` marketplace entry, then commit it. Each teammate still runs the install once. `--scope local` is only you, only this project (not committed).
+This is saved in `.claude/settings.json`, pinned to that release (`"ref"`, no auto-update): commit it. Each teammate still runs the install once. Answering "everyone on this project" at setup does the same for you. A project set up unpinned or with `"autoUpdate": true` is pinned at its next start. `--scope local` is only you, only this project (not committed).
 </details>
 
 ## ⚙️ Settings
@@ -56,7 +56,7 @@ claude plugin marketplace update better-tasks
 claude plugin update better-tasks@better-tasks
 ```
 
-Restart Claude Code. Updates bring the latest [release](https://github.com/iosifnicolae2/better-tasks/releases), not every commit on main.
+Restart Claude Code. Updates bring the latest [release](https://github.com/iosifnicolae2/better-tasks/releases), not every commit on main. In a project that pins better-tasks, saying Yes to the startup question also moves the pin.
 
 <details>
 <summary>Uninstall</summary>
