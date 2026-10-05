@@ -10,6 +10,7 @@ Ask Claude for the change. It forks this repo, makes the change there, runs the 
 - `bun scripts/yaml-check.ts [tasks folder]`: checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML).
 - `sh scripts/video-branch-check.sh`: checks the video links `bin/video-branch.sh` prints.
 - `sh scripts/open-pr-check.sh`: checks `bin/open-pr.sh` sends the gh token only to GitHub.
+- `sh scripts/record-display-check.sh` (macOS): checks `bin/record-display.sh`: own display per project, one recording at a time, a killed recording frees its turn.
 - `bun scripts/settings-doc.ts`: regenerates the settings skill after a setting changes (`--check` says whether it is current).
 - `bun scripts/skills-check.ts`: checks the skills still say what the prompts rely on.
 
