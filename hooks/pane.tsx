@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, ICONS, TITLES, sectionsOf, shortDates, shifted, wheeled } from './board'
+import { Board, ICONS, ProjectHeader, TITLES, projectTitle, sectionsOf, shortDates, shifted, wheeled } from './board'
 import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } from './board'
 import { searchTasks } from './search'
 import { ConfigPage } from './configpage'
@@ -337,6 +337,11 @@ async function openPane($: EngineInterface, options: PluginOptions, page: Page):
   $.clock.after(FOCUS_RETRY_MS, () => void $.ui.open(PANE_OPEN))
 }
 
+/** The pane body's rows left once the project header takes its line. */
+function bodyRowsUnder(bodyRows: number | undefined): number | undefined {
+  return bodyRows === undefined ? undefined : bodyRows - 1
+}
+
 function dockTip(presentation: CommandPresentation): string {
   if (!presentation.isFullscreen) {
     return ' It opened above the prompt; the fullscreen layout docks it on the right (needs 110+ columns).'
@@ -435,7 +440,9 @@ export function registerPane(on: On, options: PluginOptions): void {
     const day = await today(files)
     const current = sprintStart(day, settings.sprint)
     const goal = goalOf(await readSprints(files), current)
-    const sprintsFile = `${await $.session.root()}/${settings.paths.sprints}`
+    const root = await $.session.root()
+    const sprintsFile = `${root}/${settings.paths.sprints}`
+    const header = <ProjectHeader ui={ui} title={projectTitle(root)} />
 
     const sections = sectionsOf(tasks, day, settings.sprint)
     const closedOpen = await isClosedOpen($)
@@ -504,6 +511,7 @@ export function registerPane(on: On, options: PluginOptions): void {
     if (page === 'config') {
       return (
         <Box flexDirection="column" paddingX={1}>
+          {header}
           <ConfigPage ui={ui} settings={settings} sprintPreview={sprintLabel(current, settings.sprint)}
             {...await projectFacts($, files, settings.editor)}
             onChange={(field, value) => void setConfig($, options, field, value)}
@@ -516,8 +524,9 @@ export function registerPane(on: On, options: PluginOptions): void {
     }
     return (
       <Box flexDirection="column" paddingX={1}>
+        {header}
         <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
-          team={team} hasKeys={e.props.isFocused} bodyRows={e.props.scroll.bodyRows}
+          team={team} hasKeys={e.props.isFocused} bodyRows={bodyRowsUnder(e.props.scroll.bodyRows)}
           scrollStart={listScroll.selectedId === selectedTask?.id ? listScroll.start : undefined} onDrawn={list => { drawnList = list }}
           canSpin={e.surface === 'terminal' || e.surface === 'desktop'} search={search} hits={hits} actions={actions} />
       </Box>
