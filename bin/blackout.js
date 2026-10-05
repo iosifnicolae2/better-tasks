@@ -1,13 +1,14 @@
-// Turns the physical screens off until the first mouse move or key press: black windows, brightness 0
-// (built-in and Apple screens) and DDC/CI standby (external screens that answer). Virtual displays
-// (the projects' test and recording displays) stay on, so teammates keep working.
+// Darkens the physical screens until the first mouse move or key press: black windows, brightness 0
+// (built-in and Apple screens through DisplayServices, other external screens over DDC/CI). Never
+// DDC standby or power off (see bin/record_display.swift). Virtual displays (the projects' test and
+// recording displays) stay on, so teammates keep working.
 // Run:     osascript -l JavaScript bin/blackout.js <statusFile> <physicalIds> <displayHelper> [safetySeconds]
 //          physicalIds: the real screens' display ids, "1,2"; empty: guessed (not our virtual vendor id).
-//          displayHelper: bin/record-display.sh, for "power off|on"; empty: no standby.
+//          displayHelper: bin/record-display.sh, for "dim|undim"; empty: no DDC dimming.
 // Plan:    osascript -l JavaScript bin/blackout.js --plan <physicalIds>  prints the screens it would cover
 // Restore: osascript -l JavaScript bin/blackout.js --restore <statusFile> <displayHelper>
 // Writes "black" (or "failed: why") to <statusFile> once the windows are up. What it changes it notes
-// first (<statusFile>.brightness, <statusFile>.standby), so --restore can undo it even if this
+// first (<statusFile>.brightness, <statusFile>.ddc), so --restore can undo it even if this
 // process is killed (JXA cannot catch signals). bin/away.sh runs both.
 ObjC.import('Cocoa')
 ObjC.import('CoreGraphics')
@@ -32,7 +33,7 @@ function run(argv) {
   app.activateIgnoringOtherApps(true)
   $.NSCursor.hide
   dimDisplays(statusFile, screens.map(displayId))
-  standBy(statusFile, displayHelper)
+  runHelper(displayHelper, 'dim', statusFile)
   writeFile(statusFile, 'black')
 
   const shownAt = Date.now()
@@ -109,27 +110,17 @@ function dimDisplays(statusFile, displays) {
 }
 
 function restore(statusFile, displayHelper) {
-  wake(statusFile, displayHelper)
+  runHelper(displayHelper, 'undim', statusFile)
   restoreBrightness(statusFile)
 }
 
-// External screens to standby over DDC/CI: their backlight goes off too, unlike under a black window.
-function standBy(statusFile, displayHelper) {
+// External screens' backlight over DDC/CI (a black window alone keeps an LCD lit); the helper saves
+// the levels to <statusFile>.ddc, and undim does nothing when that file is gone.
+function runHelper(displayHelper, command, statusFile) {
   if (!displayHelper) return
-  writeFile(`${statusFile}.standby`, 'yes')
-  runHelper(displayHelper, 'off')
-}
-
-function wake(statusFile, displayHelper) {
-  if (!displayHelper || readFile(`${statusFile}.standby`) === undefined) return
-  runHelper(displayHelper, 'on')
-  $.NSFileManager.defaultManager.removeItemAtPathError(`${statusFile}.standby`, null)
-}
-
-function runHelper(displayHelper, power) {
   const task = $.NSTask.alloc.init
   task.launchPath = '/bin/sh'
-  task.arguments = [displayHelper, 'power', power]
+  task.arguments = [displayHelper, command, `${statusFile}.ddc`]
   task.launch
   task.waitUntilExit
 }

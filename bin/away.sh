@@ -1,5 +1,5 @@
 #!/bin/sh
-# Turns the physical screens off (bin/blackout.js) detached, so a plugin reload can't cut it off,
+# Darkens the physical screens (bin/blackout.js) detached, so a plugin reload can't cut it off,
 # and prints its first status line ("black" or "failed: why"). Used by hooks/screen.ts for /away.
 # Virtual displays (the projects' test and recording displays, other apps' too) stay on.
 # A failure while virtual displays are on adds the line "virtual displays on": then no display sleep.
@@ -14,7 +14,7 @@ status="$(mktemp -t better-tasks-blackout)"
 physical="$(sh "$helper" screens 2>/dev/null | cut -f1 | paste -sd, -)"
 
 # caffeinate -d keeps the displays awake, so the Mac never locks; the restore
-# step wakes the screens and puts the brightness back however the blackout ended.
+# step puts the brightness back however the blackout ended.
 (
   trap '' HUP
   caffeinate -d -i -s osascript -l JavaScript "$script" "$status" "$physical" "$helper" "$@"

@@ -9,9 +9,12 @@
 //   arrange                moves every virtual display into the row below the lowest physical screen
 //   screens                prints each real screen as "<display id><tab><name>", e.g. "2<tab>DELL U2720Q"
 //   virtuals               prints each virtual display's id, one per line (ours and other apps')
-//   power off|on           puts every external screen in standby, or wakes it, over DDC/CI (Apple silicon);
-//                          virtual displays have no such link, so they stay on. Prints "ready power off <n> screen(s)"
+//   dim <file>             sets each external screen's brightness to 0 over DDC/CI (Apple silicon), saving
+//                          the old levels to <file> first; virtual displays have no such link, so they stay on
+//   undim <file>           puts the levels saved in <file> back, then removes it
 //   ddc                    reads each external screen's power and brightness over DDC/CI, to see which answer
+// Never DDC power or standby: on 2026-10-06 standby (VCP 0xD6=4) left an LG and a Philips dark, their
+// own buttons dead and the LG still off after a replug. Brightness is safe: the monitor's buttons undo it.
 // Each prints "ready ..." once it holds what it asked for, or "failed: why".
 import AppKit
 import CoreGraphics
@@ -196,7 +199,7 @@ func listVirtuals() {
 // MARK: DDC/CI: the external screens' own controls, over the video cable
 
 let ddcChip: UInt32 = 0x37, ddcHost: UInt32 = 0x51
-let powerMode: UInt8 = 0xD6 // VCP code; values: 1 on, 4 standby (wakes over DDC)
+let powerMode: UInt8 = 0xD6 // VCP code, read only (see the top: never written)
 let brightness: UInt8 = 0x10
 
 /** The I2C links of the external screens; the built-in screen and virtual displays have none. */
@@ -243,9 +246,27 @@ func ddcRead(_ link: IOAVService, _ code: UInt8) -> (current: UInt16, max: UInt1
   return nil
 }
 
-func setPower(_ on: Bool) {
-  let done = externalLinks().filter { ddcWrite($0, powerMode, on ? 1 : 4) }.count
-  say("ready power \(on ? "on" : "off") \(done) screen(s)")
+/** Saves "<screen index> <level>" per external screen that answers, then sets each to 0. */
+func dim(_ file: String) {
+  let levels = externalLinks().enumerated().compactMap { index, link in
+    ddcRead(link, brightness).map { (index, link, $0.current) }
+  }
+  let saved = levels.map { "\($0.0) \($0.2)\n" }.joined()
+  guard (try? saved.write(toFile: file, atomically: true, encoding: .utf8)) != nil else { fail("cannot write \(file)") }
+  let done = levels.filter { ddcWrite($0.1, brightness, 0) }.count
+  say("ready dimmed \(done) screen(s)")
+}
+
+func undim(_ file: String) {
+  guard let saved = try? String(contentsOfFile: file, encoding: .utf8) else { return say("ready nothing to undim") }
+  let links = externalLinks()
+  var done = 0
+  for line in saved.split(separator: "\n") {
+    let parts = line.split(separator: " ").compactMap { Int($0) }
+    if parts.count == 2, parts[0] < links.count, ddcWrite(links[parts[0]], brightness, UInt16(parts[1])) { done += 1 }
+  }
+  try? FileManager.default.removeItem(atPath: file)
+  say("ready undimmed \(done) screen(s)")
 }
 
 func listDdc() {
@@ -336,7 +357,8 @@ case "info": info(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0)
 case "arrange": arrangeAll()
 case "screens": listScreens()
 case "virtuals": listVirtuals()
-case "power": setPower(arguments.dropFirst().first == "on")
+case "dim": dim(arguments.dropFirst().first ?? "")
+case "undim": undim(arguments.dropFirst().first ?? "")
 case "ddc": listDdc()
-default: fail("usage: record_display display|turn|info|arrange|screens|virtuals|power|ddc ...")
+default: fail("usage: record_display display|turn|info|arrange|screens|virtuals|dim|undim|ddc ...")
 }
