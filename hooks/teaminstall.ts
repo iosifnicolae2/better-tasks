@@ -5,7 +5,7 @@
 // (source.ref) with no autoUpdate: nobody gets a release the project didn't pick. Newer releases: updatecheck.ts.
 
 import type { GitFlow } from './gitflow'
-import { isReleaseTag } from './updatecheck'
+import { isGithubRepo, isHttpsUrl, isReleaseTag } from './updatecheck'
 
 export const TEAM_SETTING = 'shareWithTeam'
 export const SHARED_SETTINGS = '.claude/settings.json'
@@ -44,11 +44,14 @@ export function needsPin(settingsText: string | undefined): boolean {
   return hasTeamInstall(settingsText) && pinnedTag(settingsText) === undefined
 }
 
-/** The git URL of the marketplace's repo (a fork's, when the entry names one), for `git ls-remote`. */
+/**
+ * The git URL of the marketplace's repo (a fork's, when the entry names one), for `git ls-remote`. A cloned repo
+ * writes this file: only an owner/repo or a plain https URL is used, else upstream's (updatecheck.ts).
+ */
 export function repoUrl(settingsText: string | undefined): string {
   const source = marketplaceOf(settingsText)?.source
-  if (source?.source === 'git' && typeof source.url === 'string') return source.url
-  const repo = source?.source === 'github' && typeof source.repo === 'string' ? source.repo : UPSTREAM.repo
+  if (source?.source === 'git' && isHttpsUrl(source.url)) return source.url
+  const repo = source?.source === 'github' && isGithubRepo(source.repo) ? source.repo : UPSTREAM.repo
   return `https://github.com/${repo}.git`
 }
 

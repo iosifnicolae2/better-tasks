@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { activeInstall, isNewer, newestTag, offeredRelease, pinTarget, releaseTags, updateQuestion } from '../hooks/updatecheck'
+import { activeInstall, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, updateArgv, updateQuestion } from '../hooks/updatecheck'
 
 const LS_REMOTE = ['aaa\trefs/tags/v0.9.0', 'bbb\trefs/tags/v0.10.7', 'ccc\trefs/tags/v0.10.10', 'ddd\trefs/tags/nightly', 'eee\trefs/tags/v1.0.0-rc1'].join('\n')
 const ROOT = '/work/app'
@@ -43,6 +43,18 @@ describe('the startup update check', () => {
     expect(activeInstall(list, `${CACHE}/0.10.7`, '/elsewhere')).toEqual({ version: '0.10.7', scope: 'user' })
     expect(activeInstall(list, '/home/me/src/better-tasks', ROOT)).toBeUndefined()
     expect(activeInstall('not json', `${CACHE}/0.10.7`, ROOT)).toBeUndefined()
+  })
+
+  test('a source from the shared settings never reads as an option or another transport', () => {
+    expect(lsRemoteArgv('--upload-pack=touch /tmp/x')).toEqual(['git', 'ls-remote', '--tags', '--refs', '--', '--upload-pack=touch /tmp/x'])
+    for (const source of ['--upload-pack=touch /tmp/x', '-c core.sshCommand=touch /tmp/x', 'ext::sh -c touch% /tmp/x', '-owner/repo', 'https://x.com/a b', 'file:///tmp/repo']) {
+      expect(repinArgv(source, 'v1.0.0')).toBeUndefined()
+    }
+    expect(repinArgv('someone/better-tasks', '--help')).toBeUndefined()
+    expect(repinArgv('someone/better-tasks', 'v1.0.0')).toEqual(['claude', 'plugin', 'marketplace', 'add', '--scope', 'project', '--', 'someone/better-tasks#v1.0.0'])
+    expect(repinArgv('https://git.example.com/bt.git', 'v1.0.0')?.at(-1)).toBe('https://git.example.com/bt.git#v1.0.0')
+    expect(updateArgv('--evil')).toEqual(['claude', 'plugin', 'update', '--scope', 'user', '--', 'better-tasks@better-tasks'])
+    expect(updateArgv('project')).toEqual(['claude', 'plugin', 'update', '--scope', 'project', '--', 'better-tasks@better-tasks'])
   })
 
   test('the question is short and plain', () => {

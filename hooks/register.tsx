@@ -448,7 +448,9 @@ async function updateTo($: EngineInterface, tag: string, install: Install): Prom
   const isPinnedHere = hasTeamInstall(shared) && pinnedTag(shared) !== undefined
   const hadEdits = await hasSharedEdits($)
   const run = async (argv: string[]) => $.process.run(argv, { cwd: await $.session.root(), timeoutMs: 180_000 })
-  const moved = await run(isPinnedHere ? repinArgv(addSource(shared), tag) : refreshArgv)
+  const fetchArgv = isPinnedHere ? repinArgv(addSource(shared), tag) : refreshArgv
+  if (fetchArgv === undefined) return $.ui.log(`better-tasks: the better-tasks source in ${SHARED_SETTINGS} is not an owner/repo or https URL; update it yourself`)
+  const moved = await run(fetchArgv)
   if (moved.exitCode !== 0) return $.ui.log(`better-tasks: could not fetch ${tag}: ${moved.stderr.trim()}`)
   const pinNote = isPinnedHere ? ` ${SHARED_SETTINGS} now pins ${tag}. ${await selfCommit($, updateCommit(tag), hadEdits)}` : ''
   const updated = await run(updateArgv(install.scope))
@@ -540,8 +542,9 @@ async function setUpFlow($: EngineInterface, flow: GitFlow): Promise<void> {
 
 /** Makes the dev branch at this commit and switches to it: the same commit, so no file changes. One that exists is left alone. */
 async function useDevBranch($: EngineInterface, dev: string): Promise<void> {
+  if (dev.startsWith('-')) return $.ui.log(`better-tasks: "${dev}" is not a branch name (devBranch in config.json)`)
   const git = (...args: string[]) => $.process.run(['git', ...args])
-  if ((await git('branch', '--list', dev)).stdout.trim()) {
+  if ((await git('branch', '--list', '--', dev)).stdout.trim()) {
     const current = (await git('symbolic-ref', '--quiet', '--short', 'HEAD')).stdout.trim()
     if (current !== dev) $.ui.log(`better-tasks: teammates land on ${dev}; this checkout is on ${current || 'no branch'}: git switch ${dev} when you're ready`)
     return
