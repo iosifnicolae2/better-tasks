@@ -13,7 +13,7 @@ import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from 
 import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, TEAMMATE_POINTER, videoSkillSettings, voiceDir } from './demovideo'
-import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, prSkillSettings, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
+import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, prSkillSettings, recommend, teammateRules as flowRules, usesWorktree, WORKTREE_COMMAND_RULES } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
@@ -184,9 +184,10 @@ export const register: Register = (on, options) => {
     const testing = testingPointer(settings.offScreen)
     const videos = settings.demoVideos ? TEAMMATE_POINTER : ''
     const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
-    const instructions = await instructionsNow($, settings)
-    const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, instructions].filter(Boolean).join('\n\n')
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
+    const commands = isWorktree || e.isolation === 'worktree' ? WORKTREE_COMMAND_RULES : ''
+    const instructions = await instructionsNow($, settings)
+    const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, commands, instructions].filter(Boolean).join('\n\n')
     return next({
       ...e,
       description: named.description,

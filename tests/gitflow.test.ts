@@ -3,7 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import {
   appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf, prBodyRules, prSkillSettings,
-  recommend, teammateRules, usesWorktree,
+  recommend, teammateRules, usesWorktree, WORKTREE_COMMAND_RULES,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
 import { openPrLine, prCoordinatorRules } from '../hooks/pullrequest'
@@ -159,5 +159,18 @@ describe('looking at a project', () => {
   test('du out of time: the cache counts as too big to measure', async () => {
     const lists: Record<string, FsEntry[]> = { '/p': [dir('target')] }
     expect((await lookAt(probeOf(lists, [], GITHUB, TWO_PEOPLE, undefined))).cacheMb).toBeUndefined()
+  })
+})
+
+describe('gh and git in a worktree (T-040: the shapes Claude Code refuses, tested for real)', () => {
+  test('names the refused shapes, the fine ones, the PR-checks watch and the script fallback', () => {
+    for (const refused of ['`( … )` subshell', '`{ …; }` group', 'a function', '`bash -c`', 'heredoc', '`[[ … ]]`', '`git -C` to another checkout']) {
+      expect(WORKTREE_COMMAND_RULES).toContain(refused)
+    }
+    expect(WORKTREE_COMMAND_RULES).toContain('pipes, jq `\\(.x)`, `$( … )`, for/while, if, case')
+    expect(WORKTREE_COMMAND_RULES).toContain('`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>`')
+    expect(WORKTREE_COMMAND_RULES).toContain('`gh run watch <id> --exit-status --compact`')
+    expect(WORKTREE_COMMAND_RULES).toContain('a gh argument (a title, a search) that starts with "git", or has a quote mark and the word git')
+    expect(WORKTREE_COMMAND_RULES).toContain('Write a script to your scratchpad and run it by its path')
   })
 })
