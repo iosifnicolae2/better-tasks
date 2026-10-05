@@ -24,6 +24,8 @@ export type Teammate = {
   id: string
   name: string
   status: string
+  /** The effort its model runs at (low, medium, high…), from its agent type; undefined for a type better-tasks did not register. */
+  effort?: string
   /** Context fill, 0 to 100; undefined until its first step. */
   percent?: number
   /** What it does right now ("editing auth.ts"); absent between turns. */

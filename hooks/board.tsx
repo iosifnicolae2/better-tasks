@@ -2,8 +2,7 @@ import type { ElementTable } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
 import type { SprintConfig } from './sprints'
-import { stateWord } from './activity'
-import { cacheText } from './team'
+import { cacheText, stateOf } from './team'
 import { isOpen, whenOf } from './tasks'
 
 // The board page of the Sprint pane: the task list (sections, then the collapsed closed tasks) in a
@@ -463,7 +462,7 @@ function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast
       <Box flexGrow={1} flexShrink={1}>{title}</Box>
       {isMoving && isLast && <Button key="slot-down" plain label="▼" onPress={() => undefined} />}
       {isMoving && <Text color="claude">moving</Text>}
-      {!isMoving && !isClosed && task.owner !== '' && <Text color="subtle">{task.owner}</Text>}
+      {!isMoving && !isClosed && task.owner !== '' && <OwnerTag ui={ui} name={task.owner} mate={owner} />}
       {!isMoving && !isClosed && owner?.percent !== undefined && <Text color="subtle">{percentText(owner)}</Text>}
       {!isMoving && !isClosed && owner?.cache === 'cold' && <Text color="warning">cold</Text>}
       {!isMoving && !isClosed && task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
@@ -516,7 +515,7 @@ function Detail({ ui, selected, hasKeys, actions }: DetailProps) {
 }
 
 function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps, 'selected'>> & Omit<DetailProps, 'selected'>) {
-  const { Text } = ui
+  const { Box, Text } = ui
   const { task, when, mate } = selected
   const place = when ? `${ICONS[when]} ${TITLES[when]}` : task.status === 'cancelled' ? '✗ Cancelled' : '✓ Closed'
   return (
@@ -526,9 +525,9 @@ function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps,
         <Text color="subtle">{place}</Text>
       </DetailLine>
       <DetailLine ui={ui}>
-        <Text color="subtle">⎿</Text>
+        <Box flexShrink={0}><Text color="subtle">⎿</Text></Box>
         {mate ? (
-          <Text wrap="truncate-end"><Text>{mate.name} </Text><MateFacts ui={ui} mate={mate} /></Text>
+          <Text wrap="truncate-end"><Text>{mate.name}</Text><Text color="subtle"> · </Text><MateFacts ui={ui} mate={mate} /></Text>
         ) : (
           <Text color="subtle">{statusWords(task)}</Text>
         )}
@@ -653,14 +652,33 @@ function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
   )
 }
 
-/** "working · editing auth.ts · 63%": the state coloured by meaning, the rest quiet. */
+/** The colour of a state word: working in Claude's colour, waiting a warning, done a success, the rest quiet. */
+function stateColor(state: string): string {
+  const colors: Record<string, string> = { working: 'claude', waiting: 'warning', done: 'success' }
+  return colors[state] ?? 'subtle'
+}
+
+/** "shop · medium · working": a task row's owner, its effort and its state; just the name until it is spawned. */
+function OwnerTag({ ui, name, mate }: { ui: Ui; name: string; mate?: Teammate }) {
+  const { Text } = ui
+  if (!mate) return <Text color="subtle">{name}</Text>
+  const state = stateOf(mate)
+  return (
+    <Text>
+      <Text color="subtle">{[name, mate.effort].filter(Boolean).join(' · ')} · </Text>
+      <Text color={stateColor(state)}>{state}</Text>
+    </Text>
+  )
+}
+
+/** "medium · working · editing auth.ts · 63%": the effort, the state coloured by meaning, the rest quiet. */
 export function MateFacts({ ui, mate }: { ui: Ui; mate: Teammate }) {
   const { Text } = ui
-  const state = mate.status === 'running' && !mate.activity ? 'idle' : stateWord(mate.status)
-  const isWaiting = mate.activity === 'waiting for your answer'
+  const state = stateOf(mate)
   return (
     <Text wrap="truncate-end">
-      <Text color={isWaiting ? 'warning' : state === 'working' ? 'claude' : state === 'done' ? 'success' : 'subtle'}>{state}</Text>
+      {mate.effort ? <Text color="subtle">{mate.effort} · </Text> : ''}
+      <Text color={stateColor(state)}>{state}</Text>
       {mate.activity ? <Text color="subtle"> · {mate.activity}</Text> : ''}
       {mate.percent !== undefined ? <Text color="subtle"> · {percentText(mate)}</Text> : ''}
       {cacheText(mate) ? <Text color={mate.cache === 'cold' ? 'warning' : 'subtle'}> · {cacheText(mate)}</Text> : ''}

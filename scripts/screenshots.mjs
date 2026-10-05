@@ -168,7 +168,7 @@ const CREATED = [
   result('Created T-007 (currently working on): .claude/tasks/T-007.md. Route it now.'),
   gap(),
   tool('better-tasks - team_status (MCP)', ''),
-  result('shop · idle · context 41 % · cache warm 52m'),
+  result('shop · medium · idle · context 41 % · cache warm 52m'),
   gap(),
   tool('SendMessage', 'to: "shop", message: "Add to cart loses clicks · T-007 …"'),
   result('Sent'),
