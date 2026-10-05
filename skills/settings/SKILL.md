@@ -27,7 +27,7 @@ Grep a key (`gitFlow`) or a word (`video`) to find its row.
 | `keepAwake` | Holds caffeinate (the Mac stays awake) while any teammate runs. | true, false | true | /config "Keep the Mac awake" or config.json |
 | `excludeWorktreesFromIde` | IntelliJ skips .claude/worktrees/ from the first run, so teammates' worktrees don't set off re-indexing (git ignores them too: .gitignore). On by default, not asked. | true, false | true | config.json |
 | `useBetterTasks` | Use better-tasks in this project at all. false: it stays quiet here (no tools, no task rules, no setup questions; only its commands). Not asked: set it in config.json, then restart. | true, false | true | config.json |
-| `shareWithTeam` | Who gets better-tasks in this project. true: it is in the project's shared .claude/settings.json (committed, not pushed), so teammates who open the project see it turned on, install it once, and get new releases by themselves (autoUpdate). false: only this user has it. Asked once per git project. | true, false | false | config.json |
+| `shareWithTeam` | Who gets better-tasks in this project. true: it is in the project's shared .claude/settings.json (committed, not pushed), so teammates who open the project see it turned on, install it once, and get the release it pins (source.ref, a release tag; no autoUpdate). A newer release: asked at startup, Yes moves the pin. false: only this user has it. Asked once per git project. | true, false | false | config.json |
 
 ## Git & PRs
 
