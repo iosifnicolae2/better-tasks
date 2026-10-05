@@ -5,9 +5,9 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
-import { GIT_NO, GIT_SETTING, GIT_YES, gitQuestion, OFF_LINE, withIgnored } from './projectsetup'
-import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
-import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
+import { OFF_LINE } from './projectsetup'
+import { AUTO_UPDATE_COMMIT, hasTeamInstall, lacksAutoUpdate, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
+import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
@@ -17,7 +17,7 @@ import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadR
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
-import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingPointer, testingSkillSettings } from './testenv'
+import { coordinatorTestingRules, testingPointer, testingSkillSettings } from './testenv'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, prCoordinatorRules, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
@@ -275,9 +275,10 @@ async function declareCommands($: EngineInterface): Promise<void> {
   }
 }
 
-/** IntelliJ skips .claude/worktrees/ once the user said yes (intellij.ts); a project without .idea/ is left as it is. */
+/** With worktrees, IntelliJ skips .claude/worktrees/ (intellij.ts; on by default); a project without .idea/ is left as it is. */
 async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
-  if (!(await settingsNow($)).excludeWorktreesFromIde) return
+  const settings = await settingsNow($)
+  if (!settings.excludeWorktreesFromIde || !usesWorktree(settings.gitFlow, settings.worktree)) return
   const line = await excludeWorktrees(ioOf($), await ideaFilesOf($))
   if (line) $.ui.log(line)
 }
@@ -285,13 +286,6 @@ async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
 /** The names in the project's .idea/; undefined when it has none (no JetBrains IDE). */
 async function ideaFilesOf($: EngineInterface): Promise<string[] | undefined> {
   return $.fs.list(`${await $.session.root()}/.idea`).then(entries => entries.map(entry => entry.name), () => undefined)
-}
-
-/** Teammates in worktrees and an IntelliJ project: asks once per project whether IntelliJ may skip the worktrees. */
-async function askIdeExclusion($: EngineInterface): Promise<void> {
-  const settings = await settingsNow($)
-  if (!usesWorktree(settings.gitFlow, settings.worktree) || (await ideaFilesOf($)) === undefined) return
-  await askToTurnOn($, { field: IDE_SETTING, question: IDE_QUESTION, header: 'IntelliJ', answers: [IDE_YES, IDE_NO] })
 }
 
 function logFailure($: EngineInterface, what: string, error: unknown): void {
@@ -368,7 +362,6 @@ async function pointUserRules($: EngineInterface): Promise<void> {
 async function startQuestions($: EngineInterface): Promise<void> {
   if (await isOffHere($)) return
   await askTeamInstall($)
-  await askTasksInGit($)
   const settings = await settingsNow($)
   if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
@@ -379,8 +372,6 @@ async function startQuestions($: EngineInterface): Promise<void> {
   const isChosen = FLOW_KEYS.some(key => key in values) || settings.gitFlow !== 'direct'
   if (!isChosen) await askGitFlow($)
   else if (hasPrs(settings.gitFlow)) await checkGh($)
-  await askIdeExclusion($)
-  await askToTurnOn($, { field: OFFSCREEN_FIELD, question: OFFSCREEN_QUESTION, header: 'Off-screen' })
 }
 
 /** True when better-tasks is off in this project (the user said no to it here). */
@@ -388,49 +379,36 @@ async function isOffHere($: EngineInterface): Promise<boolean> {
   return !(await settingsNow($)).useBetterTasks
 }
 
-/** In a git project: keep the task files in git, or put their folder in .gitignore? */
-async function askTasksInGit($: EngineInterface): Promise<void> {
-  if (!(await isGitRepo($))) return
-  const folder = (await settingsNow($)).tasks.folder
-  const keep = await askToTurnOn($, { field: GIT_SETTING, question: gitQuestion(folder), header: 'Task files', answers: [GIT_YES, GIT_NO] })
-  if (keep === false) await ignoreTasks($, folder)
-}
-
-/** Adds the task folder to .gitignore (not committed); says how to untrack files git has already. */
-async function ignoreTasks($: EngineInterface, folder: string): Promise<void> {
-  const root = await $.session.root()
-  const path = `${root}/.gitignore`
-  const changed = withIgnored(await $.fs.read(path).catch(() => undefined), folder)
-  if (changed !== undefined) await $.fs.write(path, changed)
-  const tracked = await $.process.run(['git', '-C', root, 'ls-files', '--', folder]).then(done => done.stdout.trim(), () => '')
-  const untrack = tracked ? ` git still tracks the ones committed before: git rm -r --cached ${folder}` : ''
-  $.ui.log(`better-tasks: ${folder}/ is in .gitignore now, so the task files stay on this computer.${untrack}`)
-}
-
 async function isGitRepo($: EngineInterface): Promise<boolean> {
   return $.process.run(['git', 'rev-parse', '--is-inside-work-tree']).then(done => done.exitCode === 0, () => false)
 }
 
-/** In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project? */
+/**
+ * In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project?
+ * Shared before auto-update existed: turns it on (the team said yes to sharing then).
+ */
 async function askTeamInstall($: EngineInterface): Promise<void> {
   const shared = await $.fs.read(`${await $.session.root()}/${SHARED_SETTINGS}`).catch(() => undefined)
+  if (lacksAutoUpdate(shared)) return shareWithTeam($)
   if (hasTeamInstall(shared)) return
   if (await isGitRepo($)) await askToTurnOn($, { field: TEAM_SETTING, question: TEAM_QUESTION, header: 'Team', answers: [TEAM_YES, TEAM_NO] })
 }
 
-/** Adds better-tasks to the project's shared settings and commits only that file (teaminstall.ts). */
+/** Adds better-tasks (auto-updating) to the project's shared settings and commits only that file (teaminstall.ts). */
 async function shareWithTeam($: EngineInterface): Promise<void> {
   const root = await $.session.root()
   const path = `${root}/${SHARED_SETTINGS}`
   const shared = await $.fs.read(path).catch(() => undefined)
-  if (hasTeamInstall(shared)) return
+  const upgrade = lacksAutoUpdate(shared)
+  if (hasTeamInstall(shared) && !upgrade) return
   const changed = withTeamInstall(shared)
   if (changed === undefined) return $.ui.log(`better-tasks: ${SHARED_SETTINGS} is not one JSON object; better-tasks was not added to it`)
   await $.fs.write(path, changed)
   const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
   const added = await git('add', '--', SHARED_SETTINGS)
-  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
-  if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
+  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', upgrade ? AUTO_UPDATE_COMMIT : TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
+  if (committed.exitCode === 0 && upgrade) $.ui.log(`better-tasks: turned on auto-update in ${SHARED_SETTINGS} and committed it. Push it; teammates then get new releases by themselves.`)
+  else if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
   else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
 }
 
@@ -453,6 +431,7 @@ async function askGitFlow($: EngineInterface): Promise<void> {
 async function setUpFlow($: EngineInterface, flow: GitFlow): Promise<void> {
   if (flow === 'dev-prs') await useDevBranch($, (await settingsNow($)).devBranch).catch(error => logFailure($, 'making the dev branch', error))
   if (hasPrs(flow)) await checkGh($)
+  await keepWorktreesFromIde($)
 }
 
 /** Makes the dev branch at this commit and switches to it: the same commit, so no file changes. One that exists is left alone. */
@@ -558,8 +537,7 @@ async function hasGitHubRemote($: EngineInterface): Promise<boolean> {
 async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === SETTING_KEY) await setUpVoice($)
   if (key === 'better-tasks.gitFlow') await setUpFlow($, (await settingsNow($)).gitFlow)
-  if (key === 'better-tasks.gitFlow' || key === 'better-tasks.worktree') await askIdeExclusion($)
-  if (key === `better-tasks.${IDE_SETTING}`) await keepWorktreesFromIde($)
+  if (['better-tasks.gitFlow', 'better-tasks.worktree', `better-tasks.${IDE_SETTING}`].includes(key)) await keepWorktreesFromIde($)
   if (key === `better-tasks.${TEAM_SETTING}`) await shareWithTeam($)
 }
 

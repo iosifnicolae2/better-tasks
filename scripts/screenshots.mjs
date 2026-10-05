@@ -162,18 +162,18 @@ const gap = () => []
 
 // Tasks start now by default: created, then routed to the teammate that owns the area.
 const CREATED = [
-  you('the login loops after a password reset, fix it'),
+  you('the Add to cart button loses clicks, fix it'),
   gap(),
-  tool('better-tasks - task_create (MCP)', 'title: "Login loops after password reset", …'),
+  tool('better-tasks - task_create (MCP)', 'title: "Add to cart loses clicks", …'),
   result('Created T-007 (currently working on): .claude/tasks/T-007.md. Route it now.'),
   gap(),
   tool('better-tasks - team_status (MCP)', ''),
-  result('auth · idle · context 41 % · cache warm 52m'),
+  result('shop · idle · context 41 % · cache warm 52m'),
   gap(),
-  tool('SendMessage', 'to: "auth", message: "Login loops after password reset · T-007 …"'),
+  tool('SendMessage', 'to: "shop", message: "Add to cart loses clicks · T-007 …"'),
   result('Sent'),
   gap(),
-  says('T-007 is with auth: it owns login, its cache is warm and it has room.'),
+  says('T-007 is with shop: it owns the cart, its cache is warm and it has room.'),
   gap(),
 ]
 
@@ -189,7 +189,7 @@ const SCENES = {
     tool('better-tasks - task_list (MCP)', 'sprint: "current"'),
     result('T-007 [doing] … · T-001 [todo] … · T-004 [todo] …'),
     gap(),
-    says('Three open: T-007 is with auth, T-001 and T-004 wait. Rate limiting'),
+    says('Three open: T-007 is with shop, T-001 and T-004 wait. Rate limiting'),
     says('matters more for the launch, so I moved T-004 above T-001.'),
     gap(),
   ],

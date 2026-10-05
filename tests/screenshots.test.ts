@@ -22,8 +22,8 @@ const PANE = {
 type Spec = { id: string; title: string; sprint: string; status: string; owner?: string; rolled?: number; urgent?: boolean }
 
 const TASKS: Spec[] = [
-  { id: 'T-007', title: 'Login loops after password reset', sprint: '2026-10-05', status: 'doing', owner: 'auth', urgent: true },
-  { id: 'T-001', title: 'Fix the login redirect', sprint: '2026-10-05', status: 'todo', rolled: 1 },
+  { id: 'T-007', title: 'Add to cart loses clicks', sprint: '2026-10-05', status: 'doing', owner: 'shop', urgent: true },
+  { id: 'T-001', title: 'Show prices with tax', sprint: '2026-10-05', status: 'todo', rolled: 1 },
   { id: 'T-004', title: 'Rate-limit the public API', sprint: '2026-10-05', status: 'todo' },
   { id: 'T-006', title: 'Session timeout banner', sprint: '2026-10-05', status: 'done' },
   { id: 'T-009', title: 'Dark mode for settings', sprint: '2026-10-12', status: 'todo' },
@@ -48,10 +48,10 @@ function taskFile(spec: Spec, order: number): string {
   ].join('\n')
 }
 
-/** The demo project, a running teammate "auth" at 63 % editing auth.ts, and a session to look into. */
+/** The demo project, a running teammate "shop" at 63 % editing cart.ts, and a session to look into. */
 async function demo($: Engine, on: On): Promise<void> {
   const files = new Map<string, string>(TASKS.map((spec, order) => [`${DIR}/${spec.id}.md`, taskFile(spec, order)]))
-  files.set(`${ROOT}/.claude/tasks/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the new login flow\n')
+  files.set(`${ROOT}/.claude/tasks/sprints.md`, '# Sprints\n\n## 2026-10-05 · Sprint 41\nGoal: Ship the new checkout\n')
   mock.clock(on, { now: WEDNESDAY })
   mock.store(on)
   mock.env(on, { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1', CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: '1h' })
@@ -59,7 +59,7 @@ async function demo($: Engine, on: On): Promise<void> {
   on('session.root', () => ({ value: ROOT }))
   on('session.id', () => ({ value: 'demo' }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000, percent: 10 }, rateLimits: [] } }))
-  on('agent.list', () => ({ value: [{ id: 'a1', name: 'auth', description: 'auth', type: 'teammate', status: 'running' }] }))
+  on('agent.list', () => ({ value: [{ id: 'a1', name: 'shop', description: 'shop', type: 'teammate', status: 'running' }] }))
   on('fs.list', ($, e) => ({
     value: [...files.keys()]
       .filter(path => path.startsWith(`${e.path}/`))
@@ -81,7 +81,7 @@ async function demo($: Engine, on: On): Promise<void> {
   })
   await $.command.run({ command: 'better-tasks', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
   for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'm', messageCount: 1, agentId: 'a1' })) void chunk
-  await $.tool.call({ tool: 'Edit', tool_use_id: 'e1', agentId: 'a1', file_path: '/demo/src/auth.ts', old_string: 'a', new_string: 'b' } as never)
+  await $.tool.call({ tool: 'Edit', tool_use_id: 'e1', agentId: 'a1', file_path: '/demo/src/cart.ts', old_string: 'a', new_string: 'b' } as never)
 }
 
 const arrowTo = ($: Engine, element: string) =>

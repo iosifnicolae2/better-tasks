@@ -13,9 +13,7 @@ export const VIDEOS_FOLDER = '.claude/tasks_videos'
 const VIDEO_SIZE: Record<VideoQuality, string> = { low: '1280x720', medium: '1920x1080', high: '1920x1080' }
 
 export const QUESTION =
-  'Make a short before/after video for each finished task? A teammate records the bug, then the fix, ' +
-  'labels them BEFORE and AFTER, marks what changed with red boxes and arrows, and a voice reads the ' +
-  'subtitles. The voice (Kokoro) is set up once on this computer, about 1 GB. Change it later in /better-tasks config.'
+  'Record a short before/after video for each finished task?'
 
 /** Where kokoro-setup.sh installs; it writes `.ready` there once done. */
 export function voiceDir(env: { custom?: string; dataHome?: string; home?: string }): string {

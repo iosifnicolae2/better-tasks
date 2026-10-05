@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { backlogToggle, filledCells, neighbour, partsOf, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
+import { backlogToggle, filledCells, neighbour, partsOf, projectTitle, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -97,6 +97,13 @@ const sprintCommand = (args = '') => ({
 
 // ---- Pure ----
 
+test('the project folder name, for people', () => {
+  expect(projectTitle('/Users/me/better-tasks')).toBe('Better Tasks')
+  expect(projectTitle('/work/my-shop_app/')).toBe('My Shop App')
+  expect(projectTitle('/work/church.hub')).toBe('Church Hub')
+  expect(projectTitle('/work/iOS-app')).toBe('iOS App')
+})
+
 test('the editor setting picks the command', () => {
   const plain: HostApp = { hasIdeaCli: false }
   expect(openCommand('default', '/a.md', plain)).toEqual(['open', '/a.md'])
@@ -183,7 +190,8 @@ async function listShape(ui: { drawn: () => Promise<unknown> }, depth = Infinity
 }
 
 async function listLines(ui: { drawn: () => Promise<unknown> }): Promise<unknown[]> {
-  const board = ((await ui.drawn()) as Node).children?.[0] as Node
+  // The pane: the project's name, then the board.
+  const board = ((await ui.drawn()) as Node).children?.at(-1) as Node
   // The board: the search box while open, the list window, the box, the key line.
   const window = (board.children ?? []).find(child => (child as { props?: { overflow?: string; position?: string } }).props?.overflow === 'hidden'
     && (child as { props?: { position?: string } }).props?.position !== 'absolute')
@@ -350,6 +358,15 @@ for (const surface of SURFACES) {
     expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks_videos/T-004.mp4`]) // it failed here: the default player
   })
 
+  test(`the project's name sits at the top right, on the board and the settings (${surface})`, async ($, on) => {
+    fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    expect(await ui.find({ type: 'Text', text: 'Project' })).toBeDefined()
+    await $.command.run({ ...sprintCommand(), args: 'config' })
+    expect(await ui.find({ type: 'Text', text: 'Project' })).toBeDefined()
+  })
+
   test(`a board without the keys looks it and cannot act on a chord from the prompt (${surface})`, async ($, on) => {
     fakeProject(on)
     await $.command.run(sprintCommand())
@@ -432,10 +449,10 @@ for (const surface of SURFACES) {
     for (let n = 10; n < 40; n += 1) files.set(`${DIR}/T-0${n}-x.md`, taskFile(`T-0${n}`, `Task ${n}`, 'backlog', 'todo'))
     await $.command.run(sprintCommand())
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 24 } } })
-    expect(await listLines(ui)).toHaveLength(16)
+    expect(await listLines(ui)).toHaveLength(15) // 24 rows: the name's line, the list, the box and the key line
     expect(await ui.find({ type: 'Text', text: /more below$/ })).toBeDefined()
     await arrowTo($, 'task-T-039')
-    expect(await listLines(ui)).toHaveLength(16)
+    expect(await listLines(ui)).toHaveLength(15)
     expect(await ui.find({ key: 'task-T-039' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /more above$/ })).toBeDefined()
   })

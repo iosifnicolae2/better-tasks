@@ -1,20 +1,12 @@
 // Keeps JetBrains IDEs (IntelliJ, WebStorm, PyCharm...) from indexing teammate worktrees.
 // Claude Code puts each worktree, a full copy of the repo, in <project>/.claude/worktrees/, so the IDE
 // sees it as project content and re-indexes a whole copy each time one is made, merged or removed.
-// Asked once per project at setup (worktrees on and a .idea folder): the answer is the project setting
-// excludeWorktreesFromIde. When yes, each session start marks that folder as excluded in the .idea module file.
+// Done by default, not asked (project setting excludeWorktreesFromIde, on unless set false): with worktrees on and a
+// .idea folder, each session start marks that folder as excluded in the .idea module file.
 
 export const WORKTREES_DIR = '.claude/worktrees'
 
 export const IDE_SETTING = 'excludeWorktreesFromIde'
-export const IDE_YES = 'Yes, skip that folder'
-export const IDE_NO = 'No, leave IntelliJ as is'
-export const IDE_QUESTION = [
-  `Teammates each keep a full copy of this project in ${WORKTREES_DIR}/. IntelliJ indexes every copy, which slows it down.`,
-  `Yes: better-tasks marks that folder as Excluded in this project's IntelliJ settings (.idea), so IntelliJ skips it. ` +
-    'Nothing else changes. To undo it, right-click the folder in IntelliJ: Mark Directory as > Cancel Exclusion.',
-  `Should IntelliJ skip ${WORKTREES_DIR}/?`,
-].join('\n\n')
 
 const EXCLUDE_LINE = `<excludeFolder url="file://$MODULE_DIR$/${WORKTREES_DIR}" />`
 

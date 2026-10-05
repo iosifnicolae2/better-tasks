@@ -1,76 +1,74 @@
 # better-tasks
 
-**Plan and track tasks inside Claude Code, kept as plain Markdown files in your project.**
+**A better way to manage tasks in Claude Code.**
 
 <p align="center">
-  <img src="docs/screenshots/board.svg" alt="Claude Code with the Sprint board docked on the right">
+  <img src="docs/screenshots/board.svg" alt="Claude Code with the sprint board docked on the right">
 </p>
 
-## 📦 Install
+A Claude Code plugin. Your tasks are Markdown files in your project; a team of Claude agents works on them; you only review the result. Above: you ask for a fix, the lead files it as T-007 and hands it to the teammate that owns the shop.
 
-**For you, in every project** (default, recommended):
+## ✨ Features
+
+- 📝 **Tasks as Markdown**: plain files in `.claude/tasks/`, committed with your code.
+- 🤖 **A team of agents**: a lead routes each task to a teammate; teammates work in parallel.
+- 🎥 **Before/after video**: after each task you get a short narrated video to review it ([see an example](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)). Turn it on with the `demoVideos` setting.
+- ✅ **You approve**: no task closes without your yes.
+- 🔀 **Your git flow**: straight to main, a shared `dev` branch, or a worktree and PR per task. Asked once per project.
+- 🗂️ **Sprint board**: `/better-tasks` shows sprints, goals, the backlog and search.
+- 🌙 **`/away`**: screens off, the Mac keeps working.
+
+## 📦 Install
 
 ```sh
 claude plugin marketplace add iosifnicolae2/better-tasks
 claude plugin install better-tasks@better-tasks
 ```
 
-**For one project only**, run inside the project folder:
+Restart Claude Code. Optional tools: `brew install ffmpeg uv` for videos, `gh` for pull requests.
+
+Get new releases by themselves: `/plugin` → Marketplaces → better-tasks → Enable auto-update (Claude Code leaves it off for marketplaces outside Anthropic). Projects shared with the team have it on already.
+
+<details>
+<summary>Install for one project only</summary>
+
+Run inside the project folder:
 
 ```sh
 claude plugin marketplace add iosifnicolae2/better-tasks --scope project
 claude plugin install better-tasks@better-tasks --scope project
 ```
 
-- Project scope: saved in `.claude/settings.json`; commit it. Each teammate still runs the install once.
-- `--scope local`: only you, only this project (`.claude/settings.local.json`, not committed).
+This is saved in `.claude/settings.json`: add `"autoUpdate": true` to its `better-tasks` marketplace entry, then commit it. Each teammate still runs the install once. `--scope local` is only you, only this project (not committed).
+</details>
 
-Restart Claude Code.
+## ⚙️ Settings
 
-## ✨ Features
+`/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`.
+Git flow, teammate models, videos, your PR template, your own instructions for every task, and more. Every setting, its choices and default: [skills/settings/SKILL.md](skills/settings/SKILL.md). Or just ask Claude what you can configure.
 
-- 📝 **Tasks as Markdown** in your project, committed with your code.
-- 🗂️ **Sprint board** (`/better-tasks`): sprints with a goal, backlog, search.
-- 🤖 **A team of agents:** the lead hands each task to a teammate.
-- ✅ **You approve** finished work before a task closes.
-- 🎥 **Before/after videos** of each change, narrated.
-- 🔀 **Your git flow, asked once per project:** straight to main; a shared `dev` branch with a pull request per task (one build, one install for everything); or a worktree and pull request per teammate. Recommended from a quick look at the project.
-- 📝 **PR descriptions from a template:** the project's own (`.github/pull_request_template.md` and the other places GitHub and GitLab look), a path of your choice (`prTemplate` in `.claude/tasks/config.json`), else better-tasks' short one: the request and why on top, then the video, what changed, how to test. The settings page's "PR template" row adds it to your repo when you press Enter.
-- 📌 **Your own instructions** for every task: point `instructions` in `.claude/tasks/config.json` at a file or folder; prompts carry its path and first line.
-- 🧘 **A quiet IDE:** with teammates in worktrees, an IntelliJ project is asked once whether IntelliJ may skip them (`.claude/worktrees/`), so they don't set off re-indexing; the answer is `excludeWorktreesFromIde` in `.claude/tasks/config.json`.
-- 🌙 **`/away`:** screens off, the Mac keeps working.
-
-### 🎬 Demo: a before/after video
-
-A sample of what a teammate hands in with a fix: a shop's "Add to cart" button that lost every click, before and after. The picture is the one a PR shows; click it for the video, and turn the sound on: the subtitles are read aloud.
-
-[![Play the before/after demo video](docs/videos/sample-before-after.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)
+Project rules for every task: ask *"set up better-tasks for this project"*, then edit the files in `.claude/tasks/`.
 
 ## 🔄 Update / uninstall
-
-**Update:**
 
 ```sh
 claude plugin marketplace update better-tasks
 claude plugin update better-tasks@better-tasks
 ```
 
-Then restart Claude Code. Updates bring the latest [release](https://github.com/iosifnicolae2/better-tasks/releases), not every commit on main; `claude plugin list` shows the installed version.
+Restart Claude Code. Updates bring the latest [release](https://github.com/iosifnicolae2/better-tasks/releases), not every commit on main.
 
-**Uninstall:**
+<details>
+<summary>Uninstall</summary>
 
 ```sh
 claude plugin uninstall better-tasks@better-tasks
 claude plugin marketplace remove better-tasks
 ```
 
-Installed per project? Add the same `--scope project` to `update` and `uninstall`.
+Installed per project? Add `--scope project` to `update` and `uninstall`.
+</details>
 
-## 🧩 More
+## 🛠️ Contributing
 
-- **Settings:** `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`. Every setting, its choices, default and where it lives: [skills/settings/SKILL.md](skills/settings/SKILL.md); Claude loads it when you ask what you can configure.
-- **Skills, loaded only when their step comes:** teammates load `testing` before they run the app, `video` before a change that shows on screen, `pull-request` to open the PR, `done` to report; the lead loads `contribute` for a change to better-tasks itself. The prompts keep a one-line pointer to each; a loaded skill gets the settings in force under its title. In [skills/](skills/).
-- **Optional tools:** before/after videos need `ffmpeg` and `uv` (`brew install ffmpeg uv`); pull requests need `gh`; the shared-dev-branch flow uses `python3`.
-- **Project setup:** ask "set up better-tasks for this project", then edit the files in `.claude/tasks/`.
-- **Changing better-tasks:** ask Claude for the change. It forks this repo, makes the change there, runs the fork as a linked install (an edit applies on `/reload-plugins`, no reinstall), then asks whether to open a PR here: Yes, Not now or Never (kept per user in `~/.claude/better-tasks/user.json`).
-- **Development:** `claude --plugin-dir .` runs this copy; `claude plugin test .` runs the tests; `bun scripts/yaml-check.ts [tasks folder]` checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML); `sh scripts/video-branch-check.sh` checks the video links bin/video-branch.sh prints; `sh scripts/open-pr-check.sh` checks bin/open-pr.sh sends the gh token only to GitHub; `bun scripts/settings-doc.ts` regenerates the settings skill after a setting changes (`--check` says whether it is current); `bun scripts/skills-check.ts` checks the skills still say what the prompts rely on.
+Ask Claude for the change: it forks this repo, tries it as a linked install, then offers to open a PR here. Details and dev commands: [CONTRIBUTING.md](CONTRIBUTING.md).

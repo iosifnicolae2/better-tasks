@@ -149,7 +149,27 @@ export function percentText(mate: Teammate | undefined): string {
   return mate?.percent === undefined ? '' : `${Math.round(mate.percent)}%`
 }
 
+/** "my-shop_app" → "My Shop App": the project folder's name, for people. A word with capitals keeps them ("iOS"). */
+export function projectTitle(folder: string): string {
+  const name = folder.split('/').filter(Boolean).pop() ?? ''
+  return name
+    .split(/[-_.\s]+/)
+    .filter(Boolean)
+    .map(word => (word === word.toLowerCase() ? word[0]!.toUpperCase() + word.slice(1) : word))
+    .join(' ')
+}
+
 // ---- Drawing ----
+
+/** The project's name at the top right of the pane, in Claude Code's orange. Takes one line. */
+export function ProjectHeader({ ui, title }: { ui: Ui; title: string }) {
+  const { Box, Text } = ui
+  return (
+    <Box flexDirection="row" justifyContent="flex-end" height={1} overflow="hidden">
+      <Text bold color="claude" wrap="truncate-end">{title}</Text>
+    </Box>
+  )
+}
 
 export type BoardActions = {
   /** A click or Enter on a task: selects it, or on the selected one hands the keys to its actions. */
@@ -285,7 +305,7 @@ function resultLines({ ui, search, selected, hasKeys, canSpin, actions }: BoardP
 
 type ResultProps = { ui: Ui; hit: Hit; isSelected: boolean; hasKeys: boolean; isStill: boolean; canSpin: boolean; actions: BoardActions }
 
-/** "▌✻ T-007  Login loops after password reset   ⚡ Currently working on", the matched words lit. */
+/** "▌✻ T-007  Add to cart loses clicks   ⚡ Currently working on", the matched words lit. */
 function ResultRow({ ui, hit, isSelected, hasKeys, isStill, canSpin, actions }: ResultProps) {
   const { Box, Button, Text } = ui
   const { task } = hit

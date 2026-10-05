@@ -153,7 +153,7 @@ export const FIELDS: readonly Field[] = [
     describe: 'Teammates test and record in a hidden browser, simulator or terminal, so your screen, mouse and keyboard stay yours. Saved in this project.',
     options: ON_OFF,
     value: settings => (settings.offScreen ? 'on' : 'off'),
-    initial: 'off',
+    initial: 'on',
     stored: isOn,
   },
   ...LEVELS.flatMap(modelFields),

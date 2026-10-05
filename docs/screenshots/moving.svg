@@ -95,8 +95,8 @@
 <text x="293.2" y="68.25" fill="rgb(255,255,255)" textLength="159.6" xml:space="preserve">(sprint: "current")</text>
 <text x="721.6" y="68.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="68.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">✻</text>
-<text x="772.0" y="68.25" fill="rgb(255,255,255)" opacity="0.55" textLength="327.6" xml:space="preserve">T-007  Login loops after password reset</text>
-<text x="1192.0" y="68.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">auth</text>
+<text x="772.0" y="68.25" fill="rgb(255,255,255)" opacity="0.55" textLength="260.4" xml:space="preserve">T-007  Add to cart loses clicks</text>
+<text x="1192.0" y="68.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">shop</text>
 <text x="1234.0" y="68.25" fill="rgb(80,80,80)" textLength="25.2" xml:space="preserve">63%</text>
 <text x="24.4" y="87.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
 <text x="66.4" y="87.25" fill="rgb(153,153,153)" textLength="411.6" xml:space="preserve">T-007 [doing] … · T-001 [todo] … · T-004 [todo] …</text>
@@ -108,9 +108,9 @@
 <text x="1183.6" y="106.25" fill="rgb(78,186,101)" textLength="8.4" xml:space="preserve">▰</text>
 <text x="1192.0" y="106.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">▱▱▱▱</text>
 <text x="1234.0" y="106.25" fill="rgb(80,80,80)" textLength="25.2" xml:space="preserve">1/4</text>
-<text x="24.4" y="125.25" fill="rgb(255,255,255)" textLength="579.6" xml:space="preserve">⏺ Three open: T-007 is with auth, T-001 and T-004 wait. Rate limiting</text>
+<text x="24.4" y="125.25" fill="rgb(255,255,255)" textLength="579.6" xml:space="preserve">⏺ Three open: T-007 is with shop, T-001 and T-004 wait. Rate limiting</text>
 <text x="721.6" y="125.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="738.4" y="125.25" fill="rgb(80,80,80)" textLength="226.8" xml:space="preserve">  ◎ Ship the new login flow</text>
+<text x="738.4" y="125.25" fill="rgb(80,80,80)" textLength="210.0" xml:space="preserve">  ◎ Ship the new checkout</text>
 <rect x="738.4" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="746.8" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="755.2" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
@@ -181,7 +181,7 @@
 <text x="1208.8" y="144.25" fill="rgb(215,119,87)" textLength="50.4" xml:space="preserve">moving</text>
 <text x="721.6" y="163.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="163.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">·</text>
-<text x="772.0" y="163.25" fill="rgb(255,255,255)" opacity="0.55" textLength="243.6" xml:space="preserve">T-001  Fix the login redirect</text>
+<text x="772.0" y="163.25" fill="rgb(255,255,255)" opacity="0.55" textLength="226.8" xml:space="preserve">T-001  Show prices with tax</text>
 <text x="1242.4" y="163.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">↻1</text>
 <text x="721.6" y="182.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="721.6" y="201.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
