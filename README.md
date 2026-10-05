@@ -42,9 +42,9 @@ Restart Claude Code.
 
 ### 🎬 Demo: a before/after video
 
-A video better-tasks made of its own change: the settings page before and after the "Before/after videos" row. Turn the sound on: the subtitles are read aloud.
+A sample of what a teammate hands in with a fix: a shop's "Add to cart" button that lost every click, before and after. The picture is the one a PR shows; click it for the video, and turn the sound on: the subtitles are read aloud.
 
-[![Play the before/after demo video](docs/videos/before-after-poster.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@24f713a11783dd8ccc503f74adad448c4108aa79/docs/videos/before-after.mp4)
+[![Play the before/after demo video](docs/videos/sample-before-after.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)
 
 ## 🔄 Update / uninstall
 
