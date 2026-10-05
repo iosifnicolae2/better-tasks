@@ -4,6 +4,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
+import { gitQuestion, GIT_NO, USE_NO, USE_QUESTION } from '../hooks/projectsetup'
 import { TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
 import { OFFSCREEN_QUESTION } from '../hooks/testenv'
 import { PANE_COMMANDS } from '../hooks/pane'
@@ -16,7 +17,7 @@ const MONDAY_OCT_5 = new Date(2026, 9, 5, 9).getTime()
 const SUNDAY_OCT_11_LATE = new Date(2026, 9, 11, 23, 58).getTime()
 const WINDOW = 200_000
 /** Setup questions wait for a quiet, empty prompt box (2 s) before each one asks. */
-const QUIET_PROMPT_BOX = 10_000
+const QUIET_PROMPT_BOX = 30_000
 
 const TEAMS_ON = { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
 
@@ -960,6 +961,68 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
   expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
 })
 
+/** The setup questions a test about other questions leaves alone (dismissed: asked again next time). */
+const isOtherSetupQuestion = (question: string) =>
+  [OFFSCREEN_QUESTION, TEAM_QUESTION, USE_QUESTION, gitQuestion('.claude/tasks')].includes(question)
+
+/** Answers each setup question from `answers` (by question), dismisses the rest; returns the questions asked, in order. */
+function answerSetup(on: On, answers: Record<string, string>): string[] {
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    asked.push(question)
+    return { result: { answers: question in answers ? { [question]: answers[question] } : {} } }
+  })
+  return asked
+}
+
+test('"No" to better-tasks here: no more questions, and from the next start it stays quiet (no rules, no tools)', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerSetup(on, { [USE_QUESTION]: USE_NO })
+  const host = fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).toEqual([USE_QUESTION])
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toEqual({ useBetterTasks: false })
+
+  host.registered.length = 0
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).toEqual([USE_QUESTION])
+  expect(host.registered.every(name => name.startsWith('/'))).toBe(true) // commands only: /better-tasks config still opens
+  expect(host.notices.at(-1)).toContain('better-tasks is off in this project')
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections).toEqual([{ id: 'intro', text: 'You are Claude.', scope: 'shared' }])
+})
+
+test('the setup order: use it here, then who gets it, then task files in git; "No" puts the task folder in .gitignore', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const git = gitQuestion('.claude/tasks')
+  const asked = answerSetup(on, { [USE_QUESTION]: 'Yes, use it here', [TEAM_QUESTION]: TEAM_NO, [git]: GIT_NO })
+  const host = fakeHost(on, [], { [`${ROOT}/.gitignore`]: 'node_modules/' })
+  host.runOutput[`git -C ${ROOT} ls-files -- .claude/tasks`] = '.claude/tasks/T-001-old.md\n'
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked.slice(0, 3)).toEqual([USE_QUESTION, TEAM_QUESTION, git])
+  expect(host.files.get(`${ROOT}/.gitignore`)).toBe('node_modules/\n.claude/tasks/\n')
+  expect(host.notices.at(-1)).toContain('git rm -r --cached .claude/tasks')
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toMatchObject({ useBetterTasks: true, shareWithTeam: false, tasksInGit: false })
+})
+
+test('a project that has tasks already is not asked whether to use better-tasks', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerSetup(on, {})
+  fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: '---\nid: T-001\ntitle: Fix login\nsprint: backlog\nstatus: todo\n---\n' })
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).not.toContain(USE_QUESTION)
+  expect(asked).toContain(TEAM_QUESTION)
+})
+
 /** Answers the "who gets better-tasks" question with `answer`, dismisses the rest; returns how often it was asked. */
 function answerTeam(on: On, answer: string): { asked: number } {
   const count = { asked: 0 }
@@ -1017,7 +1080,7 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
     const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
     const question = first?.question ?? ''
     const options = (first?.options ?? []).map(option => option.label)
-    if (question === OFFSCREEN_QUESTION || question === TEAM_QUESTION) return { result: { answers: {} } } // dismissed: their own tests
+    if (isOtherSetupQuestion(question)) return { result: { answers: {} } } // dismissed: their own tests
     asked.push({ question, options })
     return { result: { answers: { [question]: question === QUESTION ? 'No' : options[1] } } }
   })
@@ -1042,7 +1105,7 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   const asked: string[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
-    if (question === OFFSCREEN_QUESTION || question === TEAM_QUESTION) return { result: { answers: {} } }
+    if (isOtherSetupQuestion(question)) return { result: { answers: {} } }
     asked.push(question)
     return { result: { answers: { [question]: 'No' } } }
   })
