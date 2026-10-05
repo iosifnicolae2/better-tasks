@@ -2,7 +2,7 @@ import type { FsEntry } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
 import {
-  appOf, authorsOf, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf,
+  appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf,
   recommend, teammateRules, usesWorktree,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
@@ -25,27 +25,35 @@ describe('git flow', () => {
   })
 
   test('no GitHub remote: straight to main, whatever else', () => {
-    expect(recommend({ ...SOLO_LIGHT, hasGitHub: false, cacheMb: 90_000, authors: 4 })).toEqual({ flow: 'direct', reason: 'no GitHub remote, so no PRs' })
+    expect(recommend({ ...SOLO_LIGHT, hasGitHub: false, app: 'an Xcode app', authors: 4 })).toEqual({ flow: 'direct', reason: 'no GitHub remote, so no PRs' })
   })
 
-  test('a heavy build or an app to install: the shared dev branch', () => {
-    expect(recommend({ ...SOLO_LIGHT, cacheMb: 82_000, app: 'an Xcode app' })).toEqual({ flow: 'dev-prs', reason: 'a 80.1 GB build cache and an Xcode app to install' })
-    expect(recommend({ ...SOLO_LIGHT, cacheMb: undefined })).toEqual({ flow: 'dev-prs', reason: 'a build cache too big to measure quickly' })
-    expect(recommend({ ...SOLO_LIGHT, app: 'a Flutter app' })).toEqual({ flow: 'dev-prs', reason: 'a Flutter app to install' })
+  test('an app to install: the shared dev branch, solo or not', () => {
+    expect(recommend({ ...SOLO_LIGHT, app: 'an Xcode app' })).toEqual({ flow: 'dev-prs', reason: 'an Xcode app to build and install once for every change' })
   })
 
-  test('a light project with a team or CI on PRs: a worktree and PR each', () => {
+  test('a team or CI on PRs: a worktree and PR each, or the shared dev branch when a copy is heavy', () => {
     expect(recommend({ ...SOLO_LIGHT, authors: 3 }).flow).toBe('worktree-prs')
     expect(recommend({ ...SOLO_LIGHT, prChecks: true })).toEqual({ flow: 'worktree-prs', reason: 'CI runs on PRs, and a copy is cheap to set up' })
+    expect(recommend({ ...SOLO_LIGHT, authors: 2, cacheMb: 82_000 })).toEqual({ flow: 'dev-prs', reason: '2 people commit, and a 80.1 GB build cache for every copy' })
+    expect(recommend({ ...SOLO_LIGHT, prChecks: true, cacheMb: undefined })).toEqual({ flow: 'dev-prs', reason: 'CI runs on PRs, and a build cache too big to measure quickly for every copy' })
   })
 
-  test('solo, light, no CI on PRs: straight to main', () => {
-    expect(recommend(SOLO_LIGHT)).toEqual({ flow: 'direct', reason: 'one person, a light build and no CI on PRs' })
+  test('solo, no app, no CI on PRs: straight to main, however big the build', () => {
+    expect(recommend(SOLO_LIGHT)).toEqual({ flow: 'direct', reason: 'one person, no app to install and no CI on PRs' })
+    expect(recommend({ ...SOLO_LIGHT, cacheMb: undefined }).flow).toBe('direct')
   })
 
-  test('people count once per name; bots are not people', () => {
-    const shortlog = '   266\tIosif Nicolae <iosif@bringes.io>\n    30\tBogdan Baghiu <b@x.com>\n    25\tBogdan Baghiu <team@bringes.io>\n    23\tgithub-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>\n     2\tdependabot <d@x>\n'
-    expect(authorsOf(shortlog)).toBe(3)
+  test('people count once per name or email; bots are not people', () => {
+    const shortlog = [
+      '   266\tIosif Nicolae <iosif@bringes.io>',
+      '    54\tIosif Bringes <iosif@bringes.io>',
+      '    30\tBogdan Baghiu <b@x.com>',
+      '    25\tBogdan Baghiu <team@bringes.io>',
+      '    23\tgithub-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>',
+      '     2\tdependabot <d@x>',
+    ].join('\n')
+    expect(authorsOf(shortlog)).toBe(2)
     expect(authorsOf('')).toBe(0)
   })
 
@@ -56,7 +64,7 @@ describe('git flow', () => {
   test('an app to install, from file names', () => {
     expect(appOf(['README.md', 'BRD.xcodeproj'])).toBe('an Xcode app')
     expect(appOf(['pubspec.yaml', 'android'])).toBe('a Flutter app')
-    expect(appOf(['src-tauri'])).toBe('a Tauri app')
+    expect(appOf(['tauri.conf.json'])).toBe('a Tauri app')
     expect(appOf(['package.json', 'src'])).toBe('')
   })
 
@@ -78,45 +86,62 @@ describe('git flow', () => {
     expect(dev).toContain('"Asked for": the user\'s request')
     expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toMatch(/^PR RULES\n- The PR's description/)
   })
+
+  test("the dev flow's lead rules take the PR flow's Finishing line as it is", () => {
+    const pr = '## Pull request per task (on)\n- A finished task\'s notes hold "PR: <url>". Show it.\n- Mark as resolved: merge.'
+    const lead = devLeadRules('/bin', 'dev', pr)
+    expect(lead).toContain('- A finished task\'s notes hold "PR: <url>". Show it.')
+    expect(lead).not.toContain('- Mark as resolved: merge.')
+    expect(lead).toContain('python3 /bin/task_pr.py sync')
+  })
 })
 
 const dir = (name: string): FsEntry => ({ name, kind: 'dir', size: 0, mtimeMs: 0, isLink: false })
 const file = (name: string): FsEntry => ({ name, kind: 'file', size: 1, mtimeMs: 0, isLink: false })
 
+function probeOf(lists: Record<string, FsEntry[]>, ran: string[][], remotes: string, shortlog: string, du?: string): Probe {
+  return {
+    root: '/p',
+    run: async argv => {
+      ran.push(argv)
+      if (argv[0] === 'git') return argv[1] === 'remote' ? remotes : shortlog
+      return du
+    },
+    list: async path => {
+      const found = lists[path]
+      if (!found) throw new Error('ENOENT')
+      return found
+    },
+    read: async path => (path.endsWith('pr.yml') ? 'on:\n  pull_request:\n' : 'on: release'),
+  }
+}
+
+const GITHUB = 'origin\tgit@github.com:me/app.git (fetch)\n'
+const TWO_PEOPLE = '   10\tMe <me@x>\n    3\tYou <you@x>\n'
+
 describe('looking at a project', () => {
-  test('one look: remote, people, caches one level down, an app, CI on PRs', async () => {
+  test('one look: remote, people, an app two levels down, CI on PRs; no du when an app decides', async () => {
     const lists: Record<string, FsEntry[]> = {
-      '/p': [dir('app'), dir('.github'), dir('node_modules'), file('package.json')],
-      '/p/app': [dir('target'), file('pubspec.yaml')],
+      '/p': [dir('apps'), dir('.github'), dir('node_modules'), file('package.json')],
+      '/p/apps': [dir('ios')],
+      '/p/apps/ios': [dir('App.xcodeproj')],
       '/p/.github/workflows': [file('pr.yml'), file('release.yml')],
     }
     const ran: string[][] = []
-    const probe: Probe = {
-      root: '/p',
-      run: async argv => {
-        ran.push(argv)
-        if (argv[0] === 'git' && argv[1] === 'remote') return 'origin\tgit@github.com:me/app.git (fetch)\n'
-        if (argv[0] === 'git') return '   10\tMe <me@x>\n'
-        return '2097152\t/p/node_modules\n1048576\t/p/app/target\n'
-      },
-      list: async path => {
-        const found = lists[path]
-        if (!found) throw new Error('ENOENT')
-        return found
-      },
-      read: async path => (path.endsWith('pr.yml') ? 'on:\n  pull_request:\n' : 'on: release'),
-    }
-    expect(await lookAt(probe)).toEqual({ hasGitHub: true, cacheMb: 3072, app: 'a Flutter app', authors: 1, prChecks: true })
-    expect(ran).toContainEqual(['du', '-sk', '/p/node_modules', '/p/app/target'])
+    expect(await lookAt(probeOf(lists, ran, GITHUB, '   10\tMe <me@x>\n'))).toEqual({ hasGitHub: true, cacheMb: 0, app: 'an Xcode app', authors: 1, prChecks: true })
+    expect(ran.some(argv => argv[0] === 'du')).toBe(false)
+  })
+
+  test('a team and no app: the caches one and two levels down are measured', async () => {
+    const lists: Record<string, FsEntry[]> = { '/p': [dir('web'), dir('node_modules')], '/p/web': [dir('server')], '/p/web/server': [dir('target')] }
+    const ran: string[][] = []
+    const facts = await lookAt(probeOf(lists, ran, GITHUB, TWO_PEOPLE, '2097152\t/p/node_modules\n1048576\t/p/web/server/target\n'))
+    expect(facts.cacheMb).toBe(3072)
+    expect(ran).toContainEqual(['du', '-sk', '/p/node_modules', '/p/web/server/target'])
   })
 
   test('du out of time: the cache counts as too big to measure', async () => {
-    const probe: Probe = {
-      root: '/p',
-      run: async argv => (argv[0] === 'du' ? undefined : ''),
-      list: async path => (path === '/p' ? [dir('target')] : []),
-      read: async () => undefined,
-    }
-    expect((await lookAt(probe)).cacheMb).toBeUndefined()
+    const lists: Record<string, FsEntry[]> = { '/p': [dir('target')] }
+    expect((await lookAt(probeOf(lists, [], GITHUB, TWO_PEOPLE, undefined))).cacheMb).toBeUndefined()
   })
 })

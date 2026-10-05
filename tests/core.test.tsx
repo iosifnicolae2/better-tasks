@@ -905,7 +905,7 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(0)
-  expect(asked.map(one => one.question)).toEqual([QUESTION, expect.stringContaining('Recommended here: Shared dev branch, PR per task (a Flutter app to install).')])
+  expect(asked.map(one => one.question)).toEqual([QUESTION, expect.stringContaining('Recommended here: Shared dev branch, PR per task (a Flutter app to build and install once for every change).')])
   expect(asked[1]?.options.slice(0, 3)).toEqual(['Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ '//': 'notes', demoVideos: false, gitFlow: 'dev-prs' })
   expect(host.notices).toContain('better-tasks: made the dev branch here, from this commit: teammates land on it, PRs go to main')
@@ -932,7 +932,7 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   host.runOutput['git remote -v'] = 'origin\thttps://github.com/someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(0)
-  expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Straight to main (one person, a light build and no CI on PRs).')])
+  expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Straight to main (one person, no app to install and no CI on PRs).')])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ demoVideos: false }) // "Not now" names no flow: asked again next time
 })
 

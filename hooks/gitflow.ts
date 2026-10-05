@@ -46,7 +46,7 @@ export const DU_TIMEOUT_MS = 3000
 
 export type ProjectFacts = {
   hasGitHub: boolean
-  /** Build caches, in MB; undefined when du ran out of time (very big). */
+  /** Build caches, in MB, measured only when they decide the flow (0 otherwise); undefined when du ran out of time (very big). */
   cacheMb: number | undefined
   /** What gets installed and run on a device or as an app ("an Xcode app"); '' for none. */
   app: string
@@ -65,30 +65,51 @@ export type Probe = {
   read: (path: string) => Promise<string | undefined>
 }
 
-const SKIP_DIRS = new Set(['.git', '.claude', '.idea', '.vscode', ...CACHE_DIRS])
+const SKIP_DIRS = new Set(['.git', '.claude', '.idea', '.vscode', 'docs', 'test', 'tests', ...CACHE_DIRS])
+/** Folders looked into below the root: two levels, at most this many. */
+const MAX_LISTED = 120
 
-/** One cheap look: a few directory listings, `git remote`, `git shortlog`, one bounded `du`. */
+type Folder = { path: string; entries: FsEntry[] }
+
+/** The root and the folders two levels below it, skipping caches and hidden folders. */
+async function foldersOf(probe: Probe): Promise<Folder[]> {
+  const listed = async (path: string): Promise<Folder> => ({ path, entries: await probe.list(path).catch(() => []) })
+  const inside = (folder: Folder) =>
+    folder.entries.filter(entry => entry.kind === 'dir' && !SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')).map(entry => `${folder.path}/${entry.name}`)
+  const root = await listed(probe.root)
+  const first = await Promise.all(inside(root).slice(0, MAX_LISTED).map(listed))
+  const second = await Promise.all(first.flatMap(inside).slice(0, MAX_LISTED - first.length).map(listed))
+  return [root, ...first, ...second]
+}
+
+/**
+ * One cheap look: directory listings two levels down, `git remote`, `git shortlog`, the workflow files,
+ * and only when it decides the flow (a team or CI on PRs, no app) one `du` of the caches, 3 s at most.
+ */
 export async function lookAt(probe: Probe): Promise<ProjectFacts> {
-  const top = await probe.list(probe.root).catch(() => [])
-  const subdirs = top.filter(entry => entry.kind === 'dir' && !SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')).slice(0, 40)
-  const below = await Promise.all(subdirs.map(dir => probe.list(`${probe.root}/${dir.name}`).then(entries => ({ dir: dir.name, entries }), () => ({ dir: dir.name, entries: [] }))))
-  const levels = [{ dir: '', entries: top }, ...below]
-  const caches = levels.flatMap(({ dir, entries }) =>
-    entries.filter(entry => entry.kind !== 'file' && CACHE_DIRS.includes(entry.name)).map(entry => [probe.root, dir, entry.name].filter(Boolean).join('/')),
-  )
-  const [remotes, shortlog, du, prChecks] = await Promise.all([
+  const folders = await foldersOf(probe)
+  const [remotes, shortlog, prChecks] = await Promise.all([
     probe.run(['git', 'remote', '-v']),
     probe.run(['git', 'shortlog', '-sne', '--since=90.days', 'HEAD']),
-    caches.length === 0 ? Promise.resolve('') : probe.run(['du', '-sk', ...caches], DU_TIMEOUT_MS),
     hasPrChecks(probe),
   ])
-  return {
+  const facts = {
     hasGitHub: hasGitHub(remotes ?? ''),
-    cacheMb: du === undefined ? undefined : megabytesOf(du),
-    app: appOf(levels.flatMap(level => level.entries.map(entry => entry.name))),
+    cacheMb: 0,
+    app: appOf(folders.flatMap(folder => folder.entries.map(entry => entry.name))),
     authors: authorsOf(shortlog ?? ''),
     prChecks,
   }
+  const needsSize = facts.hasGitHub && !facts.app && (facts.authors >= 2 || facts.prChecks)
+  return needsSize ? { ...facts, cacheMb: await cacheSize(probe, folders) } : facts
+}
+
+/** The build caches' size in MB; undefined when du ran out of time (very big). */
+async function cacheSize(probe: Probe, folders: readonly Folder[]): Promise<number | undefined> {
+  const caches = folders.flatMap(folder => folder.entries.filter(entry => entry.kind !== 'file' && CACHE_DIRS.includes(entry.name)).map(entry => `${folder.path}/${entry.name}`))
+  if (caches.length === 0) return 0
+  const du = await probe.run(['du', '-sk', ...caches], DU_TIMEOUT_MS)
+  return du === undefined ? undefined : megabytesOf(du)
 }
 
 async function hasPrChecks(probe: Probe): Promise<boolean> {
@@ -104,39 +125,46 @@ export function megabytesOf(du: string): number {
   return Math.round(kb / 1024)
 }
 
-/** People in `git shortlog -sne`: one per name (a person with two emails counts once), bots left out. */
+/** People in `git shortlog -sne`: a name or an email seen before is the same person; bots left out. */
 export function authorsOf(shortlog: string): number {
-  const names = shortlog
-    .split('\n')
-    .map(line => line.replace(/^\s*\d+\s+/, '').replace(/\s*<[^>]*>\s*$/, '').trim())
-    .filter(name => name && !/\[bot\]|\bbot$/i.test(name))
-  return new Set(names.map(name => name.toLowerCase())).size
+  const seen = new Set<string>()
+  let people = 0
+  for (const line of shortlog.split('\n')) {
+    const match = line.match(/^\s*\d+\s+(.*?)\s*<([^>]*)>\s*$/)
+    if (!match || /\[bot\]|bot$/i.test(match[1]!)) continue
+    const keys = [match[1]!.toLowerCase(), match[2]!.toLowerCase()]
+    if (!keys.some(key => seen.has(key))) people += 1
+    for (const key of keys) seen.add(key)
+  }
+  return people
 }
 
 /** What gets built and run as an app, from the names at the top and one level down. */
 export function appOf(names: readonly string[]): string {
   if (names.some(name => name.endsWith('.xcodeproj') || name.endsWith('.xcworkspace'))) return 'an Xcode app'
   if (names.includes('pubspec.yaml')) return 'a Flutter app'
-  if (names.includes('src-tauri') || names.includes('tauri.conf.json')) return 'a Tauri app'
+  if (names.includes('src-tauri') || names.includes('tauri.conf.json') || names.includes('Tauri.toml')) return 'a Tauri app'
   if (names.includes('AndroidManifest.xml') || names.includes('android')) return 'an Android app'
   return ''
 }
 
 const gigabytes = (mb: number) => `${Math.round(mb / 102.4) / 10} GB`
 
-/** The flow that fits, and why, in a few plain words. */
+/**
+ * The flow that fits, and why, in a few plain words. An app to install: everyone on one dev branch, so one
+ * build and one install test it all. A team or CI on PRs: a PR per task, from dev when a copy is heavy to
+ * build. Else straight to main: nobody reviews a PR.
+ */
 export function recommend(facts: ProjectFacts): { flow: GitFlow; reason: string } {
   if (!facts.hasGitHub) return { flow: 'direct', reason: 'no GitHub remote, so no PRs' }
-  const isHeavy = facts.cacheMb === undefined || facts.cacheMb >= HEAVY_MB
-  if (isHeavy || facts.app) {
-    const cache = facts.cacheMb === undefined ? 'a build cache too big to measure quickly' : isHeavy ? `a ${gigabytes(facts.cacheMb)} build cache` : ''
-    return { flow: 'dev-prs', reason: [cache, facts.app && `${facts.app} to install`].filter(Boolean).join(' and ') }
+  if (facts.app) return { flow: 'dev-prs', reason: `${facts.app} to build and install once for every change` }
+  if (facts.authors < 2 && !facts.prChecks) return { flow: 'direct', reason: 'one person, no app to install and no CI on PRs' }
+  const why = [facts.authors >= 2 && `${facts.authors} people commit`, facts.prChecks && 'CI runs on PRs'].filter(Boolean).join(', ')
+  if (facts.cacheMb === undefined || facts.cacheMb >= HEAVY_MB) {
+    const cache = facts.cacheMb === undefined ? 'a build cache too big to measure quickly' : `a ${gigabytes(facts.cacheMb)} build cache`
+    return { flow: 'dev-prs', reason: `${why}, and ${cache} for every copy` }
   }
-  if (facts.authors >= 2 || facts.prChecks) {
-    const why = [facts.authors >= 2 && `${facts.authors} people commit`, facts.prChecks && 'CI runs on PRs'].filter(Boolean).join(', ')
-    return { flow: 'worktree-prs', reason: `${why}, and a copy is cheap to set up` }
-  }
-  return { flow: 'direct', reason: 'one person, a light build and no CI on PRs' }
+  return { flow: 'worktree-prs', reason: `${why}, and a copy is cheap to set up` }
 }
 
 // ---- The first-start question ----
