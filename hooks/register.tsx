@@ -18,7 +18,7 @@ import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
 import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingPointer, testingSkillSettings } from './testenv'
-import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from './pullrequest'
+import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, prCoordinatorRules, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -112,7 +112,7 @@ export const register: Register = (on, options) => {
     if (!(await teamsOn($)) || (await isOffHere($))) return composed
     const settings = await settingsNow($)
     const testing = coordinatorTestingRules(settings.offScreen)
-    const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, PR_COORDINATOR_RULES)
+    const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, prCoordinatorRules(settings.openPrInBrowser, binOf($)))
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
     const instructions = await instructionsNow($, settings)
     const rules = [await projectText(ioOf($), 'coordinator'), models, testing, flow, instructions, CONTRIBUTE_POINTER].filter(Boolean).join('\n\n')

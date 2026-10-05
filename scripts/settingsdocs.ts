@@ -23,6 +23,7 @@ export const SETTING_DOCS: Record<string, Doc> = {
   longCache: { group: 'Team', about: '1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself.' },
   statusEvery: { group: 'Team', about: 'Minutes of quiet before the lead checks the open work and moves it forward. 0: off.' },
   keepAwake: { group: 'Team', about: 'Holds caffeinate (the Mac stays awake) while any teammate runs.' },
+  openPrInBrowser: { group: 'Team', about: 'Before the lead asks the user to approve a finished task that has a PR, it opens that PR in the default browser (once its video is uploaded) and waits a few seconds for the page to load. Either way the lead asks about one finished task at a time.' },
   demoVideos: { group: 'Team', about: 'Finished work comes with a short narrated before/after video (red boxes, arrows, subtitles read aloud by Kokoro, set up once per machine). Asked once per project.' },
   videoQuality: { group: 'Team', about: 'The videos\' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file.' },
   offScreen: { group: 'Team', about: 'Teammates test and record in a hidden browser, simulator or terminal, so the screen, mouse and keyboard stay the user\'s. Asked once per project.' },

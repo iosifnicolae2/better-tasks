@@ -70,6 +70,8 @@ export type Settings = {
   useBetterTasks: boolean
   /** The PR description's template, relative to the project root; empty: the project's own, else better-tasks' (prtemplate.ts). */
   prTemplate: string
+  /** The lead opens a finished task's PR in the default browser right before asking the user to approve it. */
+  openPrInBrowser: boolean
   models: TeammateModels
   sprint: SprintConfig
   tasks: TaskNaming
@@ -100,6 +102,7 @@ export const FIELDS: Record<string, Field> = {
   instructions: { kind: 'string' },
   excludeWorktreesFromIde: { kind: 'boolean' },
   prTemplate: { kind: 'string' },
+  openPrInBrowser: { kind: 'boolean' },
   shareWithTeam: { kind: 'boolean' },
   useBetterTasks: { kind: 'boolean' },
   tasksInGit: { kind: 'boolean' },
@@ -136,6 +139,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   instructions: '',
   excludeWorktreesFromIde: false,
   prTemplate: '',
+  openPrInBrowser: true,
   shareWithTeam: false,
   useBetterTasks: true,
   tasksInGit: true,
@@ -176,6 +180,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     excludeWorktreesFromIde: value('excludeWorktreesFromIde') === true,
     useBetterTasks: value('useBetterTasks') !== false,
     prTemplate: String(value('prTemplate')).trim(),
+    openPrInBrowser: value('openPrInBrowser') !== false,
     models: {
       easy: choiceOf('easy'),
       normal: choiceOf('normal'),

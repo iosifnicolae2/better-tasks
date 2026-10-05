@@ -966,6 +966,19 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   expect(composed.sections.at(-1)?.text).toContain('links the PR, not the video')
 })
 
+test('with PR per task on, the lead opens each PR in the browser before its question, unless openPrInBrowser is off', { options: { pullRequests: true } }, async ($, on) => {
+  mock.store(on)
+  const host = fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const leadRules = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
+  expect(await leadRules()).toContain('/bin/open-pr.sh <url>`: once the PR\'s video is uploaded it opens the PR in the default browser')
+  expect(await leadRules()).toContain('one finished task per call, never several at once')
+  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ openPrInBrowser: false }))
+  expect(await leadRules()).not.toContain('default browser')
+  expect(await leadRules()).toContain('one finished task per call, never several at once')
+})
+
 test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
