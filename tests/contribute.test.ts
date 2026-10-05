@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { contributeRules, readUpstreamPr, saveUpstreamPr, upstreamPrOf, userFile } from '../hooks/contribute'
+import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, upstreamPrOf, userFile } from '../hooks/contribute'
 
 function memoryFiles(start: Record<string, string> = {}) {
   const disk = { ...start }
@@ -19,20 +19,20 @@ function memoryFiles(start: Record<string, string> = {}) {
 const DIR = '/home/me/.claude'
 
 describe('changes to better-tasks itself', () => {
-  test('the rules say fork, change, linked install, then the PR question', () => {
-    const rules = contributeRules('ask')
-    expect(rules).toContain('gh repo fork iosifnicolae2/better-tasks --clone')
-    expect(rules).toContain('CLAUDE_CODE_PLUGIN_DIRS')
-    expect(rules).toContain('/reload-plugins')
-    expect(rules).toContain('"Yes, open a PR"')
-    expect(rules).toContain('"Not now"')
-    expect(rules).toContain('"Never"')
+  test("the lead's prompt keeps a pointer; the steps are the contribute skill", () => {
+    expect(CONTRIBUTE_POINTER).toContain('load the `better-tasks:contribute` skill before you file it')
+    expect(CONTRIBUTE_POINTER).not.toContain('gh repo fork')
   })
 
-  test('after "Never" the rules no longer ask', () => {
-    const rules = contributeRules('never')
-    expect(rules).not.toContain('AskUserQuestion')
-    expect(rules).toContain('the user chose "Never"')
+  test('the skill asks the PR question until the user says "Never"', () => {
+    const asks = contributeSkillSettings('ask')
+    expect(asks).toContain('"Yes, open a PR"')
+    expect(asks).toContain('gh pr create --repo iosifnicolae2/better-tasks')
+    expect(asks).toContain('"Not now"')
+    expect(asks).toContain('"Never"')
+    const never = contributeSkillSettings('never')
+    expect(never).not.toContain('AskUserQuestion')
+    expect(never).toContain('the user chose "Never"')
   })
 
   test('no file, or a broken one, means ask', () => {

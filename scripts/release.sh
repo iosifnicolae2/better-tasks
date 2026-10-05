@@ -17,6 +17,7 @@ git fetch -q origin main --tags
 [ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] || fail "main and origin/main differ: pull or push first"
 git rev-parse -q --verify "refs/tags/$version" >/dev/null && fail "$version already exists"
 bun scripts/settings-doc.ts --check || fail "the settings skill is stale: run bun scripts/settings-doc.ts and commit"
+bun scripts/skills-check.ts || fail "a skill lacks what its readers rely on: see above"
 
 previous=$(git describe --tags --abbrev=0 main 2>/dev/null || true)
 [ -z "$previous" ] || [ "$(git rev-parse "$previous^{commit}")" != "$(git rev-parse main)" ] || fail "nothing new since $previous"

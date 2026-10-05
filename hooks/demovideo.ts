@@ -1,8 +1,9 @@
 import type { VideoQuality } from './settings'
+import { skillCall } from './skills'
 
 // Before/after videos (setting demoVideos): the startup question, the one-time Kokoro voice setup
-// (bin/kokoro-setup.sh, outside any project) and the rules that have teammates make the video and the
-// lead show it. The video itself is bin/demo-video.sh's work. The parts that need `$` are in register.tsx.
+// (bin/kokoro-setup.sh, outside any project), the teammate's pointer to the video skill (skills/video)
+// with the settings that skill reads, and the lead's rule to show the video. The video itself is bin/demo-video.sh's work. The parts that need `$` are in register.tsx.
 
 export const ENABLE_OPTION = 'Enable (recommended)'
 export const SETTING_KEY = 'better-tasks.demoVideos'
@@ -47,18 +48,11 @@ export function setupVerdict(output: string): { isReady: boolean; text: string }
     : { isReady: false, text: `better-tasks: the Kokoro voice setup ${last || 'failed'}` }
 }
 
-export function teammateRules(root: string, quality: VideoQuality = 'medium'): string {
-  return `## Before/after video (on in this project)
-Finished work that shows on screen comes with one short narrated video. Nothing to see (a refactor, a config)? Skip it and say so in your notes.
-- BEFORE first: before you change anything, capture the bug or the missing feature. Forgot? Capture it from the last commit before yours (git worktree add <scratchpad>/before <commit>).
-- Capture with what the project has: Playwright for web (a screenshot per step, or recordVideo); the mobile MCP for iOS/Android (mobile_start_screen_recording / mobile_stop_screen_recording, or screenshots); else \`screencapture -x shot.png\` or \`screencapture -v -V <seconds> clip.mov\` on macOS. A screenshot per step is often clearest. Capture at ${VIDEO_SIZE[quality]} or more (a Playwright viewport of that size; a device or Retina screen already is).
-- AFTER: the same steps on your change.
-- Spec: a JSON file (format at the top of ${root}/bin/demo_video.py), its "name" the task id ("T-004.mp4"): a BEFORE clip and an AFTER clip, 1–4 steps each. Per step one short, plain sentence (shown and read aloud), a red box around what matters and an arrow pointing at it, in the pixels of the image or video.
-- Make it: \`${root}/bin/demo-video.sh spec.json --quality ${quality}\` (the project's video quality). Inputs stay in your scratchpad; the video goes to the project's ${VIDEOS_FOLDER}/ (git ignores it), with its poster beside it (<task id>.png: an AFTER frame with a big play button, for a PR); the script prints the poster's file:// link, then the video's. Check a frame or two (\`ffmpeg -ss <second> -i video.mp4 -frames:v 1 frame.png\`): the boxes and arrows land on target.
-- Online copy, when gh can't upload it (the PR rules say when): \`${root}/bin/video-branch.sh <video> <poster>\` commits both to the branch better-tasks-videos (its own history, never merged: videos stay out of main and out of the task's branch), pushes it and prints their web links (video first), then the caption that fits them.
-- Your task file gets, as the first line under "## Notes", the line \`Video: [T-004.mp4](../tasks_videos/T-004.mp4)\` (the path relative to the task file). A newer video replaces the file, not the line.`
-}
+/** The teammate's pointer: the how-to is the video skill, loaded only by work that shows on screen. */
+export const TEAMMATE_POINTER = `## Before/after video (on in this project)
+Finished work that shows on screen comes with one short narrated video, its BEFORE captured before you change anything. Such work: load the \`${skillCall('video')}\` skill before your first change; it says how. Nothing to see (a refactor, a config)? No video; say so in your notes.`
 
-export const COORDINATOR_RULES = `## Before/after videos (on)
-- A finished task with a video has a "Video:" line in its task file. In Finishing, its link file://<project root>/${VIDEOS_FOLDER}/<task id>.mp4 goes above and in the question like every link (Finishing), labeled "<task id> video" above. Only without a PR: with one (PR per task), the PR link replaces it: the PR's picture opens the video.
-- Work that shows on screen but has no video: ask its teammate for one before asking the user.`
+/** What the video skill reads under its title: this project's quality and the capture size it needs. */
+export function videoSkillSettings(quality: VideoQuality): string {
+  return `- Video quality: ${quality}. Capture at ${VIDEO_SIZE[quality]} or more; make it with \`--quality ${quality}\`.`
+}
