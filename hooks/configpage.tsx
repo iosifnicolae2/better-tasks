@@ -11,9 +11,19 @@ import { VIRTUAL_SCREEN } from './testenv'
 
 export type ConfigValue = string | number | boolean
 
+/** The page's groups, in order, each under its own heading. */
+export const GROUPS = [
+  { id: 'general', title: 'General' },
+  { id: 'git', title: 'Git & PRs' },
+  { id: 'testing', title: 'Testing & videos' },
+  { id: 'models', title: 'Teammate models' },
+  { id: 'sprint', title: 'Sprint' },
+] as const
+export type Group = (typeof GROUPS)[number]['id']
+
 /** A setting: what it is called, what it does, its values in order, and how it is stored. */
 export type Field = {
-  group: 'team' | 'models' | 'sprint'
+  group: Group
   /** The userConfig field, written as `better-tasks.<field>`. */
   field: string
   label: string
@@ -69,7 +79,7 @@ function modelFields(level: Level): Field[] {
 
 export const FIELDS: readonly Field[] = [
   {
-    group: 'team',
+    group: 'general',
     field: 'editor',
     label: 'Editor',
     describe: 'Opens task files. auto: the IDE Claude runs in, else the default app.',
@@ -79,7 +89,7 @@ export const FIELDS: readonly Field[] = [
     stored: asIs,
   },
   {
-    group: 'team',
+    group: 'git',
     field: 'gitFlow',
     label: 'Git flow',
     describe: 'How teammates’ work reaches main. Straight to main: one checkout, no PRs. Shared dev branch: one checkout on dev, a PR per task. Worktree: a copy and a PR each. Saved in this project’s config.json.',
@@ -89,7 +99,7 @@ export const FIELDS: readonly Field[] = [
     stored: label => GIT_FLOWS.find(flow => FLOW_LABELS[flow] === label) ?? 'direct',
   },
   {
-    group: 'team',
+    group: 'general',
     field: 'longCache',
     label: '1-hour prompt cache',
     describe: 'Teammates and the manager keep their prompt cache for an hour, so a teammate stays cheap to resume.',
@@ -99,7 +109,7 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
-    group: 'team',
+    group: 'general',
     field: 'statusEvery',
     label: 'Status check',
     describe: 'After this many quiet minutes the manager checks the open work and moves it forward. off: never.',
@@ -109,7 +119,7 @@ export const FIELDS: readonly Field[] = [
     stored: value => (value === 'off' ? 0 : Number.parseInt(value.replace('every ', ''), 10)),
   },
   {
-    group: 'team',
+    group: 'general',
     field: 'keepAwake',
     label: 'Keep the Mac awake',
     describe: 'Holds caffeinate while any teammate runs.',
@@ -119,7 +129,7 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
-    group: 'team',
+    group: 'git',
     field: 'openPrInBrowser',
     label: 'Open PRs in the browser',
     describe: 'Before the manager merges a task you accepted, it opens that task’s PR in your default browser.',
@@ -129,7 +139,7 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
-    group: 'team',
+    group: 'testing',
     field: 'demoVideos',
     label: 'Before/after videos',
     describe: 'Finished work comes with a short narrated video: the bug, then the fix, marked in red. Sets up the Kokoro voice once.',
@@ -139,7 +149,7 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   {
-    group: 'team',
+    group: 'testing',
     field: 'videoQuality',
     label: 'Video quality',
     describe: 'The before/after videos’ size: 720p small file, 1080p medium (sharp, a few MB a minute), 1080p high (sharper, bigger file).',
@@ -149,7 +159,7 @@ export const FIELDS: readonly Field[] = [
     stored: label => VIDEO_QUALITIES.find(quality => QUALITY_LABELS[quality] === label) ?? 'medium',
   },
   {
-    group: 'team',
+    group: 'testing',
     field: 'offScreen',
     label: 'Test off-screen',
     describe: 'Teammates test and record in a hidden browser, simulator or terminal, so your screen, mouse and keyboard stay yours. Saved in this project.',
@@ -197,7 +207,7 @@ export function testScreenField(screens: readonly string[]): Field {
   const shown = (screen: string) =>
     screen === VIRTUAL_SCREEN ? VIRTUAL_LABEL : screens.includes(screen) ? screen : `${screen} · not connected`
   return {
-    group: 'team',
+    group: 'testing',
     field: 'testScreen',
     label: 'Test screen',
     describe: 'Where teammates test and record Mac apps: this project’s own virtual display, kept off your screens, or one of your screens. Not connected: the virtual display. Saved in this project.',
@@ -270,12 +280,10 @@ export function ConfigPage(props: ConfigPageProps) {
   const describe = describeRow(fields, focusedRow, fromProject, project)
   return (
     <Box flexDirection="column">
-      <Heading ui={ui} title="Team" />
-      {fields.filter(field => field.group === 'team').map(fieldRow)}
-      <Heading ui={ui} title="Teammate models" />
-      {fields.filter(field => field.group === 'models').map(fieldRow)}
-      <Heading ui={ui} title="Sprint" />
-      {fields.filter(field => field.group === 'sprint').map(fieldRow)}
+      {GROUPS.map(group => [
+        <Heading ui={ui} title={group.title} />,
+        ...fields.filter(field => field.group === group.id).map(fieldRow),
+      ])}
       <Box paddingLeft={4} height={1} overflow="hidden">
         <Text color="subtle" wrap="truncate-end">{sprintPreview}</Text>
       </Box>
