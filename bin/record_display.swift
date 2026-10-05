@@ -1,0 +1,261 @@
+// The project's virtual display and its turns, for record-display.sh (which compiles and runs this).
+//   display --lock <file> --turn <file> --name <name> --serial <n> [--size WxH] [--idle-hours n]
+//       makes the project's display once and keeps it (no screen redraws per recording), in a row below
+//       the lowest physical screen, so the real screens never move. Ends after --idle-hours without a turn.
+//   turn --lock <file> [--label text] [--max-seconds n] [--max-wait n] [--parent pid]
+//       waits for the project's turn (flock: the kernel frees it if this process dies), then holds it
+//       until stopped, until its time is up, or until the parent process ends.
+//   info <display id>      prints "x=.. y=.. w=.. h=.. capture=.." (capture: screencapture -D's number)
+//   arrange                moves every virtual display into the row below the lowest physical screen
+// Each prints "ready ..." once it holds what it asked for, or "failed: why".
+import CoreGraphics
+import Foundation
+import IOKit
+
+struct Options {
+  var lock = "", turnLock = "", name = "better-tasks", label = ""
+  var serial: UInt32 = 1, width = 1920, height = 1080
+  var maxSeconds = 1200.0, maxWait = 1800.0, idleHours = 24.0
+  var parent: pid_t = 0
+}
+
+func parseOptions(_ arguments: ArraySlice<String>) -> Options {
+  var options = Options()
+  var args = arguments.makeIterator()
+  while let key = args.next() {
+    let value = args.next() ?? ""
+    switch key {
+    case "--lock": options.lock = value
+    case "--turn": options.turnLock = value
+    case "--name": options.name = value
+    case "--label": options.label = value
+    case "--serial": options.serial = UInt32(value) ?? 1
+    case "--max-seconds": options.maxSeconds = Double(value) ?? options.maxSeconds
+    case "--max-wait": options.maxWait = Double(value) ?? options.maxWait
+    case "--idle-hours": options.idleHours = Double(value) ?? options.idleHours
+    case "--parent": options.parent = pid_t(value) ?? 0
+    case "--size":
+      let parts = value.split(separator: "x").compactMap { Int($0) }
+      if parts.count == 2 { options.width = parts[0]; options.height = parts[1] }
+    default: fail("unknown option \(key)")
+    }
+  }
+  return options
+}
+
+func say(_ line: String) {
+  print(line)
+  fflush(stdout)
+}
+
+func fail(_ why: String) -> Never {
+  say("failed: \(why)")
+  exit(1)
+}
+
+func isAlive(_ pid: pid_t) -> Bool { pid <= 0 || kill(pid, 0) == 0 || errno == EPERM }
+
+func openLock(_ path: String) -> Int32 {
+  let fd = open(path, O_RDWR | O_CREAT, 0o644)
+  if fd < 0 { fail("cannot open \(path)") }
+  return fd
+}
+
+func writeHolder(_ fd: Int32, _ text: String) {
+  ftruncate(fd, 0)
+  _ = text.withCString { pwrite(fd, $0, strlen($0), 0) }
+}
+
+// MARK: displays
+
+func onlineDisplays() -> [CGDirectDisplayID] {
+  var count: UInt32 = 0
+  CGGetOnlineDisplayList(0, nil, &count)
+  var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+  CGGetOnlineDisplayList(count, &ids, &count)
+  return Array(ids.prefix(Int(count)))
+}
+
+func activeDisplays() -> [CGDirectDisplayID] {
+  var count: UInt32 = 0
+  CGGetActiveDisplayList(0, nil, &count)
+  var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+  CGGetActiveDisplayList(count, &ids, &count)
+  return Array(ids.prefix(Int(count)))
+}
+
+/** Vendor and serial of every real screen, as the graphics hardware (IOKit) sees them. */
+func hardwareScreens() -> [(vendor: UInt32, serial: UInt32?)] {
+  var screens: [(vendor: UInt32, serial: UInt32?)] = []
+  func each(_ serviceClass: String, _ body: (io_service_t) -> Void) {
+    var iterator: io_iterator_t = 0
+    guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching(serviceClass), &iterator) == KERN_SUCCESS else { return }
+    while case let service = IOIteratorNext(iterator), service != 0 {
+      body(service)
+      IOObjectRelease(service)
+    }
+    IOObjectRelease(iterator)
+  }
+  func property(_ service: io_service_t, _ key: String) -> Any? {
+    IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
+  }
+  each("IOMobileFramebuffer") { service in // Apple silicon
+    guard let attributes = property(service, "DisplayAttributes") as? [String: Any],
+          let product = attributes["ProductAttributes"] as? [String: Any],
+          let vendor = (product["LegacyManufacturerID"] as? NSNumber)?.uint32Value else { return }
+    screens.append((vendor, (product["SerialNumber"] as? NSNumber)?.uint32Value))
+  }
+  each("IODisplayConnect") { service in // Intel
+    guard let vendor = (property(service, "DisplayVendorID") as? NSNumber)?.uint32Value else { return }
+    screens.append((vendor, (property(service, "DisplaySerialNumber") as? NSNumber)?.uint32Value))
+  }
+  return screens
+}
+
+func isPhysical(_ id: CGDirectDisplayID, _ screens: [(vendor: UInt32, serial: UInt32?)]) -> Bool {
+  CGDisplayIsBuiltin(id) != 0 || screens.contains { screen in
+    screen.vendor == CGDisplayVendorNumber(id) && (screen.serial == nil || screen.serial == CGDisplaySerialNumber(id))
+  }
+}
+
+typealias Arrangement = [CGDirectDisplayID: CGPoint]
+
+func currentArrangement() -> Arrangement {
+  Dictionary(uniqueKeysWithValues: activeDisplays().map { ($0, CGDisplayBounds($0).origin) })
+}
+
+/** The row below the lowest physical screen: where virtual displays go, left to right. */
+func virtualRow(_ arrangement: Arrangement) -> (physical: Set<CGDirectDisplayID>, x: CGFloat, y: CGFloat)? {
+  let screens = hardwareScreens()
+  let physical = Set(arrangement.keys.filter { isPhysical($0, screens) && CGDisplayMirrorsDisplay($0) == kCGNullDirectDisplay })
+  let lowest = physical.map { CGRect(origin: arrangement[$0]!, size: CGDisplayBounds($0).size) }
+    .max { ($0.maxY, -$0.minX) < ($1.maxY, -$1.minX) }
+  guard let lowest else { return nil }
+  return (physical, lowest.minX, lowest.maxY)
+}
+
+/** Sets the given displays' places in one step; the others stay. */
+func place(_ origins: Arrangement) {
+  var config: CGDisplayConfigRef?
+  guard !origins.isEmpty, CGBeginDisplayConfiguration(&config) == .success else { return }
+  for (id, origin) in origins { CGConfigureDisplayOrigin(config, id, Int32(origin.x), Int32(origin.y)) }
+  CGCompleteDisplayConfiguration(config, .forSession)
+  RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+}
+
+/** A new display shows up where macOS likes and may push the real screens aside. This puts it at the
+ *  end of the row and every other display back where it was before (`before`), in one step. */
+func placeInRow(_ id: CGDirectDisplayID, before: Arrangement) {
+  guard let row = virtualRow(before) else { return }
+  let virtualInRow = before.filter { !row.physical.contains($0.key) && $0.value.y == row.y }
+  let end = virtualInRow.map { $0.value.x + CGDisplayBounds($0.key).width }.max() ?? row.x
+  var wanted = before
+  wanted[id] = CGPoint(x: max(end, row.x), y: row.y)
+  place(wanted.filter { CGDisplayBounds($0.key).origin != $0.value })
+}
+
+func arrangeAll() {
+  guard let row = virtualRow(currentArrangement()) else { fail("no physical screen found") }
+  var x = row.x
+  var origins = Arrangement()
+  for id in activeDisplays().filter({ !row.physical.contains($0) }).sorted() {
+    origins[id] = CGPoint(x: x, y: row.y)
+    x += CGDisplayBounds(id).width
+  }
+  place(origins)
+  say("ready moved \(origins.count) virtual display(s) below the lowest physical screen")
+}
+
+func info(_ id: CGDirectDisplayID) {
+  guard let index = activeDisplays().firstIndex(of: id) else { fail("display \(id) is gone") }
+  let b = CGDisplayBounds(id)
+  say("x=\(Int(b.minX)) y=\(Int(b.minY)) w=\(Int(b.width)) h=\(Int(b.height)) capture=\(index + 1)")
+}
+
+func makeDisplay(_ options: Options) -> CGVirtualDisplay {
+  let descriptor = CGVirtualDisplayDescriptor()
+  descriptor.queue = DispatchQueue.main
+  descriptor.name = options.name
+  descriptor.maxPixelsWide = UInt32(options.width)
+  descriptor.maxPixelsHigh = UInt32(options.height)
+  descriptor.sizeInMillimeters = CGSize(width: Double(options.width) * 0.28, height: Double(options.height) * 0.28)
+  descriptor.vendorID = 0xB7A5 // the same ids each time: macOS puts the project's display back where it was
+  descriptor.productID = 0x0001
+  descriptor.serialNum = options.serial
+  guard let display = CGVirtualDisplay(descriptor: descriptor) else { fail("macOS refused to make a virtual display") }
+  let settings = CGVirtualDisplaySettings()
+  settings.hiDPI = 0
+  settings.modes = [CGVirtualDisplayMode(width: UInt(options.width), height: UInt(options.height), refreshRate: 30)]
+  if !display.apply(settings) { fail("macOS refused the display's size \(options.width)x\(options.height)") }
+  for _ in 0..<50 where !activeDisplays().contains(display.displayID) {
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+  }
+  if !activeDisplays().contains(display.displayID) { fail("the virtual display did not come up") }
+  return display
+}
+
+// MARK: modes
+
+func onSignalsExit() {
+  for signalNumber in [SIGTERM, SIGINT, SIGHUP] {
+    signal(signalNumber, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
+    source.setEventHandler { exit(0) }
+    source.resume()
+    signalSources.append(source)
+  }
+}
+
+/** Keeps the project's one display; ends once no recording took a turn for --idle-hours. */
+func keepDisplay(_ options: Options) -> Never {
+  let lock = openLock(options.lock)
+  if flock(lock, LOCK_EX | LOCK_NB) != 0 { fail("this project's display is already kept by another process") }
+  let before = currentArrangement()
+  let display = makeDisplay(options)
+  placeInRow(display.displayID, before: before)
+  writeHolder(lock, "pid \(getpid()) display \(display.displayID)\n")
+  say("ready id=\(display.displayID) pid=\(getpid())")
+  onSignalsExit()
+  let turn = openLock(options.turnLock)
+  var lastUsed = Date()
+  while true {
+    RunLoop.main.run(until: Date().addingTimeInterval(30))
+    guard flock(turn, LOCK_EX | LOCK_NB) == 0 else { lastUsed = Date(); continue }
+    if Date().timeIntervalSince(lastUsed) > options.idleHours * 3600 { exit(0) } // exits holding the turn: no one records on a closing display
+    flock(turn, LOCK_UN)
+  }
+}
+
+func holdTurn(_ options: Options) -> Never {
+  let fd = openLock(options.lock)
+  let deadline = Date().addingTimeInterval(options.maxWait)
+  var toldWaiting = false
+  while flock(fd, LOCK_EX | LOCK_NB) != 0 {
+    if !toldWaiting {
+      let holder = (try? String(contentsOfFile: options.lock, encoding: .utf8)) ?? ""
+      say("waiting: another recording in this project has the display (\(holder.trimmingCharacters(in: .whitespacesAndNewlines)))")
+      toldWaiting = true
+    }
+    if !isAlive(options.parent) { exit(0) }
+    if Date() > deadline { fail("still taken after \(Int(options.maxWait)) s") }
+    Thread.sleep(forTimeInterval: 1)
+  }
+  writeHolder(fd, "pid \(getpid()) \(options.label) since \(ISO8601DateFormatter().string(from: Date()))\n")
+  say("ready pid=\(getpid())")
+  onSignalsExit()
+  let end = Date().addingTimeInterval(options.maxSeconds)
+  while Date() < end && isAlive(options.parent) {
+    RunLoop.main.run(until: Date().addingTimeInterval(1))
+  }
+  exit(0)
+}
+
+var signalSources: [DispatchSourceSignal] = []
+let arguments = CommandLine.arguments.dropFirst()
+switch arguments.first {
+case "display": keepDisplay(parseOptions(arguments.dropFirst()))
+case "turn": holdTurn(parseOptions(arguments.dropFirst()))
+case "info": info(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0)
+case "arrange": arrangeAll()
+default: fail("usage: record_display display|turn|info|arrange ...")
+}

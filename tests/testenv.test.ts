@@ -30,5 +30,6 @@ describe('testing like a user', () => {
   test('the question says what stays the user\'s and what cannot run off-screen', () => {
     expect(OFFSCREEN_QUESTION).toContain('your screen, mouse and keyboard stay yours')
     expect(OFFSCREEN_QUESTION).toContain('a step that needs a real click waits until you are away')
+    expect(OFFSCREEN_QUESTION).toContain("a virtual display of the project's own placed below your screens")
   })
 })

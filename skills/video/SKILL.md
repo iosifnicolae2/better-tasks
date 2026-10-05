@@ -10,7 +10,7 @@ Not loaded `better-tasks:testing` yet? Load it now, before you capture: it says 
 
 ## Capture
 - BEFORE first: before you change anything, capture the bug or the missing feature. Forgot? Capture it from the last commit before yours (`git worktree add <scratchpad>/before <commit>`).
-- Capture with what the project has: Playwright for web (a screenshot per step, or recordVideo); the mobile MCP for iOS/Android (mobile_start_screen_recording / mobile_stop_screen_recording, or screenshots); else `screencapture -x shot.png` or `screencapture -v -V <seconds> clip.mov` on macOS. A screenshot per step is often clearest.
+- Capture with what the project has: Playwright for web (a screenshot per step, or recordVideo); the mobile MCP for iOS/Android (mobile_start_screen_recording / mobile_stop_screen_recording, or screenshots); a Mac app on your project's virtual display (`bin/record-display.sh`, in the testing skill); else `screencapture -x shot.png` or `screencapture -v -V <seconds> clip.mov` on macOS. A screenshot per step is often clearest.
 - Capture at the size "Settings" above names, or more (a Playwright viewport of that size; a device or Retina screen already is).
 - AFTER: the same steps on your change.
 

@@ -27,6 +27,8 @@ const MUST_SAY: Record<string, string[]> = {
     'emulator -avd <name> -no-window',
     'tmux capture-pane',
     'CGEvent postToPid',
+    '${CLAUDE_PLUGIN_ROOT}/bin/record-display.sh run -- <your script>',
+    'never make, move or remove virtual displays yourself',
     'screencapture -x -o -l <window id>',
     '## On the screen: when off-screen is off',
   ],
