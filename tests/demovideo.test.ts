@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { setupVerdict, videoPointer, videoSkillSettings, voiceDir } from '../hooks/demovideo'
+import { defaultBrowserId, setupVerdict, videoPage, videoPagePath, videoPointer, videoSkillSettings, voiceDir } from '../hooks/demovideo'
 import { settingsOf } from '../hooks/settings'
 
 describe('before/after videos', () => {
@@ -27,6 +27,17 @@ describe('before/after videos', () => {
     expect(voiceDir({ custom: '/x/kokoro', home: '/Users/a' })).toBe('/x/kokoro')
     expect(voiceDir({ dataHome: '/data', home: '/Users/a' })).toBe('/data/better-tasks/kokoro')
     expect(voiceDir({ home: '/Users/a' })).toBe('/Users/a/.local/share/better-tasks/kokoro')
+  })
+
+  test('the board plays a video in a page beside it, in the default browser (Safari when none is set)', () => {
+    expect(videoPagePath('/p/.claude/tasks_videos/T-004.mp4')).toBe('/p/.claude/tasks_videos/T-004.html')
+    const page = videoPage('/p/.claude/tasks_videos/T-004.mp4')
+    expect(page).toContain('<title>T-004 · before/after video</title>')
+    expect(page).toContain('<video src="T-004.mp4" controls autoplay playsinline>')
+    const chrome = [{ LSHandlerURLScheme: 'http', LSHandlerRoleAll: 'org.mozilla.firefox' }, { LSHandlerURLScheme: 'https', LSHandlerRoleAll: 'com.google.chrome' }]
+    expect(defaultBrowserId(JSON.stringify(chrome))).toBe('com.google.chrome')
+    expect(defaultBrowserId('[]')).toBe('com.apple.safari')
+    expect(defaultBrowserId('not json')).toBe('com.apple.safari')
   })
 
   test("the setup's last line says whether the voice is ready", () => {

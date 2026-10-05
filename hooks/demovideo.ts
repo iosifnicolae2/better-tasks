@@ -22,19 +22,55 @@ export function voiceDir(env: { custom?: string; dataHome?: string; home?: strin
 
 export const SETUP_TOAST = 'Setting up the Kokoro voice for before/after videos: once, a few minutes.'
 
-/** AppleScript that opens a video in QuickTime Player and plays it at once, sound on. */
-export function quickTimePlay(path: string): string {
-  const quoted = JSON.stringify(path) // a path's " and \\ escaped as AppleScript wants them
-  return [
-    'tell application "QuickTime Player"',
-    'activate',
-    `set movie to open POSIX file ${quoted}`,
-    'set muted of movie to false',
-    'set audio volume of movie to 1',
-    'play movie',
-    'end tell',
-  ].join('\n')
+// The board's "Video" action plays the video in the default browser: a small page beside the video
+// (<task id>.html, git ignores the folder) opened with the browser itself, since `open` on an .mp4
+// starts QuickTime and on an .html may start an editor.
+
+/** The page that plays a task's video, written beside it: <task id>.html. */
+export const videoPagePath = (video: string) => video.replace(/\.mp4$/, '.html')
+
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/**
+ * A dark page that plays the video, with its controls, filling the window. A browser that blocks
+ * sound until a click gets a big "Play with sound" button instead of a still, silent frame.
+ */
+export function videoPage(video: string): string {
+  const name = video.split('/').pop() ?? video
+  const title = escapeHtml(name.replace(/\.mp4$/, ''))
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>${title} · before/after video</title>
+<style>html,body{margin:0;height:100%;background:#111}video{width:100%;height:100%;object-fit:contain}
+button{position:fixed;inset:0;margin:auto;width:340px;height:96px;border:0;border-radius:48px;background:#d77757;color:#fff;font:600 28px system-ui,sans-serif;cursor:pointer}</style></head>
+<body><video src="${escapeHtml(encodeURIComponent(name))}" controls autoplay playsinline></video>
+<button hidden>▶ Play with sound</button>
+<script>
+const video = document.querySelector('video')
+const button = document.querySelector('button')
+button.onclick = () => video.play()
+video.onplay = () => { button.hidden = true }
+video.play().catch(() => { button.hidden = false })
+</script></body></html>
+`
 }
+
+/** macOS: the default browser's app id, from LaunchServices' handlers (`plutil -extract LSHandlers json`); Safari when none is set. */
+export function defaultBrowserId(handlersJson: string): string {
+  try {
+    const handlers = JSON.parse(handlersJson) as { LSHandlerURLScheme?: string; LSHandlerRoleAll?: string }[]
+    return handlers.find(handler => handler.LSHandlerURLScheme === 'https' && handler.LSHandlerRoleAll)?.LSHandlerRoleAll ?? SAFARI
+  } catch {
+    return SAFARI
+  }
+}
+
+const SAFARI = 'com.apple.safari'
+
+export const handlersArgv = (home: string) => [
+  'plutil', '-extract', 'LSHandlers', 'json', '-o', '-',
+  `${home}/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist`,
+]
 
 export const setupArgv = (root: string) => ['/bin/sh', `${root}/bin/kokoro-setup.sh`]
 
