@@ -20,6 +20,7 @@ You work in your own git worktree, on its own branch; the project's main checkou
 - The project has no GitHub remote (`git remote -v`)? No PR: say so in your notes. A video goes on the videos branch (below) if the project has a remote; your notes get its link.
 - Push to a short branch named for the task, `git push -u origin HEAD:task/T-004`, then open the PR against the branch the project's main checkout is on (usually main):
   `gh pr create --base main --head task/T-004 --title "T-004 <task title>" --body-file <scratchpad>/pr.md`
+  A title with a quote mark and the word git, or starting with "git", is refused: reword it.
   With a video: the two lines in pr.md, and `--attach <poster's absolute path> --attach <video's absolute path>`: gh uploads both and points the picture and its link at them.
 - gh can't attach (older than 2.99, or the upload failed)? Put the video on the videos branch: `${CLAUDE_PLUGIN_ROOT}/bin/video-branch.sh <video> <poster>` prints their web links (video first), then the caption. Use them in the two lines, with no --attach: its links in the picture line, its last line as the text line.
 - Watch its checks: Bash with run_in_background, `gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>`: one notice when they end. Plain commands only: no `( … )`, `{ …; }`, function, `bash -c` or heredoc around gh or git, or Claude Code refuses it ("too complex to verify"; your prompt's "gh and git in your worktree").

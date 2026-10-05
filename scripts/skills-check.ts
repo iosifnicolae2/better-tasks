@@ -53,6 +53,7 @@ const MUST_SAY: Record<string, string[]> = {
     '## Shared dev branch: when "Settings" says so',
     'Never fix on the task branch',
     '`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>`',
+    'A title with a quote mark and the word git, or starting with "git", is refused: reword it.',
     'Plain commands only: no `( … )`, `{ …; }`, function, `bash -c` or heredoc around gh or git',
     'Never merge it yourself',
   ],

@@ -233,6 +233,7 @@ ${PR_DONE_LINE}`
 export const WORKTREE_COMMAND_RULES = `## gh and git in your worktree
 Claude Code refuses a Bash or Monitor command running gh or git that it can't check stays in your worktree ("too complex to verify").
 - Refused: \`( … )\` subshell, \`{ …; }\` group, a function, \`bash -c\`, heredoc, \`[[ … ]]\`, \`cd\` or \`git -C\` to another checkout.
+- Refused too: a gh argument (a title, a search) that starts with "git", or has a quote mark and the word git: reword it; long text goes in a file (\`--body-file\`).
 - Fine: plain commands, \`;\`, \`&&\`, pipes, jq \`\\(.x)\`, \`$( … )\`, for/while, if, case, \`[ … ]\`.
 - Watch a PR's checks: Bash with run_in_background, one notice when they end: \`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>\`. A run: \`gh run watch <id> --exit-status --compact\`.
 - Need more logic? Write a script to your scratchpad and run it by its path; it still targets only your worktree.`

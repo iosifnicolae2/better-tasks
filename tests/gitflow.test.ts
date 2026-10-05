@@ -170,6 +170,7 @@ describe('gh and git in a worktree (T-040: the shapes Claude Code refuses, teste
     expect(WORKTREE_COMMAND_RULES).toContain('pipes, jq `\\(.x)`, `$( … )`, for/while, if, case')
     expect(WORKTREE_COMMAND_RULES).toContain('`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>`')
     expect(WORKTREE_COMMAND_RULES).toContain('`gh run watch <id> --exit-status --compact`')
+    expect(WORKTREE_COMMAND_RULES).toContain('a gh argument (a title, a search) that starts with "git", or has a quote mark and the word git')
     expect(WORKTREE_COMMAND_RULES).toContain('Write a script to your scratchpad and run it by its path')
   })
 })
