@@ -12,7 +12,7 @@ A Claude Code plugin. Your tasks are Markdown files in your project; a team of C
 
 - 📝 **Tasks as Markdown**: plain files in `.claude/tasks/`, committed with your code.
 - 🤖 **A team of agents**: a lead routes each task to a teammate; teammates work in parallel.
-- 🎥 **Before/after video**: after each task you get a short narrated video, [like the one below](#-watch-the-fix-then-approve-it), to review it. Turn it on with the `demoVideos` setting.
+- 🎥 **Before/after video**: after each task you get a short narrated video to review it ([see an example](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)). Turn it on with the `demoVideos` setting.
 - ✅ **You approve**: no task closes without your yes.
 - 🔀 **Your git flow**: straight to main, a shared `dev` branch, or a worktree and PR per task. Asked once per project.
 - 🗂️ **Sprint board**: `/better-tasks` shows sprints, goals, the backlog and search.
@@ -39,16 +39,6 @@ claude plugin install better-tasks@better-tasks --scope project
 
 This is saved in `.claude/settings.json`: commit it. Each teammate still runs the install once. `--scope local` is only you, only this project (not committed).
 </details>
-
-## 🎬 Watch the fix, then approve it
-
-You watch a short video instead of reading the code first. Here is the one for T-007 above:
-
-[![Play the before/after demo video](docs/videos/sample-before-after.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)
-
-<sub>Click to play, with sound: the subtitles are read aloud.</sub>
-
-Claude asks about one task at a time. With a PR per task, it opens the PR in your browser first (setting `openPrInBrowser`).
 
 ## ⚙️ Settings
 
