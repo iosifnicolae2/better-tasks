@@ -31,6 +31,7 @@ import { contextTokens, isActive, predecessorOf, refreshTeam } from './team'
 import { fillSkill, ourSkill } from './skills'
 import type { SkillName } from './skills'
 import { projectText } from './texts'
+import { IGNORE_COMMIT, isNotIgnored, withIgnoreLine, WORKTREES_FOLDER } from './ignoreworktrees'
 import { spawnTask, withSummary } from './spawn'
 import { fingerprintOf, NO_CHECK, statusDecision, statusPrompt } from './status'
 import { startupTips } from './tips'
@@ -275,10 +276,9 @@ async function declareCommands($: EngineInterface): Promise<void> {
   }
 }
 
-/** With worktrees, IntelliJ skips .claude/worktrees/ (intellij.ts; on by default); a project without .idea/ is left as it is. */
+/** From the first run, whatever the git flow, IntelliJ skips .claude/worktrees/ (intellij.ts; on by default); a project without .idea/ is left as it is. */
 async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
-  const settings = await settingsNow($)
-  if (!settings.excludeWorktreesFromIde || !usesWorktree(settings.gitFlow, settings.worktree)) return
+  if (!(await settingsNow($)).excludeWorktreesFromIde) return
   const line = await excludeWorktrees(ioOf($), await ideaFilesOf($))
   if (line) $.ui.log(line)
 }
@@ -361,6 +361,7 @@ async function pointUserRules($: EngineInterface): Promise<void> {
  */
 async function startQuestions($: EngineInterface): Promise<void> {
   if (await isOffHere($)) return
+  await ignoreWorktrees($).catch(error => logFailure($, 'adding .claude/worktrees/ to .gitignore', error))
   await askTeamInstall($)
   const settings = await settingsNow($)
   if (settings.demoVideos) {
@@ -410,6 +411,22 @@ async function shareWithTeam($: EngineInterface): Promise<void> {
   if (committed.exitCode === 0 && upgrade) $.ui.log(`better-tasks: turned on auto-update in ${SHARED_SETTINGS} and committed it. Push it; teammates then get new releases by themselves.`)
   else if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
   else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
+}
+
+/** A git project's .gitignore gets .claude/worktrees/ once (ignoreworktrees.ts), committed alone; not from inside a worktree. */
+async function ignoreWorktrees($: EngineInterface): Promise<void> {
+  const root = await $.session.root()
+  if (root.includes(`/${WORKTREES_FOLDER}`)) return
+  const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
+  if (!isNotIgnored((await git('check-ignore', '-n', '-v', WORKTREES_FOLDER)).stdout)) return
+  const hadEdits = (await git('diff', '--quiet', 'HEAD', '--', '.gitignore')).exitCode !== 0
+  const path = `${root}/.gitignore`
+  await $.fs.write(path, withIgnoreLine(await $.fs.read(path).catch(() => undefined), WORKTREES_FOLDER))
+  if (hadEdits) return $.ui.log(`better-tasks: added ${WORKTREES_FOLDER} to .gitignore; it has your other edits too, so commit it yourself.`)
+  const added = await git('add', '--', '.gitignore')
+  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', IGNORE_COMMIT, '--only', '--', '.gitignore') : added
+  if (committed.exitCode === 0) $.ui.log(`better-tasks: added ${WORKTREES_FOLDER} to .gitignore and committed it, so git status stops listing teammates' worktrees.`)
+  else $.ui.log(`better-tasks: added ${WORKTREES_FOLDER} to .gitignore, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
 }
 
 /** The git flow question: the project looked at once for the recommendation, the answer saved in its config.json. */
