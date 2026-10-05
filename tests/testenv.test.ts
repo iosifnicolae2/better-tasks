@@ -1,0 +1,42 @@
+import { describe, expect, test } from 'claude-code/testing'
+
+import { coordinatorTestingRules, OFFSCREEN_NO, OFFSCREEN_QUESTION, OFFSCREEN_YES, offScreenAnswer, testingRules } from '../hooks/testenv'
+
+describe('testing like a user', () => {
+  test('every teammate tests in its own environment and reports new bugs to the lead', () => {
+    for (const isOffScreen of [true, false]) {
+      const rules = testingRules(isOffScreen)
+      expect(rules).toContain('Your own test environment')
+      expect(rules).toContain('never the user\'s running apps, data or accounts')
+      expect(rules).toContain('"New bug: <what you saw>, <how to see it again>"')
+    }
+  })
+
+  test('off-screen: a hidden browser, simulator or terminal, and never the user\'s screen', () => {
+    const rules = testingRules(true)
+    expect(rules).toContain('chromium.launch({ headless: true })')
+    expect(rules).toContain('booted without the Simulator app')
+    expect(rules).toContain('emulator -avd <name> -no-window')
+    expect(rules).toContain('tmux capture-pane')
+    expect(rules).toContain("A Mac app that needs clicks or typing can't run off-screen")
+    expect(testingRules(false)).not.toContain('headless: true')
+    expect(testingRules(false)).toContain('Tell the lead first')
+  })
+
+  test('the lead tells the user about new bugs and files them only when asked', () => {
+    expect(coordinatorTestingRules(false)).toContain('File it (task_create) only when they say so.')
+    expect(coordinatorTestingRules(false)).not.toContain('Off-screen is on')
+    expect(coordinatorTestingRules(true)).toContain('Off-screen is on')
+  })
+
+  test('the answer becomes the project\'s offScreen value; a dismissed question stays unanswered', () => {
+    expect(offScreenAnswer(OFFSCREEN_YES)).toBe(true)
+    expect(offScreenAnswer(OFFSCREEN_NO)).toBe(false)
+    expect(offScreenAnswer(undefined)).toBeUndefined()
+  })
+
+  test('the question says what stays the user\'s and what cannot run off-screen', () => {
+    expect(OFFSCREEN_QUESTION).toContain('your screen, mouse and keyboard stay yours')
+    expect(OFFSCREEN_QUESTION).toContain('A Mac app that needs clicks waits until you are away')
+  })
+})
