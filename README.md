@@ -67,8 +67,8 @@ Installed per project? Add the same `--scope project` to `update` and `uninstall
 
 ## 🧩 More
 
-- **Settings:** `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`.
+- **Settings:** `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`. Every setting, its choices, default and where it lives: [skills/settings/SKILL.md](skills/settings/SKILL.md); Claude loads it when you ask what you can configure.
 - **Optional tools:** before/after videos need `ffmpeg` and `uv` (`brew install ffmpeg uv`); pull requests need `gh`; the shared-dev-branch flow uses `python3`.
 - **Project setup:** ask "set up better-tasks for this project", then edit the files in `.claude/tasks/`.
 - **Changing better-tasks:** ask Claude for the change. It forks this repo, makes the change there, runs the fork as a linked install (an edit applies on `/reload-plugins`, no reinstall), then asks whether to open a PR here: Yes, Not now or Never (kept per user in `~/.claude/better-tasks/user.json`).
-- **Development:** `claude --plugin-dir .` runs this copy; `claude plugin test .` runs the tests; `bun scripts/yaml-check.ts [tasks folder]` checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML); `sh scripts/video-branch-check.sh` checks the video links bin/video-branch.sh prints.
+- **Development:** `claude --plugin-dir .` runs this copy; `claude plugin test .` runs the tests; `bun scripts/yaml-check.ts [tasks folder]` checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML); `sh scripts/video-branch-check.sh` checks the video links bin/video-branch.sh prints; `bun scripts/settings-doc.ts` regenerates the settings skill after a setting changes (`--check` says whether it is current).
