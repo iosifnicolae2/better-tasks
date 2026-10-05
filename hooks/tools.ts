@@ -152,7 +152,7 @@ const isClosing = (status: TaskStatus | undefined) => status === 'done' || statu
 /** Why a teammate may not close a task, and what it does instead. */
 function leadCloses(task: Task): string {
   return (
-    `Only the lead closes ${task.id}, once the user marks it resolved and you finish it. Write in the task file's notes what changed, ` +
+    `Only the lead closes ${task.id}, once the user marks it resolved. Write in the task file's notes what changed, ` +
     `how to test it and the commits, send the lead "${task.id} done: <commits>, see ${task.file}", and wait.`
   )
 }

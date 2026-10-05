@@ -17,9 +17,12 @@ describe('before/after videos', () => {
     expect(videoPointer('low')).toContain('at 1280x720 or more')
   })
 
-  test("the teammate's prompt says how to capture; the video skill loads only at the finish", () => {
+  test("the teammate's prompt says how to capture, for every task; the video skill loads at done, before the user is asked", () => {
     expect(videoPointer('medium')).toContain('BEFORE first: before you change anything')
-    expect(videoPointer('medium')).toContain('made at the finish, after the user accepts: the `better-tasks:video` skill')
+    expect(videoPointer('medium')).toContain('Every finished task gets one short narrated video, docs, rules and tooling too.')
+    expect(videoPointer('medium')).toContain('labeled BEFORE and AFTER')
+    expect(videoPointer('medium')).not.toContain('No video')
+    expect(videoPointer('medium')).toContain('made at done, before the user is asked: the `better-tasks:video` skill')
     expect(videoPointer('medium')).not.toContain('demo-video.sh')
   })
 

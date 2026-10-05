@@ -1,11 +1,11 @@
 ---
 name: pull-request
 user-invocable: false
-description: How a better-tasks teammate opens and updates the pull request of its task (push, gh pr create or task_pr.py, the description from the template, the video in it, conflicts). Load it at the finish, after the user accepts, when your prompt says the project has a PR per task, and when the lead asks you to update your PR.
+description: How a better-tasks teammate opens and updates the pull request of its task (push, gh pr create or task_pr.py, the description from the template, the video in it, conflicts). Load it at done, before the user is asked, when your prompt says the project has a PR per task, and when the lead asks you to update your PR.
 ---
 
 # Pull request per task
-The PR opens at the finish, after the user accepts your local build (the `better-tasks:done` skill). "Settings" above: the git flow and the description. Never merge it yourself: the lead merges once you finish.
+The PR opens at done, with its video, before the user is asked (the `better-tasks:done` skill). "Settings" above: the git flow and the description. Never merge it yourself: the lead merges once the user marks it resolved.
 
 ## The description
 `<scratchpad>/pr.md`, as "Settings" above says; the user reads it on GitHub, often on a phone.
@@ -33,4 +33,4 @@ Your commits land on the dev branch with land.sh (your prompt says how).
 - A change once the PR is open, or the merge conflicts: land the fix on the dev branch, then run open again. Never fix on the task branch.
 
 ## Then
-Notes: "PR: <url>"; back to the done skill's "Finish".
+Notes: "PR: <url>"; the PR goes in your "For the user" block, under Links and in the question (the done skill).

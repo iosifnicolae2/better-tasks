@@ -34,22 +34,25 @@ describe('PR per task', () => {
     expect(hasGitHub('')).toBe(false)
   })
 
-  test('the PR opens after the user accepts the local build; the lead merges once the teammate finishes', () => {
-    expect(prCoordinatorRules(true, '/bin')).toContain("A finished task's PR opens after the user accepts")
-    expect(prCoordinatorRules(true, '/bin')).toContain('Request changes: no PR yet; the teammate rebuilds locally.')
+  test('the question links the PR; "Mark as resolved" merges it with no new round', () => {
+    expect(prCoordinatorRules(true, '/bin')).toContain('its question links only the PR')
+    expect(prCoordinatorRules(true, '/bin')).toContain('Mark as resolved: `gh pr merge <url> --squash --delete-branch`')
+    expect(prCoordinatorRules(true, '/bin')).toContain('Request changes: the teammate pushes to the same PR.')
     expect(prCoordinatorRules(true, '/bin')).toContain('gh pr merge <url> --squash --delete-branch')
   })
 
-  test('openPrInBrowser: the lead opens the PR right before merging it; off, it does not', () => {
+  test('openPrInBrowser: the lead opens the PR right before its question, never after the answer; off, it does not', () => {
     expect(prCoordinatorRules(true, '/bin')).toContain(openPrLine('/bin'))
-    expect(openPrLine('/bin')).toContain('`/bin/open-pr.sh <url>`')
+    expect(openPrLine('/bin')).toContain('right before its question, run `/bin/open-pr.sh <url>`')
+    expect(openPrLine('/bin')).toContain('Never open it again after the user\'s answer.')
+    expect(openPrLine('/bin')).not.toContain('merging')
     expect(prCoordinatorRules(false, '/bin')).not.toContain('default browser')
     expect(prCoordinatorRules(false, '/bin')).toContain('gh pr merge <url> --squash --delete-branch')
   })
 
   test("the teammate's prompt keeps the worktree and a pointer: the how-to is the pull-request skill", () => {
     expect(PR_TEAMMATE_RULES).toContain('You work in your own git worktree')
-    expect(PR_TEAMMATE_RULES).toContain('The PR opens at the finish (the done skill\'s "Finish"), with the `better-tasks:pull-request` skill')
+    expect(PR_TEAMMATE_RULES).toContain('The PR opens at done, before the user is asked, with its video: the `better-tasks:pull-request` skill')
     expect(PR_TEAMMATE_RULES).not.toContain('gh pr create')
   })
 })

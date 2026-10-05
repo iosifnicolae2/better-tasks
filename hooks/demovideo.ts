@@ -82,13 +82,13 @@ export function setupVerdict(output: string): { isReady: boolean; text: string }
     : { isReady: false, text: `better-tasks: the Kokoro voice setup ${last || 'failed'}` }
 }
 
-/** The teammate's pointer: capturing is here, so the video skill loads only at the finish, to make it. */
+/** The teammate's pointer: capturing is here, so the video skill loads only at done, to make it. */
 export function videoPointer(quality: VideoQuality): string {
   return `## Before/after video (on in this project)
-Work that shows on screen gets one short narrated video. Nothing to see (a refactor, a config)? No video; say so in your notes.
-- BEFORE first: before you change anything, capture the bug or missing feature (how: the testing skill), at ${VIDEO_SIZE[quality]} or more, a screenshot per step. Forgot? Capture it from the commit before yours (\`git worktree add <scratchpad>/before <commit>\`).
+Every finished task gets one short narrated video, docs, rules and tooling too. Nothing changes on screen? Show the change itself: the old and the new text (or the diff) rendered, labeled BEFORE and AFTER.
+- BEFORE first: before you change anything, capture the bug, the missing feature or the old text (how: the testing skill), at ${VIDEO_SIZE[quality]} or more, a screenshot per step. Forgot? Capture it from the commit before yours (\`git worktree add <scratchpad>/before <commit>\`).
 - AFTER: the same steps on your change. Keep both in your scratchpad.
-- The video is made at the finish, after the user accepts: the \`${skillCall('video')}\` skill.`
+- The video is made at done, before the user is asked: the \`${skillCall('video')}\` skill.`
 }
 
 /** What the video skill reads under its title: this project's quality. */
