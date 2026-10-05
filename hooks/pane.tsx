@@ -12,6 +12,7 @@ import { quickTimePlay, VIDEOS_FOLDER } from './demovideo'
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
 import type { Files } from './io'
+import { screenNames, screensArgv, SCREENS_FRESH_MS } from './testenv'
 import { CONFIG_FILE, PROJECT_KEYS, projectSettings, readOverrides, saveProjectValue, settingsFrom } from './settings'
 import { pathsOf } from './instructions'
 import { findPrTemplate, NEW_TEMPLATE, shownPath } from './prtemplate'
@@ -103,6 +104,26 @@ async function videoOf($: EngineInterface, id: string): Promise<string | undefin
   const folder = `${await $.session.root()}/${VIDEOS_FOLDER}`
   const names = (await $.fs.list(folder).catch(() => [])).map(entry => entry.name)
   return names.includes(`${id}.mp4`) ? `${folder}/${id}.mp4` : undefined
+}
+
+let screensSeen: { names: string[]; at: number } | undefined
+let screensAsked: Promise<void> | undefined
+
+/** The real screens for the "Test screen" row, as last seen; asks again in the background when stale, then redraws. */
+async function connectedScreens($: EngineInterface): Promise<string[]> {
+  const now = await $.clock.now()
+  if (!screensAsked && (!screensSeen || now - screensSeen.at > SCREENS_FRESH_MS)) {
+    screensAsked = $.process.run(screensArgv($.plugin.root))
+      .then(done => screenNames(done.exitCode === 0 ? done.stdout : ''), () => [])
+      .then(names => {
+        const isNew = names.join('\n') !== screensSeen?.names.join('\n')
+        screensSeen = { names, at: now }
+        if (isNew) $.ui.invalidate('ui.render')
+      })
+      .catch(() => undefined)
+      .finally(() => { screensAsked = undefined })
+  }
+  return screensSeen?.names ?? []
 }
 
 /** A value from the settings page: /config, or the project's config.json for a setting only a project has (the git flow). */
@@ -518,6 +539,7 @@ export function registerPane(on: On, options: PluginOptions): void {
             onOpenNative={() => void $.command.run({ command: 'config' })}
             onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
             focusedRow={String((await $.store.get(CONFIG_ROW_KEY)) ?? '')}
+            screens={await connectedScreens($)}
             onBack={showPage('board')} />
         </Box>
       )

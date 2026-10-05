@@ -336,7 +336,7 @@ async function skillSettings($: EngineInterface, skill: SkillName): Promise<stri
   const settings = await settingsNow($)
   if (skill === 'pull-request') return prSkillSettings(settings.gitFlow, settings.devBranch, await prBodyNow($, settings))
   if (skill === 'video') return videoSkillSettings(settings.videoQuality)
-  return skill === 'testing' ? testingSkillSettings(settings.offScreen) : ''
+  return skill === 'testing' ? testingSkillSettings(settings.offScreen, settings.testScreen) : ''
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {

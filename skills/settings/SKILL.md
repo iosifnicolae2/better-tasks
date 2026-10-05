@@ -1,6 +1,6 @@
 ---
 name: settings
-description: Every better-tasks setting, what each one means, its choices and default, where it is saved and how to change it. Load it when the user asks what better-tasks can be configured to do, asks about a setting (git flow, teammate models, videos, off-screen testing, sprint length, editor, task ids, project instructions, PR upstream), or wants one changed.
+description: Every better-tasks setting, what each one means, its choices and default, where it is saved and how to change it. Load it when the user asks what better-tasks can be configured to do, asks about a setting (git flow, teammate models, videos, off-screen testing, the test screen, sprint length, editor, task ids, project instructions, PR upstream), or wants one changed.
 ---
 
 # better-tasks settings
@@ -31,6 +31,7 @@ Grep a key (`gitFlow`) or a word (`video`) to find its row.
 | `demoVideos` | Finished work comes with a short narrated before/after video (red boxes, arrows, subtitles read aloud by Kokoro, set up once per machine). Asked once per project. | true, false | false | /config "Before/after videos" or config.json |
 | `videoQuality` | The videos' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file. | low, medium, high | "medium" | /config "Video quality" or config.json |
 | `offScreen` | Teammates test and record in a hidden browser, simulator or terminal, so the screen, mouse and keyboard stay the user's. On by default, not asked. | true, false | true | config.json |
+| `testScreen` | The screen teammates test and record Mac apps on. virtual: the project's own virtual display, kept below the user's screens. Else a real screen's name as the settings page lists it ("Built-in Retina Display", "DELL U2720Q"); not connected: the virtual display, and the teammate tells the user. Not asked: change it on the settings page's "Test screen" row. | string | "virtual" | config.json |
 | `excludeWorktreesFromIde` | IntelliJ skips .claude/worktrees/ from the first run, so teammates' worktrees don't set off re-indexing (git ignores them too: .gitignore). On by default, not asked. | true, false | true | config.json |
 | `prTemplate` | The template every PR description fills in: a path relative to the project root. Empty: the project's own (.github/pull_request_template.md and the other places GitHub and GitLab look), else better-tasks' (the request and why on top, then the video, what changed, how to test, notes, commits). The settings page's "PR template" row opens it, or adds better-tasks' one to the repo as .github/pull_request_template.md. | string | "" | config.json |
 | `useBetterTasks` | Use better-tasks in this project at all. false: it stays quiet here (no tools, no task rules, no setup questions; only its commands). Not asked: set it in config.json, then restart. | true, false | true | config.json |

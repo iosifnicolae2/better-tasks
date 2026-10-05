@@ -9,6 +9,10 @@
 #   record-display.sh start [--size WxH] [--minutes n] [--label text]
 #       the same over several commands: prints those values and the turn's pid; stop it when done.
 #   record-display.sh stop <pid> | status | remove (the project's display) | arrange (every virtual display below the screens)
+#   record-display.sh screens: the real screens, "<id><tab><name>" each
+# The project may test on a real screen instead: "testScreen" in .claude/tasks/config.json (a name from `screens`;
+# "virtual", the default, is the project's own display); --screen <name> or BT_TEST_SCREEN wins over it.
+# A chosen screen that is not connected: the virtual display, with one line on stderr saying so.
 # Works in any git worktree of the project: they share its one display. Kept until `remove` or logout.
 # Why not a Space (Mission Control desktop): only the Dock may move another app's windows between Spaces
 # (tested on macOS 27: our move of a TextEdit window was ignored), and making a desktop takes clicks.
@@ -96,21 +100,43 @@ free_slot() {
   echo "$n"
 }
 
+# The screen this project tests on: --screen, else BT_TEST_SCREEN, else config.json's testScreen, else "virtual".
+chosen_screen() {
+  if [ -n "$screen" ]; then echo "$screen"; return; fi
+  if [ -n "${BT_TEST_SCREEN:-}" ]; then echo "$BT_TEST_SCREEN"; return; fi
+  plutil -extract testScreen raw -o - "$root/.claude/tasks/config.json" 2>/dev/null || echo virtual
+}
+
+# Sets screen_id (empty: the virtual display) and turn (its lock: a real screen's is shared by every project).
+resolve_screen() {
+  name="$(chosen_screen)" screen_id=""
+  if [ "$name" != virtual ]; then
+    screen_id="$("$exe" screens | awk -F '\t' -v n="$name" '$2 == n { print $1; exit }')"
+    [ -n "$screen_id" ] || echo "better-tasks: the test screen \"$name\" is not connected, so this uses the virtual display." >&2
+  fi
+  if [ -n "$screen_id" ]; then
+    turn="$state/screen-$(printf %s "$name" | cksum | cut -d' ' -f1).turn"
+  else
+    turn="$base.turn"
+  fi
+}
+
 # Sets BT_DISPLAY_ID, BT_DISPLAY_BOUNDS, BT_DISPLAY_CAPTURE.
 display_values() {
-  BT_DISPLAY_ID="$(display_id)"
+  BT_DISPLAY_ID="${screen_id:-$(display_id)}"
   where="$("$exe" info "$BT_DISPLAY_ID")"
   BT_DISPLAY_BOUNDS="$(field "$where" x) $(field "$where" y) $(field "$where" w) $(field "$where" h)"
   BT_DISPLAY_CAPTURE="$(field "$where" capture)"
 }
 
-size=1920x1080 minutes=20 label=""
+size=1920x1080 minutes=20 label="" screen=""
 parse_options() {
   while [ $# -gt 0 ]; do
     case "$1" in
       --size) size="$2"; shift 2 ;;
       --minutes) minutes="$2"; shift 2 ;;
       --label) label="$2"; shift 2 ;;
+      --screen) screen="$2"; shift 2 ;;
       --) shift; break ;;
       *) break ;;
     esac
@@ -121,8 +147,9 @@ parse_options() {
 run() {
   parse_options "$@"; shift $(($# - rest_count))
   [ $# -gt 0 ] || { echo "run: no command after --" >&2; exit 2; }
+  resolve_screen
   out="$(mktemp -t better-tasks-turn)"
-  "$exe" turn --lock "$base.turn" --label "$label" --max-seconds 86400 --parent $$ >"$out" 2>&1 &
+  "$exe" turn --lock "$turn" --label "$label" --max-seconds 86400 --parent $$ >"$out" 2>&1 &
   pid=$!
   trap 'kill $pid 2>/dev/null; rm -f "$out"' EXIT INT TERM
   await_ready "$out" "$pid" >/dev/null || exit 1
@@ -133,8 +160,9 @@ run() {
 
 start() {
   parse_options "$@"
+  resolve_screen
   out="$(mktemp -t better-tasks-turn)"
-  pid="$(detached "$out" "$exe" turn --lock "$base.turn" --label "$label" --max-seconds "$((minutes * 60))")"
+  pid="$(detached "$out" "$exe" turn --lock "$turn" --label "$label" --max-seconds "$((minutes * 60))")"
   await_ready "$out" "$pid" >/dev/null || exit 1
   rm -f "$out"
   display_values
@@ -146,7 +174,7 @@ start() {
 
 stop() {
   pid="${1:?stop: which pid? start printed it}"
-  grep -q "^pid $pid " "$base.turn" 2>/dev/null || { echo "pid $pid does not hold $project's turn" >&2; exit 1; }
+  grep -qs "^pid $pid " "$base.turn" "$state"/screen-*.turn || { echo "pid $pid does not hold $project's turn" >&2; exit 1; }
   kill "$pid"
 }
 
@@ -171,5 +199,6 @@ case "$command" in
   status) status ;;
   remove) remove ;;
   arrange) "$exe" arrange ;;
-  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  screens) "$exe" screens ;;
+  *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
