@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { excludeWorktrees, folderModule, IDE_QUESTION, IDE_SETTING, isBuildToolProject, moduleDir, modulePaths, withWorktreesExcluded } from '../hooks/intellij'
+import { excludeWorktrees, folderModule, IDE_QUESTION, isBuildToolProject, moduleDir, modulePaths, withWorktreesExcluded } from '../hooks/intellij'
 import type { IdeFiles } from '../hooks/intellij'
 
 const ROOT = '/Users/a/shop'
@@ -88,7 +88,8 @@ describe('IntelliJ skips the teammate worktrees', () => {
   })
 })
 
-test('the IntelliJ question says why in plain words and where to change it', () => {
-  expect(IDE_QUESTION).toContain('re-indexes every copy')
-  expect(IDE_QUESTION).toContain(IDE_SETTING)
+test('the IntelliJ question says what happens, why, and how to undo it', () => {
+  expect(IDE_QUESTION).toContain('IntelliJ indexes every copy, which slows it down')
+  expect(IDE_QUESTION).toContain('Cancel Exclusion')
+  expect(IDE_QUESTION.endsWith('?')).toBe(true)
 })

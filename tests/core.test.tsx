@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
-import { IDE_QUESTION } from '../hooks/intellij'
+import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -244,7 +244,7 @@ function answerStartup(on: On, flow: string, ide: string): string[] {
 test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may skip them; yes excludes them now and at each start', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerStartup(on, 'Worktree and PR per task', ENABLE_OPTION)
+  const asked = answerStartup(on, 'Worktree and PR per task', IDE_YES)
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
@@ -262,10 +262,10 @@ test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may s
   expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
 })
 
-test('"Not now" to the IntelliJ question is saved: .idea is left as it is and the question is not asked again', async ($, on) => {
+test('"No" to the IntelliJ question is saved: .idea is left as it is and the question is not asked again', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerStartup(on, 'Worktree and PR per task', 'Not now')
+  const asked = answerStartup(on, 'Worktree and PR per task', IDE_NO)
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
@@ -280,7 +280,7 @@ test('"Not now" to the IntelliJ question is saved: .idea is left as it is and th
 test('no IntelliJ question without worktrees or without .idea/, and nothing is excluded unasked', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerStartup(on, 'Straight to main', ENABLE_OPTION)
+  const asked = answerStartup(on, 'Straight to main', IDE_YES)
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)

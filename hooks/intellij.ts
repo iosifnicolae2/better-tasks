@@ -7,10 +7,14 @@
 export const WORKTREES_DIR = '.claude/worktrees'
 
 export const IDE_SETTING = 'excludeWorktreesFromIde'
-export const IDE_QUESTION =
-  'This project is open in IntelliJ (it has a .idea folder). Each teammate works in a full copy of the project under ' +
-  `${WORKTREES_DIR}/, and IntelliJ re-indexes every copy, which makes it slow. May better-tasks mark that folder as ` +
-  `Excluded in IntelliJ, so it skips it? Change it later in .claude/tasks/config.json ("${IDE_SETTING}": true or false).`
+export const IDE_YES = 'Yes, skip that folder'
+export const IDE_NO = 'No, leave IntelliJ as is'
+export const IDE_QUESTION = [
+  `Teammates each keep a full copy of this project in ${WORKTREES_DIR}/. IntelliJ indexes every copy, which slows it down.`,
+  `Yes: better-tasks marks that folder as Excluded in this project's IntelliJ settings (.idea), so IntelliJ skips it. ` +
+    'Nothing else changes. To undo it, right-click the folder in IntelliJ: Mark Directory as > Cancel Exclusion.',
+  `Should IntelliJ skip ${WORKTREES_DIR}/?`,
+].join('\n\n')
 
 const EXCLUDE_LINE = `<excludeFolder url="file://$MODULE_DIR$/${WORKTREES_DIR}" />`
 
