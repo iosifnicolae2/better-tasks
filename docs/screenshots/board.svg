@@ -125,14 +125,14 @@
 <rect x="1007.2" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
 <rect x="1015.6" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
 <rect x="1024.0" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1032.4" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1040.8" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1049.2" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1057.6" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1066.0" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1074.4" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1082.8" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
-<rect x="1091.2" y="54" width="9" height="19" fill="rgb(255,255,255)"/>
+<rect x="1032.4" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1040.8" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1049.2" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1057.6" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1066.0" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1074.4" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1082.8" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
+<rect x="1091.2" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="1099.6" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="1108.0" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="1116.4" y="54" width="9" height="19" fill="rgb(55,55,55)"/>
@@ -158,7 +158,7 @@
 <text x="721.6" y="68.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="68.25" fill="rgb(177,185,249)" textLength="8.4" xml:space="preserve">▌</text>
 <text x="755.2" y="68.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">✻</text>
-<text x="772.0" y="68.25" fill="rgb(55,55,55)" textLength="327.6" xml:space="preserve">T-007  Add to cart loses clicks        </text>
+<text x="772.0" y="68.25" fill="rgb(55,55,55)" textLength="260.4" xml:space="preserve">T-007  Add to cart loses clicks</text>
 <text x="1192.0" y="68.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">shop</text>
 <text x="1234.0" y="68.25" fill="rgb(80,80,80)" textLength="25.2" xml:space="preserve">63%</text>
 <text x="24.4" y="87.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
@@ -224,8 +224,8 @@
 <text x="738.4" y="486.25" fill="rgb(80,80,80)" textLength="520.8" xml:space="preserve">╭────────────────────────────────────────────────────────────╮</text>
 <text x="721.6" y="505.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="505.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="755.2" y="505.25" fill="rgb(255,255,255)" font-weight="bold" textLength="285.6" xml:space="preserve">T-007  Add to cart loses clicks   </text>
-<text x="1057.6" y="505.25" fill="rgb(80,80,80)" textLength="184.8" xml:space="preserve">⚡ Currently working on</text>
+<text x="755.2" y="505.25" fill="rgb(255,255,255)" font-weight="bold" textLength="260.4" xml:space="preserve">T-007  Add to cart loses clicks</text>
+<text x="1032.4" y="505.25" fill="rgb(80,80,80)" textLength="184.8" xml:space="preserve">⚡ Currently working on</text>
 <text x="1250.8" y="505.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="721.6" y="524.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="524.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>

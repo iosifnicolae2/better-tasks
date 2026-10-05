@@ -83,7 +83,7 @@
 <rect x="696.4" y="16" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="704.8" y="16" width="9" height="19" fill="rgb(55,55,55)"/>
 <text x="24.4" y="30.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">&gt; </text>
-<text x="41.2" y="30.25" fill="rgb(255,255,255)" textLength="386.4" xml:space="preserve">the login loops after a password reset, fix it</text>
+<text x="41.2" y="30.25" fill="rgb(255,255,255)" textLength="361.2" xml:space="preserve">the Add to cart button loses clicks, fix it</text>
 <text x="721.6" y="30.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="730.0" y="30.25" fill="rgb(255,255,255)" font-weight="bold" textLength="67.2" xml:space="preserve"> Sprint </text>
 <text x="721.6" y="49.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
@@ -92,11 +92,11 @@
 <text x="923.2" y="49.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve"> 1</text>
 <text x="24.4" y="68.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
 <text x="41.2" y="68.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - task_create (MCP)</text>
-<text x="310.0" y="68.25" fill="rgb(255,255,255)" textLength="386.4" xml:space="preserve">(title: "Login loops after password reset", …)</text>
+<text x="310.0" y="68.25" fill="rgb(255,255,255)" textLength="319.2" xml:space="preserve">(title: "Add to cart loses clicks", …)</text>
 <text x="721.6" y="68.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="68.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">✻</text>
-<text x="772.0" y="68.25" fill="rgb(80,80,80)" textLength="327.6" xml:space="preserve">T-007  Login loops after password reset</text>
-<text x="1192.0" y="68.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">auth</text>
+<text x="772.0" y="68.25" fill="rgb(80,80,80)" textLength="260.4" xml:space="preserve">T-007  Add to cart loses clicks</text>
+<text x="1192.0" y="68.25" fill="rgb(80,80,80)" textLength="33.6" xml:space="preserve">shop</text>
 <text x="1234.0" y="68.25" fill="rgb(80,80,80)" textLength="25.2" xml:space="preserve">63%</text>
 <text x="24.4" y="87.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
 <text x="66.4" y="87.25" fill="rgb(153,153,153)" textLength="630.0" xml:space="preserve">Created T-007 (currently working on): .claude/tasks/T-007.md. Route it now.</text>
@@ -111,7 +111,7 @@
 <text x="24.4" y="125.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
 <text x="41.2" y="125.25" fill="rgb(255,255,255)" font-weight="bold" textLength="268.8" xml:space="preserve">better-tasks - team_status (MCP)</text>
 <text x="721.6" y="125.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="738.4" y="125.25" fill="rgb(80,80,80)" textLength="226.8" xml:space="preserve">  ◎ Ship the new login flow</text>
+<text x="738.4" y="125.25" fill="rgb(80,80,80)" textLength="210.0" xml:space="preserve">  ◎ Ship the new checkout</text>
 <rect x="738.4" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="746.8" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="755.2" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
@@ -175,18 +175,18 @@
 <rect x="1242.4" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
 <rect x="1250.8" y="130" width="9" height="19" fill="rgb(55,55,55)"/>
 <text x="24.4" y="144.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
-<text x="66.4" y="144.25" fill="rgb(153,153,153)" textLength="361.2" xml:space="preserve">auth · idle · context 41 % · cache warm 52m</text>
+<text x="66.4" y="144.25" fill="rgb(153,153,153)" textLength="361.2" xml:space="preserve">shop · idle · context 41 % · cache warm 52m</text>
 <text x="721.6" y="144.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="144.25" fill="rgb(177,185,249)" textLength="8.4" xml:space="preserve">▌</text>
 <text x="755.2" y="144.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">·</text>
-<text x="763.6" y="144.25" fill="rgb(255,255,255)" textLength="478.8" xml:space="preserve"> T-001  Fix the login redirect                           </text>
+<text x="763.6" y="144.25" fill="rgb(255,255,255)" textLength="478.8" xml:space="preserve"> T-001  Show prices with tax                             </text>
 <text x="1242.4" y="144.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">↻1</text>
 <text x="721.6" y="163.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="163.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">·</text>
 <text x="772.0" y="163.25" fill="rgb(80,80,80)" textLength="268.8" xml:space="preserve">T-004  Rate-limit the public API</text>
 <text x="24.4" y="182.25" fill="rgb(78,186,101)" textLength="16.8" xml:space="preserve">⏺ </text>
 <text x="41.2" y="182.25" fill="rgb(255,255,255)" font-weight="bold" textLength="92.4" xml:space="preserve">SendMessage</text>
-<text x="133.6" y="182.25" fill="rgb(255,255,255)" textLength="562.8" xml:space="preserve">(to: "auth", message: "Login loops after password reset · T-007 …")</text>
+<text x="133.6" y="182.25" fill="rgb(255,255,255)" textLength="495.6" xml:space="preserve">(to: "shop", message: "Add to cart loses clicks · T-007 …")</text>
 <text x="721.6" y="182.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="24.4" y="201.25" fill="rgb(80,80,80)" textLength="42.0" xml:space="preserve">  ⎿  </text>
 <text x="66.4" y="201.25" fill="rgb(153,153,153)" textLength="33.6" xml:space="preserve">Sent</text>
@@ -197,7 +197,7 @@
 <text x="721.6" y="220.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="755.2" y="220.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">·</text>
 <text x="772.0" y="220.25" fill="rgb(80,80,80)" textLength="243.6" xml:space="preserve">T-009  Dark mode for settings</text>
-<text x="24.4" y="239.25" fill="rgb(255,255,255)" textLength="596.4" xml:space="preserve">⏺ T-007 is with auth: it owns login, its cache is warm and it has room.</text>
+<text x="24.4" y="239.25" fill="rgb(255,255,255)" textLength="621.6" xml:space="preserve">⏺ T-007 is with shop: it owns the cart, its cache is warm and it has room.</text>
 <text x="721.6" y="239.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="721.6" y="258.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="258.25" fill="rgb(80,80,80)" textLength="16.8" xml:space="preserve">○ </text>
@@ -310,8 +310,8 @@
 <text x="738.4" y="486.25" fill="rgb(80,80,80)" textLength="520.8" xml:space="preserve">╭────────────────────────────────────────────────────────────╮</text>
 <text x="721.6" y="505.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="505.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
-<text x="755.2" y="505.25" fill="rgb(255,255,255)" font-weight="bold" textLength="243.6" xml:space="preserve">T-001  Fix the login redirect</text>
-<text x="1015.6" y="505.25" fill="rgb(80,80,80)" textLength="109.2" xml:space="preserve">◆ This sprint</text>
+<text x="755.2" y="505.25" fill="rgb(255,255,255)" font-weight="bold" textLength="226.8" xml:space="preserve">T-001  Show prices with tax</text>
+<text x="998.8" y="505.25" fill="rgb(80,80,80)" textLength="109.2" xml:space="preserve">◆ This sprint</text>
 <text x="1250.8" y="505.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="721.6" y="524.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
 <text x="738.4" y="524.25" fill="rgb(80,80,80)" textLength="8.4" xml:space="preserve">│</text>
