@@ -1,6 +1,6 @@
 # better-tasks
 
-**Hand tasks to Claude. Approve each fix from a before/after video.**
+**A better way to manage tasks in Claude Code.**
 
 <p align="center">
   <img src="docs/screenshots/board.svg" alt="Claude Code with the sprint board docked on the right">
