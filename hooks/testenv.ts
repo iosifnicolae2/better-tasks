@@ -1,11 +1,9 @@
 // Testing like a user (setting offScreen): each teammate tests and records in its own environment,
 // off the user's screen when the setting is on, and reports any new bug it sees to the lead, who tells
-// the user. The parts that need `$` (the startup question, the prompts) are in register.tsx.
+// the user. register.tsx asks the question (askToTurnOn, once per project) and adds the rules to the prompts.
 
 /** The project setting, in .claude/tasks/config.json: unset means this project was not asked yet. */
 export const OFFSCREEN_FIELD = 'offScreen'
-export const OFFSCREEN_YES = 'Off-screen (recommended)'
-export const OFFSCREEN_NO = 'On my screen is fine'
 
 export const OFFSCREEN_QUESTION =
   'Should teammates test and record off-screen, so your screen, mouse and keyboard stay yours while you work? ' +
@@ -30,13 +28,6 @@ const OFF_SCREEN = `## Off-screen (on in this project): the user's screen, mouse
 
 const ON_SCREEN = `## Using the screen
 - Off-screen first when the tool allows it (a headless browser, a simulator without its window). Need the user's screen, mouse or keyboard? Tell the lead first: the user may be working.`
-
-/** The answer as the project's offScreen value; undefined (dismissed) asks again next session. */
-export function offScreenAnswer(answer: string | undefined): boolean | undefined {
-  if (answer === OFFSCREEN_YES) return true
-  if (answer === OFFSCREEN_NO) return false
-  return undefined
-}
 
 export function testingRules(isOffScreen: boolean): string {
   return [OWN_ENVIRONMENT, isOffScreen ? OFF_SCREEN : ON_SCREEN].join('\n\n')

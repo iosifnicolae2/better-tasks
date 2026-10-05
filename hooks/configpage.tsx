@@ -136,6 +136,16 @@ export const FIELDS: readonly Field[] = [
     initial: QUALITY_LABELS.medium,
     stored: label => VIDEO_QUALITIES.find(quality => QUALITY_LABELS[quality] === label) ?? 'medium',
   },
+  {
+    group: 'team',
+    field: 'offScreen',
+    label: 'Test off-screen',
+    describe: 'Teammates test and record in a hidden browser, simulator or terminal, so your screen, mouse and keyboard stay yours. Saved in this project.',
+    options: ON_OFF,
+    value: settings => (settings.offScreen ? 'on' : 'off'),
+    initial: 'off',
+    stored: isOn,
+  },
   ...LEVELS.flatMap(modelFields),
   {
     group: 'models',

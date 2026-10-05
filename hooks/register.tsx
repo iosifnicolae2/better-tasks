@@ -14,6 +14,7 @@ import { COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, s
 import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
+import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingRules } from './testenv'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
@@ -92,11 +93,12 @@ export const register: Register = (on, options) => {
     if (!(await teamsOn($))) return composed
     const settings = await settingsNow($)
     const videos = settings.demoVideos ? COORDINATOR_RULES : ''
+    const testing = coordinatorTestingRules(settings.offScreen)
     const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, PR_COORDINATOR_RULES)
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
     const instructions = await instructionsNow($, settings)
     const contribute = contributeRules(await readUpstreamPr(ioOf($), await claudeDirOf($)))
-    const rules = [await projectText(ioOf($), 'coordinator'), models, videos, flow, instructions, contribute].filter(Boolean).join('\n\n')
+    const rules = [await projectText(ioOf($), 'coordinator'), models, testing, videos, flow, instructions, contribute].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
@@ -153,10 +155,11 @@ export const register: Register = (on, options) => {
     const hasTypes = (await read($, typesState)) !== ''
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
+    const testing = testingRules(settings.offScreen)
     const videos = settings.demoVideos ? teammateRules($.plugin.root, settings.videoQuality) : ''
     const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
     const instructions = await instructionsNow($, settings)
-    const prompt = [named.prompt, handover, teammate, stuck, videos, flow, instructions].filter(Boolean).join('\n\n')
+    const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, instructions].filter(Boolean).join('\n\n')
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
     return next({
       ...e,
@@ -322,6 +325,7 @@ async function startQuestions($: EngineInterface): Promise<void> {
   const isChosen = FLOW_KEYS.some(key => key in values) || settings.gitFlow !== 'direct'
   if (!isChosen) await askGitFlow($)
   else if (hasPrs(settings.gitFlow)) await checkGh($)
+  await askToTurnOn($, { field: OFFSCREEN_FIELD, question: OFFSCREEN_QUESTION, header: 'Off-screen' })
 }
 
 /** The git flow question: the project looked at once for the recommendation, the answer saved in its config.json. */

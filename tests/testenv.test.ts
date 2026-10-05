@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { coordinatorTestingRules, OFFSCREEN_NO, OFFSCREEN_QUESTION, OFFSCREEN_YES, offScreenAnswer, testingRules } from '../hooks/testenv'
+import { coordinatorTestingRules, OFFSCREEN_QUESTION, testingRules } from '../hooks/testenv'
 
 describe('testing like a user', () => {
   test('every teammate tests in its own environment and reports new bugs to the lead', () => {
@@ -29,12 +29,6 @@ describe('testing like a user', () => {
     expect(coordinatorTestingRules(false)).toContain('File it (task_create) only when they say so.')
     expect(coordinatorTestingRules(false)).not.toContain('Off-screen is on')
     expect(coordinatorTestingRules(true)).toContain('Off-screen is on')
-  })
-
-  test('the answer becomes the project\'s offScreen value; a dismissed question stays unanswered', () => {
-    expect(offScreenAnswer(OFFSCREEN_YES)).toBe(true)
-    expect(offScreenAnswer(OFFSCREEN_NO)).toBe(false)
-    expect(offScreenAnswer(undefined)).toBeUndefined()
   })
 
   test('the question says what stays the user\'s and what cannot run off-screen', () => {
