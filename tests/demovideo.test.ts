@@ -9,6 +9,16 @@ describe('before/after videos', () => {
     expect(settingsOf({ demoVideos: true }).demoVideos).toBe(true)
   })
 
+  test('video quality: 1080p medium unless chosen; the rules pass it to the script', () => {
+    expect(settingsOf({}).videoQuality).toBe('medium')
+    expect(settingsOf({ videoQuality: 'low' }).videoQuality).toBe('low')
+    expect(settingsOf({ videoQuality: '4k' }).videoQuality).toBe('medium')
+    expect(teammateRules('/p')).toContain('/p/bin/demo-video.sh spec.json --quality medium')
+    expect(teammateRules('/p')).toContain('Capture at 1920x1080 or more')
+    expect(teammateRules('/p', 'low')).toContain('--quality low')
+    expect(teammateRules('/p', 'low')).toContain('Capture at 1280x720 or more')
+  })
+
   test('the voice lives outside any project: its own folder, else XDG data, else ~/.local/share', () => {
     expect(voiceDir({ custom: '/x/kokoro', home: '/Users/a' })).toBe('/x/kokoro')
     expect(voiceDir({ dataHome: '/data', home: '/Users/a' })).toBe('/data/better-tasks/kokoro')

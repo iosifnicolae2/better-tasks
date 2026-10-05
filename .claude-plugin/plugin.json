@@ -52,6 +52,17 @@
       "description": "Teammates record the bug and the fix as one short video: BEFORE/AFTER labels, red boxes and arrows, subtitles read aloud by Kokoro (set up once per machine).",
       "default": false
     },
+    "videoQuality": {
+      "type": "string",
+      "title": "Video quality",
+      "description": "The before/after videos' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file.",
+      "options": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium"
+    },
     "pullRequests": {
       "type": "boolean",
       "title": "PR per task",

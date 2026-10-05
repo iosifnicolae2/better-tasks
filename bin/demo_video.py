@@ -1,6 +1,8 @@
 """Makes a narrated before/after demo video from screen recordings or screenshots.
 
-Run through bin/demo-video.sh (it picks Kokoro's Python). Usage: demo-video.sh spec.json
+Run through bin/demo-video.sh (it picks Kokoro's Python). Usage: demo-video.sh spec.json [--quality low|medium|high]
+Quality (the setting videoQuality, medium by default): low fits 1280x720 in a small file, medium fits
+1920x1080, high fits 1920x1080 sharper in a bigger file. The video is scaled to fit, up or down.
 The video goes to <project>/.claude/tasks_videos/<name> (the main checkout's, also from a worktree;
 $BETTER_TASKS_VIDEOS overrides the folder), which git ignores; its file:// link is printed last.
 Next to it, <name>.png: the poster, a frame of the AFTER clip with a big play button in the middle,
@@ -26,6 +28,7 @@ libass or freetype. The spec (paths relative to the spec file):
 }
 """
 
+import argparse
 import json
 import os
 import subprocess
@@ -39,7 +42,13 @@ import soundfile as sf
 from PIL import Image, ImageDraw, ImageFont
 
 RATE = 24000
-MAX_SIDE = 1280
+# Per quality: the box the video fits in (long side, short side) and x264's settings (lower crf: sharper, bigger).
+QUALITIES = {
+    'low': {'box': (1280, 720), 'crf': 28, 'preset': 'medium'},
+    'medium': {'box': (1920, 1080), 'crf': 23, 'preset': 'medium'},
+    'high': {'box': (1920, 1080), 'crf': 18, 'preset': 'slow'},
+}
+quality = QUALITIES['medium']  # main() sets the chosen one
 FPS = 30
 LEAD_IN = 0.6
 GAP = 0.5
@@ -57,7 +66,9 @@ FONTS = [
 ]
 
 
-def main(spec_path: str) -> None:
+def main(spec_path: str, quality_name: str) -> None:
+    global quality
+    quality = QUALITIES[quality_name]
     spec_file = Path(spec_path).resolve()
     spec = json.loads(spec_file.read_text())
     base = spec_file.parent
@@ -114,7 +125,9 @@ def source_size(base: Path, clip: dict) -> tuple:
 
 
 def canvas_size(size: tuple) -> tuple:
-    scale = min(1.0, MAX_SIDE / max(size))
+    """`size` scaled to fit the quality's box, turned to match: a portrait source fits 1080x1920."""
+    long_side, short_side = quality['box']
+    scale = min(long_side / max(size), short_side / min(size))
     return tuple(int(side * scale) // 2 * 2 for side in size)
 
 
@@ -375,7 +388,7 @@ def title_card(work: Path, canvas: tuple, title: str) -> Path:
 
 def encode(inputs: list, graph: str, audio: str, seconds: float, out: Path) -> None:
     run(['ffmpeg', '-y', '-v', 'error', *inputs, '-filter_complex', graph, '-map', '[v]', '-map', audio,
-         '-t', f'{seconds:.3f}', '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p',
+         '-t', f'{seconds:.3f}', '-c:v', 'libx264', '-preset', quality['preset'], '-crf', str(quality['crf']), '-pix_fmt', 'yuv420p',
          '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-b:a', '128k', str(out)])
 
 
@@ -422,10 +435,12 @@ def run(argv: list) -> str:
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        sys.exit('usage: demo-video.sh spec.json')
-    if sys.argv[1] == '--check':
+    if sys.argv[1:] == ['--check']:
         Voice('af_heart').say('Ready.')  # setup: fetches the model and voice once
         print('ready')
     else:
-        main(sys.argv[1])
+        parser = argparse.ArgumentParser(prog='demo-video.sh')
+        parser.add_argument('spec')
+        parser.add_argument('--quality', choices=QUALITIES, default='medium')
+        args = parser.parse_args()
+        main(args.spec, args.quality)
