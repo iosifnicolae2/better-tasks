@@ -16,6 +16,7 @@ const MUST_SAY: Record<string, string[]> = {
     '${CLAUDE_PLUGIN_ROOT}/bin/video-branch.sh <video> <poster>',
     'Video: [T-004.mp4](../tasks_videos/T-004.mp4)',
     'the size "Settings" above names',
+    'make the video at the finish, after the user accepts your local build',
   ],
   testing: [
     "never the user's running apps, data or accounts",
@@ -31,15 +32,19 @@ const MUST_SAY: Record<string, string[]> = {
     'never make, move or remove virtual displays yourself',
     'screencapture -x -o -l <window id>',
     '## On the screen: when off-screen is off',
+    'Before done, quick checks only: the tests near your change.',
+    '## Local build for the user',
   ],
   done: [
     '### For the user',
-    'Video: [/Users/me/app/.claude/tasks_videos/T-004.mp4](file:///Users/me/app/.claude/tasks_videos/T-004.mp4)',
-    'Links: the video\'s file path (when there is one) and the PR, each a markdown link on its own line',
-    'The question\'s only link is the PR: the bare url on a line of its own, nothing else on it',
-    'Never the video: it\'s in Links.',
+    'Quick checks only: the tests near your change',
+    'A local build the user can try right now',
+    'The question\'s only link is the local build\'s: the bare url on a line of its own, nothing else on it',
     '"T-004 done: <commits>, see <task file>"',
     'never set it done yourself',
+    '## 5. Finish: the lead says "T-004 accepted: finish it"',
+    'The full test suite',
+    '"T-004 finished: <commits or PR url>, see <task file>"',
   ],
   contribute: ['gh repo fork iosifnicolae2/better-tasks --clone', 'CLAUDE_CODE_PLUGIN_DIRS', '/reload-plugins', 'as "Settings" above says'],
   'pull-request': [
@@ -56,6 +61,7 @@ const MUST_SAY: Record<string, string[]> = {
     'A title with a quote mark and the word git, or starting with "git", is refused: reword it.',
     'Plain commands only: no `( … )`, `{ …; }`, function, `bash -c` or heredoc around gh or git',
     'Never merge it yourself',
+    'The PR opens at the finish, after the user accepts your local build',
   ],
 }
 
