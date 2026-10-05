@@ -27,6 +27,7 @@ export const SETTING_DOCS: Record<string, Doc> = {
   videoQuality: { group: 'Team', about: 'The videos\' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file.' },
   offScreen: { group: 'Team', about: 'Teammates test and record in a hidden browser, simulator or terminal, so the screen, mouse and keyboard stay the user\'s. Asked once per project.' },
   excludeWorktreesFromIde: { group: 'Team', about: 'IntelliJ skips .claude/worktrees/, so teammates\' worktrees don\'t set off re-indexing. Asked once per IntelliJ project.' },
+  prTemplate: { group: 'Team', about: 'The template every PR description fills in: a path relative to the project root. Empty: the project\'s own (.github/pull_request_template.md and the other places GitHub and GitLab look), else better-tasks\' (the request and why on top, then the video, what changed, how to test, notes, commits). The settings page\'s "PR template" row opens it, or adds better-tasks\' one to the repo as .github/pull_request_template.md.' },
   worktree: { group: 'Team', about: 'Old switch, kept for projects that set it: with gitFlow direct, each named teammate works in its own worktree. Use gitFlow instead.' },
   pullRequests: { group: 'Team', about: 'Old switch, kept for projects that set it: true reads as gitFlow worktree-prs. Use gitFlow instead.' },
   easyModel: { group: 'Teammate models', about: 'Model for easy tasks (a typo, a text, a small fix). inherit: the lead\'s own model.' },
