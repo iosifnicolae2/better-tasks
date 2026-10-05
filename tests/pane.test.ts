@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { backlogToggle, filledCells, neighbour, partsOf, projectTitle, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
+import { backlogToggle, filledCells, neighbour, partsOf, prIn, projectTitle, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
 import { parseTask } from '../hooks/tasks'
@@ -49,7 +49,7 @@ const FILES: Record<string, string> = {
 }
 
 /** A project of four tasks on disk (two this sprint, one in the backlog, one done), and a record of every command run and setting written. */
-function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<string, unknown> = {}) {
+function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<string, unknown> = {}, outputs: Record<string, string> = {}) {
   const files = new Map(Object.entries(FILES))
   const commands: string[][] = []
   const settings: [string, unknown][] = []
@@ -74,7 +74,8 @@ function fakeProject(on: On, env: Record<string, string> = {}, stored: Record<st
   })
   on('process.run', ($, e) => {
     commands.push([...e.argv])
-    return { value: { exitCode: 1, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    const stdout = outputs[e.argv[0] ?? '']
+    return { value: { exitCode: stdout === undefined ? 1 : 0, stdout: stdout ?? '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('config.set', ($, e) => {
     settings.push([e.key, e.value])
@@ -102,6 +103,13 @@ test('the project folder name, for people', () => {
   expect(projectTitle('/work/my-shop_app/')).toBe('My Shop App')
   expect(projectTitle('/work/church.hub')).toBe('Church Hub')
   expect(projectTitle('/work/iOS-app')).toBe('iOS App')
+})
+
+test("a task's PR: the link on its last PR: line, bare or in a markdown link", () => {
+  expect(prIn('## Notes\n- fixed\n')).toBeUndefined()
+  expect(prIn('- PR: https://github.com/a/b/pull/7')).toBe('https://github.com/a/b/pull/7')
+  expect(prIn('- PR: https://x/pull/7\n- finished. PR: [#9](https://x/pull/9), commits abc')).toBe('https://x/pull/9')
+  expect(prIn('- see https://example.com\n- PR: not opened yet')).toBeUndefined()
 })
 
 test('the editor setting picks the command', () => {
@@ -353,9 +361,61 @@ for (const surface of SURFACES) {
     await arrowTo($, 'task-T-004')
     expect((await ui.find({ key: 'video' }))?.props).toMatchObject({ label: 'Video', hotkey: 'v' })
     await ui.press({ key: 'video' })
-    expect(commands.at(-2)?.slice(0, 2)).toEqual(['osascript', '-e']) // QuickTime, playing with sound
-    expect(commands.at(-2)?.[2]).toContain(`open POSIX file "${ROOT}/.claude/tasks_videos/T-004.mp4"`)
-    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks_videos/T-004.mp4`]) // it failed here: the default player
+    // A page beside the video plays it; no browser found (not macOS): the page opens in the default app.
+    expect(files.get(`${ROOT}/.claude/tasks_videos/T-004.html`)).toContain('<video src="T-004.mp4" controls autoplay')
+    expect(commands.at(-2)?.[0]).toBe('plutil')
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks_videos/T-004.html`])
+  })
+
+  test(`the video opens in the default browser, never QuickTime (${surface})`, async ($, on) => {
+    const handlers = [{ LSHandlerURLScheme: 'mailto', LSHandlerRoleAll: 'com.apple.mail' }, { LSHandlerURLScheme: 'https', LSHandlerRoleAll: 'com.google.chrome' }]
+    const { files, commands } = fakeProject(on, { HOME: '/Users/me' }, {}, { plutil: JSON.stringify(handlers) })
+    files.set(`${ROOT}/.claude/tasks_videos/T-004.mp4`, '')
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    await arrowTo($, 'task-T-004')
+    await ui.press({ key: 'video' })
+    expect(commands.at(-1)).toEqual(['open', '-b', 'com.google.chrome', `${ROOT}/.claude/tasks_videos/T-004.html`])
+    expect(commands.some(argv => argv[0] === 'osascript')).toBe(false)
+  })
+
+  test(`a task whose notes hold "PR: <url>" gets Open PR, the newest link; others don't (${surface})`, async ($, on) => {
+    const { files, commands } = fakeProject(on)
+    const t4 = `${DIR}/T-004-rate-limit.md`
+    files.set(t4, `${files.get(t4)}- 2026-10-05: PR: https://github.com/a/b/pull/7\n- 2026-10-06: done. PR: [#9](https://github.com/a/b/pull/9)\n`)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    expect(await ui.find({ key: 'pr' })).toBeUndefined()
+    await arrowTo($, 'task-T-004')
+    expect((await ui.find({ key: 'pr' }))?.props).toMatchObject({ label: 'Open PR', hotkey: 'p' })
+    await ui.press({ key: 'pr' })
+    expect(commands.at(-1)).toEqual(['open', 'https://github.com/a/b/pull/9'])
+  })
+
+  test(`the lead's question about a task selects it on the board while the question shows (${surface})`, async ($, on) => {
+    let shownWhileAsking: unknown
+    let isT004Shown = async () => false
+    on('tool.call', { tool: 'AskUserQuestion' }, async () => {
+      shownWhileAsking = await isT004Shown()
+      return { result: { answers: {} } }
+    })
+    const { opens } = fakeProject(on)
+    await $.command.run(sprintCommand())
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    isT004Shown = async () => (await ui.find({ type: 'Text', text: /^T-004 {2}Rate limit$/ })) !== undefined
+    expect(await ui.find({ type: 'Text', text: /^T-001 {2}Fix login$/ })).toBeDefined()
+    const ask = (header: string, question: string, agentId?: string) =>
+      $.tool.call({ tool: 'AskUserQuestion', tool_use_id: header, questions: [{ header, question, options: [], multiSelect: false }], ...(agentId ? { agentId } : {}) } as never)
+    const opened = opens.length
+    await ask('T-004', 'Rate limit is ready. Accept it?')
+    expect(shownWhileAsking).toBe(true)
+    expect(opens).toHaveLength(opened) // the board was open: it is not opened again and takes no keys
+    await ask('T-003', 'Old bug: reopen it?') // a closed task: the Closed section opens to show it
+    expect(await ui.find({ type: 'Text', text: /^T-003 {2}Old bug$/ })).toBeDefined()
+    await ask('Videos', 'Record videos?') // no task named: the selection stays
+    expect(await ui.find({ type: 'Text', text: /^T-003 {2}Old bug$/ })).toBeDefined()
+    await ask('T-001', 'From a teammate', 'agent-1') // a teammate's question: the board stays
+    expect(await ui.find({ type: 'Text', text: /^T-003 {2}Old bug$/ })).toBeDefined()
   })
 
   test(`the project's name sits at the top right, on the board and the settings (${surface})`, async ($, on) => {

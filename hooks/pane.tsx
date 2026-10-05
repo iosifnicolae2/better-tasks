@@ -2,12 +2,13 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, ICONS, ProjectHeader, TITLES, projectTitle, sectionsOf, shortDates, shifted, wheeled } from './board'
+import { Board, ICONS, ProjectHeader, TITLES, prIn, projectTitle, sectionsOf, shortDates, shifted, wheeled } from './board'
 import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } from './board'
 import { searchTasks } from './search'
+import { taskIdIn } from './spawn'
 import { ConfigPage } from './configpage'
 import type { ConfigValue, ProjectFacts } from './configpage'
-import { quickTimePlay, VIDEOS_FOLDER } from './demovideo'
+import { defaultBrowserId, handlersArgv, videoPage, videoPagePath, VIDEOS_FOLDER } from './demovideo'
 
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
@@ -93,10 +94,18 @@ async function openFile($: EngineInterface, editor: Editor, file: string): Promi
   await $.process.run(openCommand(editor, file, await hostOf($, editor)))
 }
 
-/** Plays at once with the sound on in QuickTime (macOS); else opens it in the default player. */
+/** Plays the video in the default browser: a page beside it that plays it (demovideo.ts), opened with the browser itself. */
 async function playVideo($: EngineInterface, path: string): Promise<void> {
-  const played = await $.process.run(['osascript', '-e', quickTimePlay(path)]).then(done => done.exitCode === 0, () => false)
-  if (!played) await openFile($, 'default', path)
+  const page = videoPagePath(path)
+  await $.fs.write(page, videoPage(path))
+  const handlers = await $.process.run(handlersArgv((await $.env.get('HOME')) ?? '~')).catch(() => undefined)
+  if (handlers?.exitCode === 0) await $.process.run(['open', '-b', defaultBrowserId(handlers.stdout), page])
+  else await openFile($, 'default', page)
+}
+
+/** Opens a link (the task's PR) in the default browser. */
+async function openLink($: EngineInterface, url: string): Promise<void> {
+  await openFile($, 'default', url)
 }
 
 /** The task's before/after video (demovideo.ts), when bin/demo-video.sh made one. */
@@ -311,9 +320,34 @@ function closedOf(tasks: readonly Task[]): Task[] {
 async function showNewTask($: EngineInterface, options: PluginOptions, id: string): Promise<void> {
   await listTasks(filesOf($, options))
   await update($, selectedState, () => id)
+  await openUnfocused($, `better-tasks: task ${id} created · type /better-tasks to see the board`)
+}
+
+/**
+ * The lead asks the user about a task: the board selects it, so its actions (Video, Open PR) are
+ * right there. A closed task shows the Closed section; an open search closes. No keys are taken.
+ */
+async function showAskedTask($: EngineInterface, options: PluginOptions, id: string): Promise<void> {
+  const task = (await listTasks(filesOf($, options))).find(one => one.id === id)
+  if (task === undefined) return
+  if (!isOpen(task)) await $.store.set(CLOSED_KEY, true)
+  await closeSearch($)
+  await leaveModes($)
+  await update($, selectedState, () => id)
+  await openUnfocused($, `better-tasks: asking about ${id} · type /better-tasks to see it on the board`)
+}
+
+/** The task a question names: in its header ("T-004"), else in its text. */
+function askedTaskId(questions: readonly { header?: string; question?: string }[], prefix: string): string | undefined {
+  const named = (text?: string) => (text ? taskIdIn(text, prefix) : undefined)
+  return questions.map(one => named(one.header) ?? named(one.question)).find(Boolean)
+}
+
+/** Opens the board without the keys, only in the fullscreen layout, as at start; elsewhere logs the line. */
+async function openUnfocused($: EngineInterface, elsewhere: string): Promise<void> {
   if ((await $.ui.panes()).some(pane => pane.id === PANE)) return
   if (!(await isFullscreenLayout($))) {
-    $.ui.log(`better-tasks: task ${id} created · type /better-tasks to see the board`)
+    $.ui.log(elsewhere)
     return
   }
   await leaveModes($)
@@ -394,6 +428,16 @@ export function registerPane(on: On, options: PluginOptions): void {
     // Showing it is a courtesy: a failure here must never fail the model's tool call.
     if (id !== undefined) await showNewTask($, options, id).catch(error => $.ui.log(`showing ${id} failed: ${error}`, { to: 'debug' }))
     return ran
+  })
+
+  // The lead's question about a task selects it on the board while the question shows, not after.
+  on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
+    if (e.agentId === undefined) {
+      const files = filesOf($, options)
+      const id = askedTaskId(e.questions ?? [], (await settingsFrom(files)).tasks.prefix)
+      if (id !== undefined) await showAskedTask($, options, id).catch(error => $.ui.log(`selecting ${id} failed: ${error}`, { to: 'debug' }))
+    }
+    return next(e)
   })
 
   // The register's own session.start runs for every session; this one, with a matcher, only reopens.
@@ -499,6 +543,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       isMoving: selectedTask.id === movingId,
       isActing: selectedTask.id === actingId,
       video: await videoOf($, selectedTask.id),
+      pr: prIn(selectedTask.body),
     }
     const sprints: Partial<Record<When, SprintFacts>> = {
       'this-sprint': { details: sprintDetails(current, settings.sprint, day), isLastDay: daysLeft(day, current, settings.sprint) <= 1, done: doneCount, total: inSprint.length, goal },
@@ -519,6 +564,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       move: (task: Task, to: When) => void leave().then(() => changeTask(files, task, { when: to }, settings.sprint)).then(keepFocus(task.id)),
       open: task => void leave().then(() => openFile($, settings.editor, task.file)).then(keepFocus(task.id)),
       playVideo: path => void playVideo($, path),
+      openPr: url => void openLink($, url),
       start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task) })).then(keepFocus(task.id)),
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
