@@ -1,16 +1,10 @@
-import type { Files } from './io'
-import { CONFIG_FILE, DEFAULTS } from './settings'
-import { skillCall } from './skills'
-
+import { CONFIG_FILE, DEFAULTS } from './settings';
+import { skillCall } from './skills';
 // The texts the mod ships, and the project's markdown overrides of them in .claude/tasks/.
 // An override replaces the shipped text, or extends it when its first line is EXTEND.
 // HTML comments in an override are notes for people and never reach the model.
-
-export const OVERRIDES_DIR = '.claude/tasks'
-export const EXTEND = '<!-- extend -->'
-
-export type TextName = 'coordinator' | 'teammate' | 'task-template' | 'tips'
-
+export const OVERRIDES_DIR = '.claude/tasks';
+export const EXTEND = '<!-- extend -->';
 const COORDINATOR = `# better-tasks: you lead a team of Claude Code teammates
 You coordinate: file the user's messages as tasks, route them to teammates, ask the user. Teammates do the work.
 - Don't do the work yourself, not even a small edit: answer questions, route the rest, and wait for the teammate.
@@ -53,8 +47,7 @@ You coordinate: file the user's messages as tasks, route them to teammates, ask 
 - Any other link in a question to the user: as the block does, a markdown link with a short label on its own line in your text before the call, and the bare url alone on its own line in the question.
 - Tell the user in one line where each message went.
 
-Board: /better-tasks (settings: /better-tasks config). /away turns the screens off. To customize better-tasks for this project, call project_init and edit .claude/tasks/.`
-
+Board: /better-tasks (settings: /better-tasks config). /away turns the screens off. To customize better-tasks for this project, call project_init and edit .claude/tasks/.`;
 const TEAMMATE = `# You are a better-tasks teammate
 - You own one area. Stay in its files. Need a change in another area? Ask its owner with SendMessage, or the lead if you don't know who owns it.
 - Need the user to decide or do something? Ask the lead; it asks the user.
@@ -63,85 +56,72 @@ const TEAMMATE = `# You are a better-tasks teammate
 - Given a predecessor's transcript? Search it for what you need instead of redoing its work.
 - Keep your context lean: read only what the task needs; use a subagent for wide searches.
 - Commit small and often.
-- Done (and when a requested change is done): load the \`${skillCall('done')}\` skill: your notes, the user's question for the lead to paste, then one line to the lead, "T-004 done: <commits>, see <task file>". Never set the task done yourself.`
-
+- Done (and when a requested change is done): load the \`${skillCall('done')}\` skill: your notes, the user's question for the lead to paste, then one line to the lead, "T-004 done: <commits>, see <task file>". Never set the task done yourself.`;
 const TASK_TEMPLATE = `## Goal
 {goal}
 
 ## Notes
-`
-
+`;
 const TIPS = `/better-tasks: the board · ↑↓: select  ⏎: actions  f: search  c: settings
 "fix the login redirect": a task, started now · "… next sprint" or "… backlog": planned, not started
-/away: screens off, Mac keeps working`
-
-export const SHIPPED: Record<TextName, string> = {
-  coordinator: COORDINATOR,
-  teammate: TEAMMATE,
-  'task-template': TASK_TEMPLATE,
-  tips: TIPS,
-}
-
-const COMMENTS = /<!--[\s\S]*?-->/g
-
+/away: screens off, Mac keeps working`;
+export const SHIPPED = {
+    coordinator: COORDINATOR,
+    teammate: TEAMMATE,
+    'task-template': TASK_TEMPLATE,
+    tips: TIPS,
+};
+const COMMENTS = /<!--[\s\S]*?-->/g;
 /** The text in force: the shipped one, replaced or extended by the project's override. */
-export function resolveText(shipped: string, override: string | undefined): string {
-  if (override === undefined) return shipped
-  const isExtending = override.trimStart().startsWith(EXTEND)
-  const own = override.replace(COMMENTS, '').trim()
-  if (!isExtending) return own
-  return own ? `${shipped.trimEnd()}\n\n${own}` : shipped
+export function resolveText(shipped, override) {
+    if (override === undefined)
+        return shipped;
+    const isExtending = override.trimStart().startsWith(EXTEND);
+    const own = override.replace(COMMENTS, '').trim();
+    if (!isExtending)
+        return own;
+    return own ? `${shipped.trimEnd()}\n\n${own}` : shipped;
 }
-
 /** Fills {name} placeholders; unknown ones stay as written. */
-export function fill(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole)
+export function fill(template, values) {
+    return template.replace(/\{(\w+)\}/g, (whole, name) => values[name] ?? whole);
 }
-
-export function overridePath(name: TextName): string {
-  return `${OVERRIDES_DIR}/${name}.md`
+export function overridePath(name) {
+    return `${OVERRIDES_DIR}/${name}.md`;
 }
-
-export async function projectText(files: Files, name: TextName): Promise<string> {
-  const override = await files.read(`${await files.root()}/${overridePath(name)}`).catch(() => undefined)
-  return resolveText(SHIPPED[name], override)
+export async function projectText(files, name) {
+    const override = await files.read(`${await files.root()}/${overridePath(name)}`).catch(() => undefined);
+    return resolveText(SHIPPED[name], override);
 }
-
 // ---- Starter files: what /better-tasks init (or the project_init tool) writes ----
-
-function starterConfig(): string {
-  const lines = Object.entries(DEFAULTS).map(([key, value]) => `  "// ${key}": ${JSON.stringify(value)}`)
-  const note =
-    '  "//": "better-tasks settings for this project. Remove the // in front of a key to set it here; ' +
-    'keys left out come from /config or the defaults. {id}, {slug} and {title} work in taskFileName."'
-  return `{\n${[note, ...lines].join(',\n')}\n}\n`
+function starterConfig() {
+    const lines = Object.entries(DEFAULTS).map(([key, value]) => `  "// ${key}": ${JSON.stringify(value)}`);
+    const note = '  "//": "better-tasks settings for this project. Remove the // in front of a key to set it here; ' +
+        'keys left out come from /config or the defaults. {id}, {slug} and {title} work in taskFileName."';
+    return `{\n${[note, ...lines].join(',\n')}\n}\n`;
 }
-
-function starterText(name: TextName): string {
-  const shipped = SHIPPED[name].replace(/-->/g, '--&gt;')
-  return (
-    `${EXTEND}\n` +
-    `<!-- What you write below is added to better-tasks' own ${name} text. Delete the first line to replace ` +
-    'that text instead. Comments like this one never reach the model. The shipped text, for reference:\n\n' +
-    `${shipped}\n-->\n`
-  )
+function starterText(name) {
+    const shipped = SHIPPED[name].replace(/-->/g, '--&gt;');
+    return (`${EXTEND}\n` +
+        `<!-- What you write below is added to better-tasks' own ${name} text. Delete the first line to replace ` +
+        'that text instead. Comments like this one never reach the model. The shipped text, for reference:\n\n' +
+        `${shipped}\n-->\n`);
 }
-
 /** Every starter file, by its path relative to the project root. */
-export function starterFiles(): Record<string, string> {
-  const texts = Object.keys(SHIPPED).map(name => [overridePath(name as TextName), starterText(name as TextName)])
-  return Object.fromEntries([[CONFIG_FILE, starterConfig()], ...texts])
+export function starterFiles() {
+    const texts = Object.keys(SHIPPED).map(name => [overridePath(name), starterText(name)]);
+    return Object.fromEntries([[CONFIG_FILE, starterConfig()], ...texts]);
 }
-
 /** Writes the starter files the project does not have yet; returns the paths written. */
-export async function initProject(files: Files): Promise<string[]> {
-  const root = await files.root()
-  const written: string[] = []
-  for (const [path, text] of Object.entries(starterFiles())) {
-    const exists = await files.read(`${root}/${path}`).then(() => true, () => false)
-    if (exists) continue
-    await files.write(`${root}/${path}`, text)
-    written.push(path)
-  }
-  return written
+export async function initProject(files) {
+    const root = await files.root();
+    const written = [];
+    for (const [path, text] of Object.entries(starterFiles())) {
+        const exists = await files.read(`${root}/${path}`).then(() => true, () => false);
+        if (exists)
+            continue;
+        await files.write(`${root}/${path}`, text);
+        written.push(path);
+    }
+    return written;
 }

@@ -49,7 +49,10 @@ You work in your own git worktree, on its own branch; the project's main checkou
 - Commit there as usual, small and often.
 ${PR_DONE_LINE}`
 
-export const PR_COORDINATOR_RULES = `## Pull request per task (on)
-- A finished task's notes hold "PR: <url>"; its "For the user" block links the PR, not the video (the PR's picture opens it). "Mark as resolved" merges: its description says "merge the PR and close T-004".
+/** The openPrInBrowser setting's line: the PR is on screen when its question comes. Its own line, so the dev-prs flow takes it too (finishingOf). */
+export const OPEN_PR_LINE = '- A finished task with a PR: open the PR in the default browser right before its question, `open <url>` (Linux: `xdg-open <url>`, Windows: `start <url>`), then ask.'
+
+export const prCoordinatorRules = (openPrInBrowser: boolean) => `## Pull request per task (on)
+- A finished task's notes hold "PR: <url>"; its "For the user" block links the PR, not the video (the PR's picture opens it). "Mark as resolved" merges: its description says "merge the PR and close T-004".${openPrInBrowser ? `\n${OPEN_PR_LINE}` : ''}
 - Mark as resolved: \`gh pr merge <url> --squash --delete-branch\`, then \`git pull --ff-only\` in the project, then close the task with the merge commit. The merge fails (a conflict)? Tell the teammate to update its PR; then merge.
 - Request changes: the teammate pushes to the same PR.`

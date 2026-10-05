@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { ghProblem, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from '../hooks/pullrequest'
+import { ghProblem, ghUpdateVerdict, hasGitHub, OPEN_PR_LINE, prCoordinatorRules, PR_TEAMMATE_RULES } from '../hooks/pullrequest'
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
@@ -35,8 +35,15 @@ describe('PR per task', () => {
   })
 
   test('with a PR the approval question shows only the PR link: its picture opens the video', () => {
-    expect(PR_COORDINATOR_RULES).toContain("links the PR, not the video (the PR's picture opens it)")
-    expect(PR_COORDINATOR_RULES).toContain('gh pr merge <url> --squash --delete-branch')
+    expect(prCoordinatorRules(true)).toContain("links the PR, not the video (the PR's picture opens it)")
+    expect(prCoordinatorRules(true)).toContain('gh pr merge <url> --squash --delete-branch')
+  })
+
+  test('openPrInBrowser: the lead opens the PR right before its question; off, it does not', () => {
+    expect(prCoordinatorRules(true)).toContain(OPEN_PR_LINE)
+    expect(OPEN_PR_LINE).toContain('`open <url>`')
+    expect(prCoordinatorRules(false)).not.toContain('default browser')
+    expect(prCoordinatorRules(false)).toContain('gh pr merge <url> --squash --delete-branch')
   })
 
   test("the teammate's prompt keeps the worktree and a pointer: the how-to is the pull-request skill", () => {

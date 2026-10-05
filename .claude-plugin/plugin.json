@@ -46,6 +46,12 @@
       "description": "Holds caffeinate while any teammate runs.",
       "default": true
     },
+    "openPrInBrowser": {
+      "type": "boolean",
+      "title": "Open PRs in the browser",
+      "description": "When the manager asks you to approve a finished task, it first opens that task's PR in your default browser.",
+      "default": true
+    },
     "demoVideos": {
       "type": "boolean",
       "title": "Before/after videos",

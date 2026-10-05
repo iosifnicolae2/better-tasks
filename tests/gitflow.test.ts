@@ -6,6 +6,7 @@ import {
   recommend, teammateRules, usesWorktree,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
+import { OPEN_PR_LINE, prCoordinatorRules } from '../hooks/pullrequest'
 
 const SOLO_LIGHT: ProjectFacts = { hasGitHub: true, cacheMb: 300, app: '', authors: 1, prChecks: false }
 
@@ -103,6 +104,11 @@ describe('git flow', () => {
     expect(lead).toContain('- A finished task\'s notes hold "PR: <url>". Show it.')
     expect(lead).not.toContain('- Mark as resolved: merge.')
     expect(lead).toContain('python3 /bin/task_pr.py sync')
+  })
+
+  test("the dev flow's lead opens the PR in the browser too, when the setting is on", () => {
+    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(true))).toContain(OPEN_PR_LINE)
+    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(false))).not.toContain('default browser')
   })
 })
 

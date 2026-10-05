@@ -118,6 +118,16 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'team',
+    field: 'openPrInBrowser',
+    label: 'Open PRs in the browser',
+    describe: 'When the manager asks you to approve a finished task, it first opens that task’s PR in your default browser.',
+    options: ON_OFF,
+    value: settings => (settings.openPrInBrowser ? 'on' : 'off'),
+    initial: 'on',
+    stored: isOn,
+  },
+  {
+    group: 'team',
     field: 'demoVideos',
     label: 'Before/after videos',
     describe: 'Finished work comes with a short narrated video: the bug, then the fix, marked in red. Sets up the Kokoro voice once.',

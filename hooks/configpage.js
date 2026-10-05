@@ -1,0 +1,265 @@
+import { KeyHint } from './board';
+import { FLOW_LABELS, GIT_FLOWS } from './gitflow';
+import { EFFORTS, LEVELS, MODELS, VIDEO_QUALITIES } from './settings';
+const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const ON_OFF = ['on', 'off'];
+const isOn = (value) => value === 'on';
+const asIs = (value) => value;
+const QUALITY_LABELS = { low: '720p small', medium: '1080p medium', high: '1080p high' };
+const LEVEL_ABOUT = {
+    easy: { label: 'Easy-task', work: 'quick, clear work: a typo, a text, a small fix', effort: 'low' },
+    normal: { label: 'Normal-task', work: 'an ordinary feature or bug fix', effort: 'medium' },
+    hard: { label: 'Hard-task', work: 'deep debugging, security work, changes across several areas', effort: 'high' },
+};
+/** A level's two rows: the model teammates run on, and how hard they think. */
+function modelFields(level) {
+    const { label, work, effort } = LEVEL_ABOUT[level];
+    return [
+        {
+            group: 'models',
+            field: `${level}Model`,
+            label: `${label} model`,
+            describe: `The model teammates run on for ${work}. inherit: the manager’s own.`,
+            options: MODELS,
+            value: settings => settings.models[level].model,
+            initial: 'opus',
+            stored: asIs,
+        },
+        {
+            group: 'models',
+            field: `${level}Effort`,
+            label: `${label} effort`,
+            describe: `How hard teammates think on ${work}.`,
+            options: EFFORTS,
+            value: settings => settings.models[level].effort,
+            initial: effort,
+            stored: asIs,
+        },
+    ];
+}
+export const FIELDS = [
+    {
+        group: 'team',
+        field: 'editor',
+        label: 'Editor',
+        describe: 'Opens task files. auto: the IDE Claude runs in, else the default app.',
+        options: ['auto', 'default', 'code', 'idea', 'cursor', 'zed'],
+        value: settings => settings.editor,
+        initial: 'auto',
+        stored: asIs,
+    },
+    {
+        group: 'team',
+        field: 'gitFlow',
+        label: 'Git flow',
+        describe: 'How teammates’ work reaches main. Straight to main: one checkout, no PRs. Shared dev branch: one checkout on dev, a PR per task. Worktree: a copy and a PR each. Saved in this project’s config.json.',
+        options: GIT_FLOWS.map(flow => FLOW_LABELS[flow]),
+        value: settings => FLOW_LABELS[settings.gitFlow],
+        initial: FLOW_LABELS.direct,
+        stored: label => GIT_FLOWS.find(flow => FLOW_LABELS[flow] === label) ?? 'direct',
+    },
+    {
+        group: 'team',
+        field: 'longCache',
+        label: '1-hour prompt cache',
+        describe: 'Teammates and the manager keep their prompt cache for an hour, so a teammate stays cheap to resume.',
+        options: ON_OFF,
+        value: settings => (settings.longCache ? 'on' : 'off'),
+        initial: 'on',
+        stored: isOn,
+    },
+    {
+        group: 'team',
+        field: 'statusEvery',
+        label: 'Status check',
+        describe: 'After this many quiet minutes the manager checks the open work and moves it forward. off: never.',
+        options: ['off', 'every 10 min', 'every 20 min', 'every 30 min', 'every 60 min'],
+        value: settings => (settings.statusEvery > 0 ? `every ${settings.statusEvery} min` : 'off'),
+        initial: 'every 10 min',
+        stored: value => (value === 'off' ? 0 : Number.parseInt(value.replace('every ', ''), 10)),
+    },
+    {
+        group: 'team',
+        field: 'keepAwake',
+        label: 'Keep the Mac awake',
+        describe: 'Holds caffeinate while any teammate runs.',
+        options: ON_OFF,
+        value: settings => (settings.keepAwake ? 'on' : 'off'),
+        initial: 'on',
+        stored: isOn,
+    },
+    {
+        group: 'team',
+        field: 'openPrInBrowser',
+        label: 'Open PRs in the browser',
+        describe: 'When the manager asks you to approve a finished task, it first opens that task’s PR in your default browser.',
+        options: ON_OFF,
+        value: settings => (settings.openPrInBrowser ? 'on' : 'off'),
+        initial: 'on',
+        stored: isOn,
+    },
+    {
+        group: 'team',
+        field: 'demoVideos',
+        label: 'Before/after videos',
+        describe: 'Finished work comes with a short narrated video: the bug, then the fix, marked in red. Sets up the Kokoro voice once.',
+        options: ON_OFF,
+        value: settings => (settings.demoVideos ? 'on' : 'off'),
+        initial: 'off',
+        stored: isOn,
+    },
+    {
+        group: 'team',
+        field: 'videoQuality',
+        label: 'Video quality',
+        describe: 'The before/after videos’ size: 720p small file, 1080p medium (sharp, a few MB a minute), 1080p high (sharper, bigger file).',
+        options: Object.values(QUALITY_LABELS),
+        value: settings => QUALITY_LABELS[settings.videoQuality],
+        initial: QUALITY_LABELS.medium,
+        stored: label => VIDEO_QUALITIES.find(quality => QUALITY_LABELS[quality] === label) ?? 'medium',
+    },
+    {
+        group: 'team',
+        field: 'offScreen',
+        label: 'Test off-screen',
+        describe: 'Teammates test and record in a hidden browser, simulator or terminal, so your screen, mouse and keyboard stay yours. Saved in this project.',
+        options: ON_OFF,
+        value: settings => (settings.offScreen ? 'on' : 'off'),
+        initial: 'off',
+        stored: isOn,
+    },
+    ...LEVELS.flatMap(modelFields),
+    {
+        group: 'models',
+        field: 'escalate',
+        label: 'Escalate when stuck',
+        describe: 'A teammate that fails or goes in circles is replaced by one a level up: easy to normal, normal to hard.',
+        options: ON_OFF,
+        value: settings => (settings.models.escalate ? 'on' : 'off'),
+        initial: 'on',
+        stored: isOn,
+    },
+    {
+        group: 'sprint',
+        field: 'sprintWeeks',
+        label: 'Sprint length',
+        describe: 'How many weeks one sprint lasts.',
+        options: ['1 week', '2 weeks', '3 weeks', '4 weeks'],
+        value: settings => (settings.sprint.weeks === 1 ? '1 week' : `${settings.sprint.weeks} weeks`),
+        initial: '1 week',
+        stored: value => value.split(' ')[0] ?? '1',
+    },
+    {
+        group: 'sprint',
+        field: 'sprintStart',
+        label: 'Sprint starts on',
+        describe: 'The weekday a new sprint begins.',
+        options: WEEKDAYS,
+        value: settings => WEEKDAYS[(settings.sprint.startDay + 6) % 7] ?? 'monday',
+        initial: 'monday',
+        stored: asIs,
+    },
+];
+/** The value after `current`, wrapping round; a value not in the list goes to the first. */
+export function nextOption(options, current) {
+    return options[(options.indexOf(current) + 1) % options.length] ?? current;
+}
+export function isChanged(field, settings) {
+    return field.value(settings) !== field.initial;
+}
+const FILE_ABOUT = {
+    'config.json': "This project's values for any setting; they win over /config.",
+    'coordinator.md': 'Replaces or extends the rules the main session coordinates by.',
+    'teammate.md': 'Goes into every named teammate’s spawn prompt.',
+    'task-template.md': 'The body a new task file starts with.',
+};
+export function ConfigPage(props) {
+    const { ui, settings, sprintPreview, fromProject, project, focusedRow, onChange, onOpenNative, onOpenSprints, onBack } = props;
+    const { Box, Button, Text } = ui;
+    const fieldRow = (field) => (<Row ui={ui} rowKey={`cfg-${field.field}`} label={field.label} value={field.value(settings)} isChanged={isChanged(field, settings)} isFromProject={fromProject.includes(field.field)} onPress={() => onChange(field.field, field.stored(nextOption(field.options, field.value(settings))))}/>);
+    const describe = describeRow(focusedRow, fromProject, project);
+    return (<Box flexDirection="column">
+      <Heading ui={ui} title="Team"/>
+      {FIELDS.filter(field => field.group === 'team').map(fieldRow)}
+      <Heading ui={ui} title="Teammate models"/>
+      {FIELDS.filter(field => field.group === 'models').map(fieldRow)}
+      <Heading ui={ui} title="Sprint"/>
+      {FIELDS.filter(field => field.group === 'sprint').map(fieldRow)}
+      <Box paddingLeft={4} height={1} overflow="hidden">
+        <Text color="subtle" wrap="truncate-end">{sprintPreview}</Text>
+      </Box>
+      <Row ui={ui} rowKey="cfg-sprints" label="Sprint goals & reviews" value="open" onPress={onOpenSprints}/>
+      <Heading ui={ui} title="This project"/>
+      {project.files.map(file => (<Row ui={ui} rowKey={`file-${file.label}`} label={file.label} value={fileValue(file, fromProject.length)} onPress={() => project.onOpen(file.label)}/>))}
+      {project.problems.length > 0 && (<Box paddingLeft={2} height={1} overflow="hidden">
+          <Text color="warning" wrap="truncate-end">⚠ {project.problems.join(' · ')}</Text>
+        </Box>)}
+      <Row ui={ui} rowKey="cfg-instructions" label="Project instructions" value={settings.instructions || 'none · set in config.json'} isFromProject={fromProject.includes('instructions')} onPress={() => project.onOpen('instructions')}/>
+      <Row ui={ui} rowKey="cfg-pr-template" label="PR template" value={prTemplateValue(project.prTemplate)} isFromProject={fromProject.includes('prTemplate')} onPress={() => project.onOpen('pr-template')}/>
+      <Row ui={ui} rowKey="cfg-native" label="All Claude Code settings" value="/config" onPress={onOpenNative}/>
+      <Box flexDirection="column" marginTop={1}>
+        <Box height={1} overflow="hidden">
+          <Text color="subtle" wrap="truncate-end">{describe}</Text>
+        </Box>
+        <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
+          <KeyHint ui={ui} keys="↑↓" word="choose"/>
+          <KeyHint ui={ui} keys="⏎" word="change"/>
+          <Button key="board" plain dimColor hotkey="b" label="board" onPress={onBack}/>
+        </Box>
+      </Box>
+    </Box>);
+}
+function fileValue(file, projectValues) {
+    if (file.label === 'config.json')
+        return file.exists ? `${projectValues} value${projectValues === 1 ? '' : 's'} · open` : 'none · create';
+    return file.exists ? 'custom · open' : 'default · create';
+}
+function prTemplateValue(template) {
+    return template.source === 'shipped' ? 'better-tasks’ · add to repo' : `${template.shown} · open`;
+}
+/** The description line: what the focused row does, and where its value comes from. */
+function describeRow(rowKey, fromProject, project) {
+    const field = FIELDS.find(one => `cfg-${one.field}` === rowKey);
+    if (field) {
+        const source = fromProject.includes(field.field) ? ' Set by this project’s config.json, which /config does not override.' : '';
+        return `${field.label}: ${field.describe}${source}`;
+    }
+    const file = rowKey.startsWith('file-') ? rowKey.slice('file-'.length) : undefined;
+    if (file !== undefined) {
+        const exists = project.files.find(one => one.label === file)?.exists === true;
+        return `${file}: ${FILE_ABOUT[file] ?? ''} ⏎ ${exists ? 'opens it' : 'creates it from the shipped text, then opens it'}.`;
+    }
+    if (rowKey === 'cfg-instructions') {
+        return 'Project instructions: files or folders every teammate and the lead follow, as "instructions" in config.json (comma-separated). The prompts get each path and its first line. ⏎ opens the first one, or config.json.';
+    }
+    if (rowKey === 'cfg-pr-template') {
+        const action = project.prTemplate.source === 'shipped'
+            ? 'This project has none, so PRs use better-tasks’ own. ⏎ adds it as .github/pull_request_template.md and opens it.'
+            : '⏎ opens it.';
+        return `PR template: what every PR description fills in: the request and why at the top, then the video, what changed, how to test. A path of your own: "prTemplate" in config.json; else the project’s, else better-tasks’. ${action}`;
+    }
+    if (rowKey === 'cfg-sprints')
+        return 'Sprint goals & reviews: opens sprints.md, one section per sprint.';
+    if (rowKey === 'cfg-native')
+        return "All Claude Code settings: opens /config; this plugin's rows read “Better Tasks: …”.";
+    return 'Values are saved as soon as they change · • differs from the default · ◆ set by this project';
+}
+function Heading({ ui, title }) {
+    const { Box, Text } = ui;
+    return (<Box marginTop={1} height={1}>
+      <Text bold color="subtle">{title}</Text>
+    </Box>);
+}
+/** "  • Editor                    auto": marker, the label (the focusable part), the value in its column. */
+function Row({ ui, rowKey, label, value, isChanged, isFromProject, onPress }) {
+    const { Box, Button, Text } = ui;
+    return (<Box flexDirection="row" height={1} overflow="hidden">
+      <Box width={2} flexShrink={0}>
+        <Text color="suggestion">{isFromProject ? '◆' : isChanged ? '•' : ' '}</Text>
+      </Box>
+      <Box width={28} flexShrink={0}>
+        <Button key={rowKey} plain label={label} onPress={onPress}/>
+      </Box>
+      <Text color={isChanged || isFromProject ? 'suggestion' : 'subtle'} wrap="truncate-end">{value}</Text>
+    </Box>);
+}
