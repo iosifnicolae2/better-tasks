@@ -34,7 +34,8 @@ Restart Claude Code.
 - 🤖 **A team of agents:** the lead hands each task to a teammate.
 - ✅ **You approve** finished work before a task closes.
 - 🎥 **Before/after videos** of each change, narrated.
-- 🔀 **A pull request per task**, merged when you approve.
+- 🔀 **Your git flow, asked once per project:** straight to main; a shared `dev` branch with a pull request per task (one build, one install for everything); or a worktree and pull request per teammate. Recommended from a quick look at the project.
+- 📌 **Your own instructions** for every task: point `instructions` in `.claude/tasks/config.json` at a file or folder; prompts carry its path and first line.
 - 🧘 **A quiet IDE:** IntelliJ skips the teammates' worktrees (`.claude/worktrees/`), so they don't set off re-indexing.
 - 🌙 **`/away`:** screens off, the Mac keeps working.
 
@@ -67,6 +68,6 @@ Installed per project? Add the same `--scope project` to `update` and `uninstall
 ## 🧩 More
 
 - **Settings:** `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`.
-- **Optional tools:** before/after videos need `ffmpeg` and `uv` (`brew install ffmpeg uv`); pull requests need `gh`.
+- **Optional tools:** before/after videos need `ffmpeg` and `uv` (`brew install ffmpeg uv`); pull requests need `gh`; the shared-dev-branch flow uses `python3`.
 - **Project setup:** ask "set up better-tasks for this project", then edit the files in `.claude/tasks/`.
 - **Development:** `claude --plugin-dir .` runs this copy; `claude plugin test .` runs the tests; `bun scripts/yaml-check.ts [tasks folder]` checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML); `sh scripts/video-branch-check.sh` checks the video links bin/video-branch.sh prints.

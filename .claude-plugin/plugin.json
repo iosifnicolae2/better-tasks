@@ -25,7 +25,7 @@
     "worktree": {
       "type": "boolean",
       "title": "Worktree per teammate",
-      "description": "Each named teammate works in its own git worktree.",
+      "description": "Old switch, kept for projects that set it: with the git flow \"Straight to main\", each named teammate works in its own git worktree. Choose the git flow in /better-tasks config.",
       "default": false
     },
     "longCache": {
@@ -66,7 +66,7 @@
     "pullRequests": {
       "type": "boolean",
       "title": "PR per task",
-      "description": "Each teammate works in its own worktree and finishes with a GitHub pull request (with its before/after video); the manager merges it when you approve. Updates gh (Homebrew) when it is too old for the video.",
+      "description": "Old switch, kept for projects that set it: on means the git flow \"Worktree and PR per task\". Choose the git flow per project in /better-tasks config.",
       "default": false
     },
     "easyModel": {
