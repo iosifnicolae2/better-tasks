@@ -1093,7 +1093,7 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
   expect(team.asked).toBe(1)
 })
 
-const LS_REMOTE = 'git ls-remote --tags --refs https://github.com/iosifnicolae2/better-tasks.git'
+const LS_REMOTE = 'git ls-remote --tags --refs -- https://github.com/iosifnicolae2/better-tasks.git'
 const RELEASES = 'a\trefs/tags/v0.10.7\nb\trefs/tags/v0.10.8'
 const SHARED = `${ROOT}/.claude/settings.json`
 /** The plugin under test runs from this checkout: its own folder, as Claude Code lists an install. */
@@ -1153,8 +1153,8 @@ test('a newer release: asked once; Yes moves the pin, updates the plugin, says t
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
   expect(asked[0]).toBe(updateQuestion('v0.10.8'))
-  expect(host.ran).toContain('claude plugin marketplace add iosifnicolae2/better-tasks#v0.10.8 --scope project')
-  expect(host.ran).toContain('claude plugin update better-tasks@better-tasks --scope user')
+  expect(host.ran).toContain('claude plugin marketplace add --scope project -- iosifnicolae2/better-tasks#v0.10.8')
+  expect(host.ran).toContain('claude plugin update --scope user -- better-tasks@better-tasks')
   expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${updateCommit('v0.10.8')} --only -- .claude/settings.json`)
   expect(host.notices).toContain('better-tasks: updated to v0.10.8. Restart Claude Code to use it. .claude/settings.json now pins v0.10.8. Committed; push it for your teammates.')
 })

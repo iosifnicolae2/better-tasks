@@ -21,6 +21,19 @@ const TAG = /^v(\d+)\.(\d+)\.(\d+)$/
 /** True for a release tag: vX.Y.Z. */
 export const isReleaseTag = (ref: unknown): ref is string => typeof ref === 'string' && TAG.test(ref)
 
+// Values from a project's shared settings reach git and claude as arguments; a cloned repo writes that file.
+// Only these shapes pass, so none can read as an option (--upload-pack=…) or a transport (ext::…).
+const GITHUB_REPO = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.][A-Za-z0-9_.-]*$/
+const HTTPS_URL = /^https:\/\/[A-Za-z0-9][A-Za-z0-9.-]*(:\d+)?\/[^\s#]*$/
+const SCOPES = ['user', 'project', 'local', 'managed']
+
+/** True for a GitHub `owner/repo`. */
+export const isGithubRepo = (repo: unknown): repo is string => typeof repo === 'string' && GITHUB_REPO.test(repo)
+/** True for a plain https:// git URL: no spaces, no fragment, nothing an option or another transport could hide in. */
+export const isHttpsUrl = (url: unknown): url is string => typeof url === 'string' && HTTPS_URL.test(url)
+/** True for a marketplace source `claude plugin marketplace add` may get: owner/repo or a plain https URL. */
+export const isSafeSource = (source: string) => isGithubRepo(source) || isHttpsUrl(source)
+
 /** The release tags in `git ls-remote --tags --refs` output. */
 export function releaseTags(lsRemote: string): string[] {
   return lsRemote.split('\n').map(line => line.split('refs/tags/')[1]?.trim() ?? '').filter(isReleaseTag)
@@ -44,7 +57,7 @@ export function newestTag(tags: string[]): string | undefined {
 export function activeInstall(listJson: string, pluginRoot: string, projectRoot: string): Install | undefined {
   const entries = parseList(listJson).filter(entry => entry.id === PLUGIN_ID && trimSlash(entry.installPath) === trimSlash(pluginRoot))
   const entry = entries.find(each => each.scope !== 'user' && each.projectPath === projectRoot) ?? entries.find(each => each.scope === 'user')
-  return entry && typeof entry.version === 'string' && isReleaseTag(`v${entry.version}`) ? { version: entry.version, scope: entry.scope ?? 'user' } : undefined
+  return entry && typeof entry.version === 'string' && isReleaseTag(`v${entry.version}`) ? { version: entry.version, scope: SCOPES.includes(entry.scope ?? 'user') ? (entry.scope ?? 'user') : 'user' } : undefined
 }
 
 /**
@@ -68,12 +81,15 @@ export function pinTarget(tags: string[], installed: string | undefined): string
   return newestTag(tags)
 }
 
-export const lsRemoteArgv = (url: string) => ['git', 'ls-remote', '--tags', '--refs', url]
+export const lsRemoteArgv = (url: string) => ['git', 'ls-remote', '--tags', '--refs', '--', url]
 export const listArgv = ['claude', 'plugin', 'list', '--json']
-/** Moves the project's pinned marketplace to `tag`: the shared settings and Claude Code's copy of the marketplace. */
-export const repinArgv = (source: string, tag: string) => ['claude', 'plugin', 'marketplace', 'add', `${source}#${tag}`, '--scope', 'project']
+/** Moves the project's pinned marketplace to `tag`: the shared settings and Claude Code's copy of the marketplace. Undefined for a source or tag of another shape. */
+export function repinArgv(source: string, tag: string): string[] | undefined {
+  if (!isSafeSource(source) || !isReleaseTag(tag)) return undefined
+  return ['claude', 'plugin', 'marketplace', 'add', '--scope', 'project', '--', `${source}#${tag}`]
+}
 export const refreshArgv = ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE_NAME]
-export const updateArgv = (scope: string) => ['claude', 'plugin', 'update', PLUGIN_ID, '--scope', scope]
+export const updateArgv = (scope: string) => ['claude', 'plugin', 'update', '--scope', SCOPES.includes(scope) ? scope : 'user', '--', PLUGIN_ID]
 
 type ListEntry = { id?: unknown; version?: unknown; scope?: string; installPath?: unknown; projectPath?: unknown }
 

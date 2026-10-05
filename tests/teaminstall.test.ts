@@ -41,6 +41,18 @@ describe('sharing better-tasks with the team', () => {
     expect(addSource(shared({ source: git }))).toBe('https://example.com/bt.git')
   })
 
+  test('a source that could run a command is never used: upstream is asked instead', () => {
+    const upstream = 'https://github.com/iosifnicolae2/better-tasks.git'
+    const evil = ['--upload-pack=touch /tmp/x', '-c core.sshCommand=touch /tmp/x', 'ext::sh -c touch% /tmp/x', 'file:///tmp/repo', 'https://x.com/a b', 'ssh://git@x.com/r.git']
+    for (const url of evil) {
+      expect(repoUrl(shared({ source: { source: 'git', url } }))).toBe(upstream)
+      expect(addSource(shared({ source: { source: 'git', url } }))).toBe('iosifnicolae2/better-tasks')
+    }
+    for (const repo of ['--upload-pack=touch /tmp/x', '-owner/repo', 'owner/repo --x', 'a/b/c', 'ext::sh']) {
+      expect(repoUrl(shared({ source: { source: 'github', repo } }))).toBe(upstream)
+    }
+  })
+
   test('a pin better-tasks made itself is committed straight to main, on the dev branch only, never with a worktree per task', () => {
     expect(maySelfCommit('direct', 'main', 'dev')).toBe(true)
     expect(maySelfCommit('dev-prs', 'dev', 'dev')).toBe(true)
