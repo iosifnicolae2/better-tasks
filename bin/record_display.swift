@@ -9,6 +9,9 @@
 //   arrange                moves every virtual display into the row below the lowest physical screen
 //   screens                prints each real screen as "<display id><tab><name>", e.g. "2<tab>DELL U2720Q"
 //   virtuals               prints each virtual display's id, one per line (ours and other apps')
+//   power off|on           puts every external screen in standby, or wakes it, over DDC/CI (Apple silicon);
+//                          virtual displays have no such link, so they stay on. Prints "ready power off <n> screen(s)"
+//   ddc                    reads each external screen's power and brightness over DDC/CI, to see which answer
 // Each prints "ready ..." once it holds what it asked for, or "failed: why".
 import AppKit
 import CoreGraphics
@@ -190,6 +193,68 @@ func listVirtuals() {
   for id in activeDisplays() where !isPhysical(id, screens) { say("\(id)") }
 }
 
+// MARK: DDC/CI: the external screens' own controls, over the video cable
+
+let ddcChip: UInt32 = 0x37, ddcHost: UInt32 = 0x51
+let powerMode: UInt8 = 0xD6 // VCP code; values: 1 on, 4 standby (wakes over DDC)
+let brightness: UInt8 = 0x10
+
+/** The I2C links of the external screens; the built-in screen and virtual displays have none. */
+func externalLinks() -> [IOAVService] {
+  var links: [IOAVService] = []
+  var iterator: io_iterator_t = 0
+  guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("DCPAVServiceProxy"), &iterator) == KERN_SUCCESS else { return [] }
+  while case let service = IOIteratorNext(iterator), service != 0 {
+    let location = IORegistryEntryCreateCFProperty(service, "Location" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String
+    if location == "External", let link = IOAVServiceCreateWithService(kCFAllocatorDefault, service) {
+      links.append(link.takeRetainedValue())
+    }
+    IOObjectRelease(service)
+  }
+  IOObjectRelease(iterator)
+  return links
+}
+
+/** A DDC packet: its bytes, then their checksum (which counts the host's addresses too). */
+func ddcPacket(_ bytes: [UInt8]) -> [UInt8] {
+  bytes + [bytes.reduce(UInt8(0x6E ^ 0x51), ^)]
+}
+
+func ddcWrite(_ link: IOAVService, _ code: UInt8, _ value: UInt16) -> Bool {
+  var packet = ddcPacket([0x84, 0x03, code, UInt8(value >> 8), UInt8(value & 0xFF)])
+  for _ in 0..<3 {
+    if IOAVServiceWriteI2C(link, ddcChip, ddcHost, &packet, UInt32(packet.count)) == kIOReturnSuccess { return true }
+    usleep(20_000)
+  }
+  return false
+}
+
+func ddcRead(_ link: IOAVService, _ code: UInt8) -> (current: UInt16, max: UInt16)? {
+  var request = ddcPacket([0x82, 0x01, code])
+  var reply = [UInt8](repeating: 0, count: 12)
+  for _ in 0..<3 {
+    usleep(20_000)
+    guard IOAVServiceWriteI2C(link, ddcChip, ddcHost, &request, UInt32(request.count)) == kIOReturnSuccess else { continue }
+    usleep(50_000)
+    guard IOAVServiceReadI2C(link, ddcChip, ddcHost, &reply, UInt32(reply.count)) == kIOReturnSuccess,
+          reply[2] == 0x02, reply[3] == 0, reply[4] == code else { continue }
+    return (UInt16(reply[8]) << 8 | UInt16(reply[9]), UInt16(reply[6]) << 8 | UInt16(reply[7]))
+  }
+  return nil
+}
+
+func setPower(_ on: Bool) {
+  let done = externalLinks().filter { ddcWrite($0, powerMode, on ? 1 : 4) }.count
+  say("ready power \(on ? "on" : "off") \(done) screen(s)")
+}
+
+func listDdc() {
+  let describe = { (value: (current: UInt16, max: UInt16)?) in value.map { "\($0.current)/\($0.max)" } ?? "no answer" }
+  for (index, link) in externalLinks().enumerated() {
+    say("external \(index + 1): power \(describe(ddcRead(link, powerMode))), brightness \(describe(ddcRead(link, brightness)))")
+  }
+}
+
 func makeDisplay(_ options: Options) -> CGVirtualDisplay {
   let descriptor = CGVirtualDisplayDescriptor()
   descriptor.queue = DispatchQueue.main
@@ -271,5 +336,7 @@ case "info": info(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0)
 case "arrange": arrangeAll()
 case "screens": listScreens()
 case "virtuals": listVirtuals()
-default: fail("usage: record_display display|turn|info|arrange|screens|virtuals ...")
+case "power": setPower(arguments.dropFirst().first == "on")
+case "ddc": listDdc()
+default: fail("usage: record_display display|turn|info|arrange|screens|virtuals|power|ddc ...")
 }
