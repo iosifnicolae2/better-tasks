@@ -1,7 +1,7 @@
 // The project's virtual display and its turns, for record-display.sh (which compiles and runs this).
-//   display --lock <file> --turn <file> --name <name> --serial <n> [--size WxH] [--idle-hours n]
+//   display --lock <file> --name <name> --serial <n> [--size WxH]
 //       makes the project's display once and keeps it (no screen redraws per recording), in a row below
-//       the lowest physical screen, so the real screens never move. Ends after --idle-hours without a turn.
+//       the lowest physical screen, so the real screens never move. Kept until stopped (record-display.sh remove).
 //   turn --lock <file> [--label text] [--max-seconds n] [--max-wait n] [--parent pid]
 //       waits for the project's turn (flock: the kernel frees it if this process dies), then holds it
 //       until stopped, until its time is up, or until the parent process ends.
@@ -13,9 +13,9 @@ import Foundation
 import IOKit
 
 struct Options {
-  var lock = "", turnLock = "", name = "better-tasks", label = ""
+  var lock = "", name = "better-tasks", label = ""
   var serial: UInt32 = 1, width = 1920, height = 1080
-  var maxSeconds = 1200.0, maxWait = 1800.0, idleHours = 24.0
+  var maxSeconds = 1200.0, maxWait = 1800.0
   var parent: pid_t = 0
 }
 
@@ -26,13 +26,11 @@ func parseOptions(_ arguments: ArraySlice<String>) -> Options {
     let value = args.next() ?? ""
     switch key {
     case "--lock": options.lock = value
-    case "--turn": options.turnLock = value
     case "--name": options.name = value
     case "--label": options.label = value
     case "--serial": options.serial = UInt32(value) ?? 1
     case "--max-seconds": options.maxSeconds = Double(value) ?? options.maxSeconds
     case "--max-wait": options.maxWait = Double(value) ?? options.maxWait
-    case "--idle-hours": options.idleHours = Double(value) ?? options.idleHours
     case "--parent": options.parent = pid_t(value) ?? 0
     case "--size":
       let parts = value.split(separator: "x").compactMap { Int($0) }
@@ -206,7 +204,7 @@ func onSignalsExit() {
   }
 }
 
-/** Keeps the project's one display; ends once no recording took a turn for --idle-hours. */
+/** Keeps the project's one display until `remove` or logout: each removal and first creation re-lays out the displays. */
 func keepDisplay(_ options: Options) -> Never {
   let lock = openLock(options.lock)
   if flock(lock, LOCK_EX | LOCK_NB) != 0 { fail("this project's display is already kept by another process") }
@@ -216,14 +214,8 @@ func keepDisplay(_ options: Options) -> Never {
   writeHolder(lock, "pid \(getpid()) display \(display.displayID)\n")
   say("ready id=\(display.displayID) pid=\(getpid())")
   onSignalsExit()
-  let turn = openLock(options.turnLock)
-  var lastUsed = Date()
-  while true {
-    RunLoop.main.run(until: Date().addingTimeInterval(30))
-    guard flock(turn, LOCK_EX | LOCK_NB) == 0 else { lastUsed = Date(); continue }
-    if Date().timeIntervalSince(lastUsed) > options.idleHours * 3600 { exit(0) } // exits holding the turn: no one records on a closing display
-    flock(turn, LOCK_UN)
-  }
+  RunLoop.main.run()
+  exit(0)
 }
 
 func holdTurn(_ options: Options) -> Never {

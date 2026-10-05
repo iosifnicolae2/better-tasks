@@ -12,6 +12,12 @@ project() { mkdir -p "$work/$1" && git -C "$work/$1" init -q && echo "$work/$1";
 alpha="$(project alpha)" beta="$(project beta)"
 git -C "$alpha" commit -q --allow-empty -m first && git -C "$alpha" worktree add -q "$work/alpha-worktree" 2>/dev/null
 in_dir() { (cd "$1" && shift && exec "$@"); }
+cleanup() { # the check's displays never outlive it, even when it fails or is stopped
+  in_dir "$alpha" "$script" remove >/dev/null 2>&1
+  in_dir "$beta" "$script" remove >/dev/null 2>&1
+  rm -rf "$work"
+}
+trap cleanup EXIT INT TERM
 in_dir "$alpha" "$script" status >/dev/null # compiles once, before the timing below
 
 # Each recording logs "<name> start|end <epoch> <display id>" and holds the display 2 s.
@@ -50,8 +56,5 @@ in_dir "$alpha" "$script" stop "$held"
 sleep 1
 in_dir "$alpha" "$script" status | grep -q "^free" || fail "stop did not free the turn"
 
-in_dir "$alpha" "$script" remove >/dev/null
-in_dir "$beta" "$script" remove >/dev/null
-rm -rf "$work"
 [ "$failed" = 0 ] && echo ok
 exit "$failed"

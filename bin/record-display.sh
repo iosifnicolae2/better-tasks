@@ -9,7 +9,9 @@
 #   record-display.sh start [--size WxH] [--minutes n] [--label text]
 #       the same over several commands: prints those values and the turn's pid; stop it when done.
 #   record-display.sh stop <pid> | status | remove (the project's display) | arrange (every virtual display below the screens)
-# Works in any git worktree of the project: they share its one display. The display goes after a day unused.
+# Works in any git worktree of the project: they share its one display. Kept until `remove` or logout.
+# Why not a Space (Mission Control desktop): only the Dock may move another app's windows between Spaces
+# (tested on macOS 27: our move of a TextEdit window was ignored), and making a desktop takes clicks.
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -63,9 +65,35 @@ display_id() {
     field "$(cat "$base.display")" id
     return
   fi
-  pid="$(detached "$base.display" "$exe" display --lock "$base.keeper" --turn "$base.turn" \
-    --name "better-tasks $project" --serial "$((key % 1000000))" --size "$size")"
+  pid="$(detached "$base.display" "$exe" display --lock "$base.keeper" \
+    --name "better-tasks $project" --serial "$(slot)" --size "$size")"
   field "$(await_ready "$base.display" "$pid")" id
+}
+
+# The display's serial: a slot number reused across projects. macOS remembers each serial's place, so only
+# a slot's very first display makes macOS lay out the screens anew (the helper then puts them back).
+# A slot is free when the project that last had it keeps no display. Prints this project's slot.
+slot() {
+  until mkdir "$state/slots.lock" 2>/dev/null; do sleep 0.1; done
+  touch "$state/slots"
+  mine="$(awk -v b="$base" '$2 == b { print $1 }' "$state/slots")"
+  if [ -z "$mine" ]; then
+    mine="$(free_slot)"
+    awk -v s="$mine" '$1 != s' "$state/slots" >"$state/slots.new"
+    echo "$mine $base" >>"$state/slots.new"
+    mv "$state/slots.new" "$state/slots"
+  fi
+  rmdir "$state/slots.lock"
+  echo "$mine"
+}
+
+free_slot() {
+  n=1
+  while owner="$(awk -v s="$n" '$1 == s { print $2 }' "$state/slots")" && [ -n "$owner" ]; do
+    holder_alive "$owner.keeper" || break
+    n=$((n + 1))
+  done
+  echo "$n"
 }
 
 # Sets BT_DISPLAY_ID, BT_DISPLAY_BOUNDS, BT_DISPLAY_CAPTURE.
@@ -143,5 +171,5 @@ case "$command" in
   status) status ;;
   remove) remove ;;
   arrange) "$exe" arrange ;;
-  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
