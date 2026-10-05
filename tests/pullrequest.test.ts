@@ -49,8 +49,7 @@ describe('PR per task', () => {
 
   test("the teammate's prompt keeps the worktree and a pointer: the how-to is the pull-request skill", () => {
     expect(PR_TEAMMATE_RULES).toContain('You work in your own git worktree')
-    expect(PR_TEAMMATE_RULES).toContain('No PR at done: the user tries your local build first.')
-    expect(PR_TEAMMATE_RULES).toContain('load the `better-tasks:pull-request` skill: it opens the PR; then the done skill\'s "Finish"')
+    expect(PR_TEAMMATE_RULES).toContain('The PR opens at the finish (the done skill\'s "Finish"), with the `better-tasks:pull-request` skill')
     expect(PR_TEAMMATE_RULES).not.toContain('gh pr create')
   })
 })

@@ -42,7 +42,7 @@ export function ghUpdateVerdict(output: string): { isReady: boolean; text: strin
 
 
 /** A PR flow's last step in the teammate's prompt: the how-to is the pull-request skill (skills/pull-request). */
-export const PR_DONE_LINE = `- No PR at done: the user tries your local build first. "Accepted: finish it": load the \`${skillCall('pull-request')}\` skill: it opens the PR; then the done skill's "Finish". The lead asks you to update the PR (a conflict): that skill again. Never merge it yourself.`
+export const PR_DONE_LINE = `- The PR opens at the finish (the done skill's "Finish"), with the \`${skillCall('pull-request')}\` skill; that skill again when the lead asks you to update it. Never merge it yourself.`
 
 export const PR_TEAMMATE_RULES = `## Pull request per task (on in this project)
 You work in your own git worktree, on its own branch; the project's main checkout stays as it is. This setting is the user's ask for branches and PRs.

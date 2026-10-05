@@ -46,11 +46,16 @@ export function setupVerdict(output: string): { isReady: boolean; text: string }
     : { isReady: false, text: `better-tasks: the Kokoro voice setup ${last || 'failed'}` }
 }
 
-/** The teammate's pointer: the how-to is the video skill, loaded only by work that shows on screen. */
-export const TEAMMATE_POINTER = `## Before/after video (on in this project)
-Finished work that shows on screen comes with one short narrated video, its BEFORE captured before you change anything, made once the user accepts. Such work: load the \`${skillCall('video')}\` skill before your first change; it says how. Nothing to see (a refactor, a config)? No video; say so in your notes.`
+/** The teammate's pointer: capturing is here, so the video skill loads only at the finish, to make it. */
+export function videoPointer(quality: VideoQuality): string {
+  return `## Before/after video (on in this project)
+Work that shows on screen gets one short narrated video. Nothing to see (a refactor, a config)? No video; say so in your notes.
+- BEFORE first: before you change anything, capture the bug or missing feature (how: the testing skill), at ${VIDEO_SIZE[quality]} or more, a screenshot per step. Forgot? Capture it from the commit before yours (\`git worktree add <scratchpad>/before <commit>\`).
+- AFTER: the same steps on your change. Keep both in your scratchpad.
+- The video is made at the finish, after the user accepts: the \`${skillCall('video')}\` skill.`
+}
 
-/** What the video skill reads under its title: this project's quality and the capture size it needs. */
+/** What the video skill reads under its title: this project's quality. */
 export function videoSkillSettings(quality: VideoQuality): string {
-  return `- Video quality: ${quality}. Capture at ${VIDEO_SIZE[quality]} or more; make it with \`--quality ${quality}\`.`
+  return `- Video quality: ${quality}: make it with \`--quality ${quality}\`.`
 }
