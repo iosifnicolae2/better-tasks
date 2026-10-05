@@ -5,6 +5,8 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
+import { GIT_NO, GIT_SETTING, GIT_YES, gitQuestion, OFF_LINE, withIgnored } from './projectsetup'
+import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
 import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
@@ -48,8 +50,6 @@ let loggedMissingTemplate = ''
 let voiceSetup: Promise<void> | undefined
 let ghUpdate: Promise<void> | undefined
 
-/** First in every setup question, so a stray Enter lands on it: nothing is saved, asked again next session. */
-export const LATER_OPTION = 'Decide later'
 const NO_OPTION = 'No'
 /** A setup question waits for an empty prompt box this long (the user is not typing), checked every POLL_MS. */
 const QUIET_MS = 2000
@@ -77,7 +77,13 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    await declareAll($)
+    if (await isOffHere($)) {
+      await declareCommands($)
+      $.ui.log(OFF_LINE)
+      return started
+    }
+    await declareTools($)
+    await declareCommands($)
     await useLongCache($).catch(error => logFailure($, 'the 1-hour cache', error))
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
@@ -103,7 +109,7 @@ export const register: Register = (on, options) => {
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
-    if (!(await teamsOn($))) return composed
+    if (!(await teamsOn($)) || (await isOffHere($))) return composed
     const settings = await settingsNow($)
     const testing = coordinatorTestingRules(settings.offScreen)
     const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, PR_COORDINATOR_RULES)
@@ -139,7 +145,7 @@ export const register: Register = (on, options) => {
       const unclosed = unclosedLine(await unclosedIds($))
       return next({ ...e, context: [...(e.context ?? []), await contextBlock(ioOf($), await settingsNow($), unclosed)] })
     }
-    if (!isPerson(e.origin)) return next(e)
+    if (!isPerson(e.origin) || (await isOffHere($))) return next(e)
     const now = await $.clock.now()
     await update($, statusState, check => ({ ...check, activeAt: now, quiet: 0 }))
     const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
@@ -165,7 +171,7 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
-    if (!e.name || !(await teamsOn($))) return next(e)
+    if (!e.name || !(await teamsOn($)) || (await isOffHere($))) return next(e)
     const settings = await settingsNow($)
     const task = spawnTask(await listTasks(ioOf($)), e.prompt, e.name, settings.tasks.prefix)
     const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
@@ -256,10 +262,14 @@ async function syncTeammateTypes($: EngineInterface, settings: Settings): Promis
 }
 
 /** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */
-async function declareAll($: EngineInterface): Promise<void> {
+async function declareTools($: EngineInterface): Promise<void> {
   for (const tool of [...TOOLS, ...SCREEN_TOOLS, UPSTREAM_PR_TOOL]) {
     await $.tool.register(tool).catch(error => logFailure($, `tool ${tool.name}`, error))
   }
+}
+
+/** The commands stay even where better-tasks is off: /better-tasks config is how to look and turn it on. */
+async function declareCommands($: EngineInterface): Promise<void> {
   for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) {
     await $.command.register(command).catch(error => logFailure($, `/${command.name}`, error))
   }
@@ -356,6 +366,9 @@ async function pointUserRules($: EngineInterface): Promise<void> {
  * IntelliJ project, whether IntelliJ may skip them. A setting already on gets what it needs.
  */
 async function startQuestions($: EngineInterface): Promise<void> {
+  if (await isOffHere($)) return
+  await askTeamInstall($)
+  await askTasksInGit($)
   const settings = await settingsNow($)
   if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
@@ -368,6 +381,57 @@ async function startQuestions($: EngineInterface): Promise<void> {
   else if (hasPrs(settings.gitFlow)) await checkGh($)
   await askIdeExclusion($)
   await askToTurnOn($, { field: OFFSCREEN_FIELD, question: OFFSCREEN_QUESTION, header: 'Off-screen' })
+}
+
+/** True when better-tasks is off in this project (the user said no to it here). */
+async function isOffHere($: EngineInterface): Promise<boolean> {
+  return !(await settingsNow($)).useBetterTasks
+}
+
+/** In a git project: keep the task files in git, or put their folder in .gitignore? */
+async function askTasksInGit($: EngineInterface): Promise<void> {
+  if (!(await isGitRepo($))) return
+  const folder = (await settingsNow($)).tasks.folder
+  const keep = await askToTurnOn($, { field: GIT_SETTING, question: gitQuestion(folder), header: 'Task files', answers: [GIT_YES, GIT_NO] })
+  if (keep === false) await ignoreTasks($, folder)
+}
+
+/** Adds the task folder to .gitignore (not committed); says how to untrack files git has already. */
+async function ignoreTasks($: EngineInterface, folder: string): Promise<void> {
+  const root = await $.session.root()
+  const path = `${root}/.gitignore`
+  const changed = withIgnored(await $.fs.read(path).catch(() => undefined), folder)
+  if (changed !== undefined) await $.fs.write(path, changed)
+  const tracked = await $.process.run(['git', '-C', root, 'ls-files', '--', folder]).then(done => done.stdout.trim(), () => '')
+  const untrack = tracked ? ` git still tracks the ones committed before: git rm -r --cached ${folder}` : ''
+  $.ui.log(`better-tasks: ${folder}/ is in .gitignore now, so the task files stay on this computer.${untrack}`)
+}
+
+async function isGitRepo($: EngineInterface): Promise<boolean> {
+  return $.process.run(['git', 'rev-parse', '--is-inside-work-tree']).then(done => done.exitCode === 0, () => false)
+}
+
+/** In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project? */
+async function askTeamInstall($: EngineInterface): Promise<void> {
+  const shared = await $.fs.read(`${await $.session.root()}/${SHARED_SETTINGS}`).catch(() => undefined)
+  if (hasTeamInstall(shared)) return
+  if (await isGitRepo($)) await askToTurnOn($, { field: TEAM_SETTING, question: TEAM_QUESTION, header: 'Team', answers: [TEAM_YES, TEAM_NO] })
+}
+
+/** Adds better-tasks to the project's shared settings and commits only that file (teaminstall.ts). */
+async function shareWithTeam($: EngineInterface): Promise<void> {
+  const root = await $.session.root()
+  const path = `${root}/${SHARED_SETTINGS}`
+  const shared = await $.fs.read(path).catch(() => undefined)
+  if (hasTeamInstall(shared)) return
+  const changed = withTeamInstall(shared)
+  if (changed === undefined) return $.ui.log(`better-tasks: ${SHARED_SETTINGS} is not one JSON object; better-tasks was not added to it`)
+  await $.fs.write(path, changed)
+  const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
+  const added = await git('add', '--', SHARED_SETTINGS)
+  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
+  if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
+  else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
 }
 
 /** The git flow question: the project looked at once for the recommendation, the answer saved in its config.json. */
@@ -444,28 +508,31 @@ type TurnOnQuestion = { field: string; question: string; header: string; answers
 
 /**
  * Asks once per project: the answer, on or off, is saved in its config.json, so another project is asked
- * at its own first start. Decided later, dismissed or answered in free text, it is asked again next session.
- * Enable also sets the setting up.
+ * at its own first start. Dismissed or answered in free text, it is asked again next session.
+ * Enable also sets the setting up. Returns the answer just saved; undefined when none was.
  */
-async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<void> {
-  if (ask.field in (await readOverrides(ioOf($))).values) return
+async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<boolean | undefined> {
+  if (ask.field in (await readOverrides(ioOf($))).values) return undefined
   const [yes, no] = ask.answers ?? [ENABLE_OPTION, NO_OPTION]
   const answer = await askSetup($, ask.question, [yes, no], ask.header)
-  if (answer !== yes && answer !== no) return
+  if (answer !== yes && answer !== no) return undefined
   const problem = await saveProjectValue(ioOf($), ask.field, answer === yes)
-  if (problem) $.ui.log(`better-tasks: ${problem}`)
-  else if (answer === yes) await setUpTurnedOn($, `better-tasks.${ask.field}`)
+  if (problem) {
+    $.ui.log(`better-tasks: ${problem}`)
+    return undefined
+  }
+  if (answer === yes) await setUpTurnedOn($, `better-tasks.${ask.field}`)
+  return answer === yes
 }
 
 /**
- * A setup question pops up on its own, so a key meant for the prompt box can answer it: Enter picks the
- * highlighted option. So it waits until the user is not typing, and "Decide later" (saves nothing) comes
- * first. Returns the answer; undefined for "Decide later", a dismissal, or a user who never stopped typing.
+ * A setup question pops up on its own, so a key meant for the prompt box could answer it: Enter picks the
+ * highlighted option (the recommended one, first). So it waits until the user is not typing. Returns the
+ * answer; undefined for a dismissal (asked again next session) or a user who never stopped typing.
  */
 async function askSetup($: EngineInterface, question: string, options: string[], header: string): Promise<string | undefined> {
   if (!(await untilNotTyping($))) return undefined
-  const answer = await $.ui.ask(question, { options: [LATER_OPTION, ...options], header }).catch(() => undefined)
-  return answer === LATER_OPTION ? undefined : answer
+  return $.ui.ask(question, { options, header }).catch(() => undefined)
 }
 
 /** True once the prompt box has stayed empty for QUIET_MS; false when that never happens within GIVE_UP_MS. */
@@ -493,6 +560,7 @@ async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === 'better-tasks.gitFlow') await setUpFlow($, (await settingsNow($)).gitFlow)
   if (key === 'better-tasks.gitFlow' || key === 'better-tasks.worktree') await askIdeExclusion($)
   if (key === `better-tasks.${IDE_SETTING}`) await keepWorktreesFromIde($)
+  if (key === `better-tasks.${TEAM_SETTING}`) await shareWithTeam($)
 }
 
 /** PR per task needs gh, 2.99 or newer for the video: updates it when it is missing or older (bin/gh-update.sh). */

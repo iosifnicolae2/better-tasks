@@ -66,6 +66,8 @@ export type Settings = {
   instructions: string
   /** The user said yes to "may IntelliJ skip the worktrees folder?", asked once per project (intellij.ts). */
   excludeWorktreesFromIde: boolean
+  /** False: the user said no to better-tasks in this project; it stays quiet (projectsetup.ts). */
+  useBetterTasks: boolean
   /** The PR description's template, relative to the project root; empty: the project's own, else better-tasks' (prtemplate.ts). */
   prTemplate: string
   models: TeammateModels
@@ -98,6 +100,9 @@ export const FIELDS: Record<string, Field> = {
   instructions: { kind: 'string' },
   excludeWorktreesFromIde: { kind: 'boolean' },
   prTemplate: { kind: 'string' },
+  shareWithTeam: { kind: 'boolean' },
+  useBetterTasks: { kind: 'boolean' },
+  tasksInGit: { kind: 'boolean' },
   easyModel: { kind: 'string', values: MODELS },
   easyEffort: { kind: 'string', values: EFFORTS },
   normalModel: { kind: 'string', values: MODELS },
@@ -131,6 +136,9 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   instructions: '',
   excludeWorktreesFromIde: false,
   prTemplate: '',
+  shareWithTeam: false,
+  useBetterTasks: true,
+  tasksInGit: true,
   easyModel: 'opus',
   easyEffort: 'low',
   normalModel: 'opus',
@@ -166,6 +174,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     devBranch: String(value('devBranch')).trim() || 'dev',
     instructions: String(value('instructions')),
     excludeWorktreesFromIde: value('excludeWorktreesFromIde') === true,
+    useBetterTasks: value('useBetterTasks') !== false,
     prTemplate: String(value('prTemplate')).trim(),
     models: {
       easy: choiceOf('easy'),

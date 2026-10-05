@@ -4,6 +4,8 @@ import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
+import { gitQuestion, GIT_NO } from '../hooks/projectsetup'
+import { TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
 import { OFFSCREEN_QUESTION } from '../hooks/testenv'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -15,7 +17,7 @@ const MONDAY_OCT_5 = new Date(2026, 9, 5, 9).getTime()
 const SUNDAY_OCT_11_LATE = new Date(2026, 9, 11, 23, 58).getTime()
 const WINDOW = 200_000
 /** Setup questions wait for a quiet, empty prompt box (2 s) before each one asks. */
-const QUIET_PROMPT_BOX = 10_000
+const QUIET_PROMPT_BOX = 30_000
 
 const TEAMS_ON = { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
 
@@ -39,6 +41,8 @@ type Host = {
   spawnOutput: string
   /** What process.run prints, by its argv joined with spaces. */
   runOutput: Record<string, string>
+  /** Each process.run's argv, joined with spaces. */
+  ran: string[]
   env: Map<string, string>
   composer: string
 }
@@ -52,7 +56,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, env: new Map(), composer: '' }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, ran: [], env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -111,6 +115,7 @@ function fakeHost(
     return { value: names.map(name => ({ name, kind: kindOf(name), size: 1, mtimeMs: 0, isLink: false })) }
   })
   on('process.run', ($, e) => {
+    host.ran.push(e.argv.join(' '))
     const [command, ...args] = e.argv
     const paths = args.filter(arg => !arg.startsWith('-'))
     if (command === 'mv' && paths.length === 2) {
@@ -972,6 +977,100 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
   expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
 })
 
+/** The setup questions a test about other questions leaves alone (dismissed: asked again next time). */
+const isOtherSetupQuestion = (question: string) =>
+  [OFFSCREEN_QUESTION, TEAM_QUESTION, gitQuestion('.claude/tasks')].includes(question)
+
+/** Answers each setup question from `answers` (by question), dismisses the rest; returns the questions asked, in order. */
+function answerSetup(on: On, answers: Record<string, string>): string[] {
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    asked.push(question)
+    return { result: { answers: question in answers ? { [question]: answers[question] } : {} } }
+  })
+  return asked
+}
+
+test('"useBetterTasks": false in config.json: better-tasks stays quiet (no questions, no tools, no rules)', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerSetup(on, {})
+  const host = fakeHost(on, [], { [`${TASKS}/config.json`]: '{ "useBetterTasks": false }' })
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).toEqual([])
+  expect(host.registered.every(name => name.startsWith('/'))).toBe(true) // commands only: /better-tasks config still opens
+  expect(host.notices.at(-1)).toContain('better-tasks is off in this project')
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections).toEqual([{ id: 'intro', text: 'You are Claude.', scope: 'shared' }])
+})
+
+test('the setup order: who gets it, then task files in git; "No" puts the task folder in .gitignore', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const git = gitQuestion('.claude/tasks')
+  const asked = answerSetup(on, { [TEAM_QUESTION]: TEAM_NO, [git]: GIT_NO })
+  const host = fakeHost(on, [], { [`${ROOT}/.gitignore`]: 'node_modules/' })
+  host.runOutput[`git -C ${ROOT} ls-files -- .claude/tasks`] = '.claude/tasks/T-001-old.md\n'
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked.slice(0, 2)).toEqual([TEAM_QUESTION, git])
+  expect(host.files.get(`${ROOT}/.gitignore`)).toBe('node_modules/\n.claude/tasks/\n')
+  expect(host.notices.at(-1)).toContain('git rm -r --cached .claude/tasks')
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toMatchObject({ shareWithTeam: false, tasksInGit: false })
+})
+
+/** Answers the "who gets better-tasks" question with `answer`, dismisses the rest; returns how often it was asked. */
+function answerTeam(on: On, answer: string): { asked: number } {
+  const count = { asked: 0 }
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    if (question !== TEAM_QUESTION) return { result: { answers: {} } }
+    count.asked += 1
+    return { result: { answers: { [question]: answer } } }
+  })
+  return count
+}
+
+test('"Everyone on this project": better-tasks goes in the shared .claude/settings.json, committed alone; not asked again', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const team = answerTeam(on, TEAM_YES)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/settings.json`]: JSON.stringify({ permissions: { allow: ['Bash(npm test)'] } }) })
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(team.asked).toBe(1)
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '')).toEqual({
+    permissions: { allow: ['Bash(npm test)'] },
+    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } } },
+    enabledPlugins: { 'better-tasks@better-tasks': true },
+  })
+  expect(host.ran).toContain(`git -C ${ROOT} add -- .claude/settings.json`)
+  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${TEAM_COMMIT} --only -- .claude/settings.json`)
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toEqual({ shareWithTeam: true })
+
+  host.files.delete(`${TASKS}/config.json`) // a teammate's checkout: better-tasks is in the shared settings already
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(team.asked).toBe(1)
+})
+
+test('"Only me": nothing in the project changes, the answer is saved, and it is not asked again', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const team = answerTeam(on, TEAM_NO)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(team.asked).toBe(1)
+  expect(host.files.has(`${ROOT}/.claude/settings.json`)).toBe(false)
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toEqual({ shareWithTeam: false })
+})
+
 test('in a GitHub project startup asks about videos, then the git flow; the flow is saved in config.json and set up', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
@@ -980,16 +1079,16 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
     const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
     const question = first?.question ?? ''
     const options = (first?.options ?? []).map(option => option.label)
-    if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } } // dismissed: its own test below
+    if (isOtherSetupQuestion(question)) return { result: { answers: {} } } // dismissed: their own tests
     asked.push({ question, options })
-    return { result: { answers: { [question]: question === QUESTION ? 'No' : options[1] } } }
+    return { result: { answers: { [question]: question === QUESTION ? 'No' : options[0] } } }
   })
   const host = fakeHost(on, [], { [`${ROOT}/app/pubspec.yaml`]: '', [`${ROOT}/.claude/tasks/config.json`]: '{ "//": "notes", "// gitFlow": "direct" }' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
   expect(asked.map(one => one.question)).toEqual([QUESTION, expect.stringContaining('Recommended here: Shared dev branch, PR per task (a Flutter app to build and install once for every change).')])
-  expect(asked[1]?.options.slice(0, 4)).toEqual(['Decide later', 'Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
+  expect(asked[1]?.options.slice(0, 3)).toEqual(['Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ '//': 'notes', demoVideos: false, gitFlow: 'dev-prs' })
   expect(host.notices).toContain('better-tasks: made the dev branch here, from this commit: teammates land on it, PRs go to main')
   expect(host.spawnedArgv.map(argv => argv.at(-1)?.split('/').pop())).toEqual(['gh-update.sh']) // gh --version printed nothing: gh missing
@@ -1005,7 +1104,7 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   const asked: string[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
-    if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } }
+    if (isOtherSetupQuestion(question)) return { result: { answers: {} } }
     asked.push(question)
     return { result: { answers: { [question]: 'No' } } }
   })
@@ -1040,20 +1139,19 @@ test('a setup question waits while the user types a prompt, and asks once the pr
   expect(asked).toContain(QUESTION)
 })
 
-test('"Decide later" comes first, so a stray Enter picks it: nothing is saved and the question comes back next session', async ($, on) => {
+test('the recommended option comes first, and a dismissed setup question saves nothing and comes back next session', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const asked: string[][] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
-    const options = (first?.options ?? []).map(option => option.label)
-    if (first?.question === QUESTION) asked.push(options)
-    return { result: { answers: { [first?.question ?? '']: options[0] } } }
+    if (first?.question === QUESTION) asked.push((first?.options ?? []).map(option => option.label))
+    return { result: { answers: {} } }
   })
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).toEqual([['Decide later', ENABLE_OPTION, 'No']])
+  expect(asked).toEqual([[ENABLE_OPTION, 'No']])
   expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).not.toHaveProperty('demoVideos')
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
