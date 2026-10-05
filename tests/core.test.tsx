@@ -3,6 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
+import { IDE_QUESTION } from '../hooks/intellij'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -225,13 +226,73 @@ test('with worktree on, a named teammate is spawned in a worktree', { options: {
   expect(scout.result).toEqual({ isolation: 'none' })
 })
 
-test("at session start IntelliJ is told to skip the worktrees folder; a project without .idea/ gets nothing", async ($, on) => {
-  mock.clock(on, { now: MONDAY_OCT_5 })
+const EXCLUDED = '<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />'
+const IDE_NOTICE = 'better-tasks: IntelliJ now skips .claude/worktrees/ (teammate worktrees), so they are not indexed'
+
+/** Answers every startup question: videos "Not now", the git flow `flow`, IntelliJ `ide`; returns the questions asked. */
+function answerStartup(on: On, flow: string, ide: string): string[] {
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    asked.push(question)
+    const answer = question === QUESTION ? 'Not now' : question === IDE_QUESTION ? ide : flow
+    return { result: { answers: { [question]: answer } } }
+  })
+  return asked
+}
+
+test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may skip them; yes excludes them now and at each start', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
+  const asked = answerStartup(on, 'Worktree and PR per task', ENABLE_OPTION)
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
+  host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
-  expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain('<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />')
-  expect(host.notices).toContain('better-tasks: IntelliJ now skips .claude/worktrees/ (teammate worktrees), so they are not indexed')
+  await clock.advance(0)
+  expect(asked.at(-1)).toBe(IDE_QUESTION)
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toMatchObject({ gitFlow: 'worktree-prs', excludeWorktreesFromIde: true })
+  expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
+  expect(host.notices).toContain(IDE_NOTICE)
+
+  host.files.delete(`${ROOT}/.idea/project.iml`)
+  host.files.delete(`${ROOT}/.idea/modules.xml`)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked.filter(question => question === IDE_QUESTION)).toHaveLength(1)
+  expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
+})
+
+test('"Not now" to the IntelliJ question is saved: .idea is left as it is and the question is not asked again', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerStartup(on, 'Worktree and PR per task', 'Not now')
+  const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
+  host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked.filter(question => question === IDE_QUESTION)).toHaveLength(1)
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toMatchObject({ excludeWorktreesFromIde: false })
+  expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
+})
+
+test('no IntelliJ question without worktrees or without .idea/, and nothing is excluded unasked', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked = answerStartup(on, 'Straight to main', ENABLE_OPTION)
+  const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
+  host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).not.toContain(IDE_QUESTION)
+  expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
+
+  host.files.delete(`${ROOT}/.idea/misc.xml`)
+  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ gitFlow: 'worktree-prs' }))
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).not.toContain(IDE_QUESTION)
 })
 
 test('a new sprint rolls unfinished work over and writes the review', async ($, on) => {

@@ -62,6 +62,8 @@ export type Settings = {
   devBranch: string
   /** The project's own instructions for tasks: paths to files or folders, comma-separated (instructions.ts). */
   instructions: string
+  /** The user said yes to "may IntelliJ skip the worktrees folder?", asked once per project (intellij.ts). */
+  excludeWorktreesFromIde: boolean
   models: TeammateModels
   sprint: SprintConfig
   tasks: TaskNaming
@@ -89,6 +91,7 @@ export const FIELDS: Record<string, Field> = {
   gitFlow: { kind: 'string', values: GIT_FLOWS },
   devBranch: { kind: 'string' },
   instructions: { kind: 'string' },
+  excludeWorktreesFromIde: { kind: 'boolean' },
   easyModel: { kind: 'string', values: MODELS },
   easyEffort: { kind: 'string', values: EFFORTS },
   normalModel: { kind: 'string', values: MODELS },
@@ -119,6 +122,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   gitFlow: 'direct',
   devBranch: 'dev',
   instructions: '',
+  excludeWorktreesFromIde: false,
   easyModel: 'opus',
   easyEffort: 'low',
   normalModel: 'opus',
@@ -152,6 +156,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
     instructions: String(value('instructions')),
+    excludeWorktreesFromIde: value('excludeWorktreesFromIde') === true,
     models: {
       easy: choiceOf('easy'),
       normal: choiceOf('normal'),

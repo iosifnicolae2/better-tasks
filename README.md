@@ -36,7 +36,7 @@ Restart Claude Code.
 - 🎥 **Before/after videos** of each change, narrated.
 - 🔀 **Your git flow, asked once per project:** straight to main; a shared `dev` branch with a pull request per task (one build, one install for everything); or a worktree and pull request per teammate. Recommended from a quick look at the project.
 - 📌 **Your own instructions** for every task: point `instructions` in `.claude/tasks/config.json` at a file or folder; prompts carry its path and first line.
-- 🧘 **A quiet IDE:** IntelliJ skips the teammates' worktrees (`.claude/worktrees/`), so they don't set off re-indexing.
+- 🧘 **A quiet IDE:** with teammates in worktrees, an IntelliJ project is asked once whether IntelliJ may skip them (`.claude/worktrees/`), so they don't set off re-indexing; the answer is `excludeWorktreesFromIde` in `.claude/tasks/config.json`.
 - 🌙 **`/away`:** screens off, the Mac keeps working.
 
 ### 🎬 Demo: a before/after video

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { excludeWorktrees, folderModule, IDE_QUESTION, IDE_SETTING, isBuildToolProject, moduleDir, modulePaths, shouldAskIde, withWorktreesExcluded } from '../hooks/intellij'
+import { excludeWorktrees, folderModule, IDE_QUESTION, IDE_SETTING, isBuildToolProject, moduleDir, modulePaths, withWorktreesExcluded } from '../hooks/intellij'
 import type { IdeFiles } from '../hooks/intellij'
 
 const ROOT = '/Users/a/shop'
@@ -88,17 +88,7 @@ describe('IntelliJ skips the teammate worktrees', () => {
   })
 })
 
-describe('the IntelliJ question', () => {
-  test('asked only with worktrees on, a .idea folder and no answer yet', () => {
-    expect(shouldAskIde(true, ['misc.xml'], undefined)).toBe(true)
-    expect(shouldAskIde(false, ['misc.xml'], undefined)).toBe(false)
-    expect(shouldAskIde(true, undefined, undefined)).toBe(false)
-    expect(shouldAskIde(true, ['misc.xml'], true)).toBe(false)
-    expect(shouldAskIde(true, ['misc.xml'], false)).toBe(false)
-  })
-
-  test('says why in plain words and where to change it', () => {
-    expect(IDE_QUESTION).toContain('re-indexes every copy')
-    expect(IDE_QUESTION).toContain(IDE_SETTING)
-  })
+test('the IntelliJ question says why in plain words and where to change it', () => {
+  expect(IDE_QUESTION).toContain('re-indexes every copy')
+  expect(IDE_QUESTION).toContain(IDE_SETTING)
 })
