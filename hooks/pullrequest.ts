@@ -42,18 +42,18 @@ export function ghUpdateVerdict(output: string): { isReady: boolean; text: strin
 
 
 /** A PR flow's last step in the teammate's prompt: the how-to is the pull-request skill (skills/pull-request). */
-export const PR_DONE_LINE = `- Done: first load the \`${skillCall('pull-request')}\` skill: it opens the PR; then the done skill. The lead asks you to update the PR (changes, a conflict): that skill again. Never merge it yourself.`
+export const PR_DONE_LINE = `- No PR at done: the user tries your local build first. "Accepted: finish it": load the \`${skillCall('pull-request')}\` skill: it opens the PR; then the done skill's "Finish". The lead asks you to update the PR (a conflict): that skill again. Never merge it yourself.`
 
 export const PR_TEAMMATE_RULES = `## Pull request per task (on in this project)
 You work in your own git worktree, on its own branch; the project's main checkout stays as it is. This setting is the user's ask for branches and PRs.
 - Commit there as usual, small and often.
 ${PR_DONE_LINE}`
 
-/** The openPrInBrowser setting's line: the PR, its video uploaded, is on screen and loaded when its question comes. Its own line, so the dev-prs flow takes it too (finishingOf). */
+/** The openPrInBrowser setting's line: the PR, its video uploaded, is on screen before it merges. Its own line, so the dev-prs flow takes it too (finishingOf). */
 export const openPrLine = (bin: string) =>
-  `- A finished task with a PR: right before its question, run \`${bin}/open-pr.sh <url>\`: once the PR's video is uploaded it opens the PR in the default browser and waits a few seconds for the page to load; then ask. It says "not ready" (the video not uploaded yet): tell the teammate to finish its PR, and ask once it has.`
+  `- A finished task with a PR: right before merging, run \`${bin}/open-pr.sh <url>\`: once the PR's video is uploaded it opens the PR in the default browser and waits a few seconds for the page to load; then merge. It says "not ready" (the video not uploaded yet): tell the teammate to finish its PR, and merge once it has.`
 
 export const prCoordinatorRules = (openPrInBrowser: boolean, bin: string) => `## Pull request per task (on)
-- A finished task's notes hold "PR: <url>"; its question links only the PR; the video's path and the PR sit above it, in Links. "Mark as resolved" merges: its description says "merge the PR and close T-004".${openPrInBrowser ? `\n${openPrLine(bin)}` : ''}
-- Mark as resolved: \`gh pr merge <url> --squash --delete-branch\`, then \`git pull --ff-only\` in the project, then close the task with the merge commit. The merge fails (a conflict)? Tell the teammate to update its PR; then merge.
-- Request changes: the teammate pushes to the same PR.`
+- A finished task's PR opens after the user accepts: "Mark as resolved" says "login finishes it and opens the PR; I merge it and close T-004". Its "finished" notes hold "PR: <url>".${openPrInBrowser ? `\n${openPrLine(bin)}` : ''}
+- Finished: \`gh pr merge <url> --squash --delete-branch\`, then \`git pull --ff-only\` in the project, then close the task with the merge commit. The merge fails (a conflict)? Tell the teammate to update its PR; then merge.
+- Request changes: no PR yet; the teammate rebuilds locally.`

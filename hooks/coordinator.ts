@@ -92,12 +92,12 @@ export function resolvedIn(answers: unknown, prefix: string): string[] {
     .filter((id): id is string => id !== undefined)
 }
 
-/** One line while a task the user resolved is still open: the lead closes it now. */
+/** One line while a task the user resolved is still open: its teammate finishes it, then the lead closes it. */
 export function unclosedLine(ids: readonly string[]): string {
   if (ids.length === 0) return ''
   return (
-    `The user marked ${ids.join(', ')} resolved, still open: close each now (task_update status done with a one-line ` +
-    'summary and the commits from the task file), then stop its teammate.'
+    `The user marked ${ids.join(', ')} resolved, still open: its teammate was told "accepted: finish it"? Once it ` +
+    'sends "finished", close it now (task_update status done with a one-line summary and the commits from the task file), then stop its teammate.'
   )
 }
 
