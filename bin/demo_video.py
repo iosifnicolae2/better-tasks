@@ -3,6 +3,8 @@
 Run through bin/demo-video.sh (it picks Kokoro's Python). Usage: demo-video.sh spec.json
 The video goes to <project>/.claude/tasks_videos/<name> (the main checkout's, also from a worktree;
 $BETTER_TASKS_VIDEOS overrides the folder), which git ignores; its file:// link is printed last.
+Next to it, <name>.png: the poster, a frame of the AFTER clip with a big play button in the middle,
+for a PR to show as a picture that opens the video (its link is printed first).
 Each clip gets its BEFORE/AFTER label top-left, red boxes and arrows, burned-in subtitles
 and the subtitles read aloud by Kokoro. Overlays are drawn with Pillow, so ffmpeg needs no
 libass or freetype. The spec (paths relative to the spec file):
@@ -43,6 +45,7 @@ LEAD_IN = 0.6
 GAP = 0.5
 TAIL = 0.8
 TITLE_SECONDS = 2.5
+POSTER_DELAY = 1.0  # the poster frame: this long into the last clip's first step, its marks on screen
 LOUD_PEAK = 0.89  # -1 dBFS
 RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
@@ -67,6 +70,9 @@ def main(spec_path: str) -> None:
         parts = [title_card(work, canvas, spec['title'])] if spec.get('title') else []
         parts += [render_clip(work / f'clip{i}', base, clip, canvas, voice) for i, clip in enumerate(clips)]
         join(work, parts, output)
+        moment = sum(probe(part)['duration'] for part in parts[:-1]) + first_step_start(clips[-1]) + POSTER_DELAY
+        poster = make_poster(work, output, moment)
+    print(poster.as_uri())
     print(output.as_uri())
 
 
@@ -267,6 +273,10 @@ def fitted(path: Path, canvas: tuple) -> tuple:
 
 # ---- Timeline and rendering ----
 
+def first_step_start(clip: dict) -> float:
+    return max(LEAD_IN, float(clip['steps'][0].get('at', 0)))
+
+
 def timeline(steps: list, voice: Voice) -> tuple:
     """Each step's start and narration, and the narration's end."""
     clock, timed = LEAD_IN, []
@@ -375,6 +385,33 @@ def join(work: Path, parts: list, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', str(listing),
          '-c', 'copy', '-movflags', '+faststart', str(output)])
+
+
+def make_poster(work: Path, video: Path, moment: float) -> Path:
+    """The video's frame at `moment` with a big play button in the middle, saved as <video>.png."""
+    frame_path = work / 'poster-frame.png'
+    moment = min(moment, probe(video)['duration'] - 0.1)
+    run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{moment:.3f}', '-i', str(video), '-frames:v', '1', str(frame_path)])
+    with Image.open(frame_path) as frame:
+        poster = frame.convert('RGBA')
+    size = round(min(poster.size) * 0.25)
+    button = play_button(size)
+    poster.alpha_composite(button, ((poster.width - size) // 2, (poster.height - size) // 2))
+    out = video.with_suffix('.png')
+    poster.convert('RGB').save(out, optimize=True)
+    return out
+
+
+def play_button(size: int) -> Image.Image:
+    """A dark round button with a white ring and triangle, drawn 4x large and shrunk for smooth edges."""
+    big = size * 4
+    image = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((0, 0, big - 1, big - 1), fill=(0, 0, 0, 190), outline=(255, 255, 255, 235), width=big // 30)
+    middle, reach = big / 2, big * 0.21
+    draw.polygon([(middle - reach * 0.75, middle - reach), (middle - reach * 0.75, middle + reach),
+                  (middle + reach * 1.05, middle)], fill=WHITE)
+    return image.resize((size, size), Image.LANCZOS)
 
 
 def run(argv: list) -> str:
