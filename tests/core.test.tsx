@@ -3,6 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
+import { OFFSCREEN_QUESTION } from '../hooks/testenv'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -828,7 +829,9 @@ test('startup asks once per project about before/after videos; the answer goes i
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   let asked = 0
-  on('tool.call', { tool: 'AskUserQuestion' }, () => {
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question
+    if (question !== QUESTION) return { result: { answers: {} } } // the other startup questions: dismissed
     asked += 1
     return { result: { answers: { [QUESTION]: ENABLE_OPTION } } }
   })
@@ -898,6 +901,7 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
     const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
     const question = first?.question ?? ''
     const options = (first?.options ?? []).map(option => option.label)
+    if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } } // dismissed: its own test below
     asked.push({ question, options })
     return { result: { answers: { [question]: question === QUESTION ? 'Not now' : options[0] } } }
   })
@@ -922,6 +926,7 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   const asked: string[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } }
     asked.push(question)
     return { result: { answers: { [question]: 'Not now' } } }
   })
@@ -934,6 +939,38 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   await clock.advance(0)
   expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Straight to main (one person, no app to install and no CI on PRs).')])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ demoVideos: false }) // "Not now" names no flow: asked again next time
+})
+
+test('startup asks once per project whether to test off-screen; the answer goes in its config.json and the rules follow', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  let asked = 0
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question
+    if (question !== OFFSCREEN_QUESTION) return { result: { answers: {} } }
+    asked += 1
+    return { result: { answers: { [question]: ENABLE_OPTION } } }
+  })
+  const host = fakeHost(on, [], {}, { env: TEAMS_ON, settingsEnv: TEAMS_ON })
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toBe(1)
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).toEqual({ offScreen: true })
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toBe(1)
+
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(host.spawned[0]).toContain('## Testing like a user')
+  expect(host.spawned[0]).toContain('## Off-screen (on in this project)')
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections.at(-1)?.text).toContain('## New bugs from testing')
+
+  host.files.delete(`${TASKS}/config.json`) // another project: asked at its own first start
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toBe(2)
 })
 
 test('straight to main, the default: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {

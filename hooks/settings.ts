@@ -55,6 +55,8 @@ export type Settings = {
   keepAwake: boolean
   /** Teammates make a narrated before/after video of finished work. */
   demoVideos: boolean
+  /** Teammates test and record off the user's screen (hooks/testenv.ts); a project setting. */
+  offScreen: boolean
   videoQuality: VideoQuality
   /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
   gitFlow: GitFlow
@@ -84,6 +86,7 @@ export const FIELDS: Record<string, Field> = {
   statusEvery: { kind: 'number' },
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
+  offScreen: { kind: 'boolean' },
   videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
   pullRequests: { kind: 'boolean' },
   gitFlow: { kind: 'string', values: GIT_FLOWS },
@@ -114,6 +117,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   statusEvery: 10,
   keepAwake: true,
   demoVideos: false,
+  offScreen: false,
   videoQuality: 'medium',
   pullRequests: false,
   gitFlow: 'direct',
@@ -148,6 +152,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
+    offScreen: value('offScreen') === true,
     videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
@@ -178,7 +183,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 export const CONFIG_FILE = '.claude/tasks/config.json'
 
 /** Settings that belong to the project only: the settings page writes them to its config.json, never to /config. */
-export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions']
+export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen']
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }
