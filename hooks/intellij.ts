@@ -9,7 +9,7 @@ export const WORKTREES_DIR = '.claude/worktrees'
 export const IDE_SETTING = 'excludeWorktreesFromIde'
 export const IDE_YES = 'Yes, skip that folder'
 export const IDE_NO = 'No, leave IntelliJ as is'
-export const IDE_QUESTION = 'We recommend IntelliJ skip teammate worktrees (.claude/worktrees/) to speed it up. Skip them?'
+export const IDE_QUESTION = 'Should we add worktrees to the IntelliJ ignore list?'
 
 const EXCLUDE_LINE = `<excludeFolder url="file://$MODULE_DIR$/${WORKTREES_DIR}" />`
 

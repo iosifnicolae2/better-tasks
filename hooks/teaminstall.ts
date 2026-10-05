@@ -12,7 +12,7 @@ const MARKETPLACE = 'better-tasks'
 const PLUGIN = `better-tasks@${MARKETPLACE}`
 const MARKETPLACE_SOURCE = { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } }
 
-export const TEAM_QUESTION = 'Let others on this project use better-tasks too (one line in the shared project settings)?'
+export const TEAM_QUESTION = 'Should we set up better-tasks in this project for other team members?'
 
 export const TEAMMATE_INSTALL = `claude plugin install ${PLUGIN} --scope project`
 export const TEAM_COMMIT = 'Share better-tasks with everyone on this project: Claude Code turns it on here; each teammate installs it once'

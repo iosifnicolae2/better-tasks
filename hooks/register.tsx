@@ -5,7 +5,7 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
-import { GIT_NO, GIT_SETTING, GIT_YES, gitQuestion, OFF_LINE, withIgnored } from './projectsetup'
+import { OFF_LINE } from './projectsetup'
 import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
 import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
 import { migrateFolder } from './migrate'
@@ -17,7 +17,7 @@ import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadR
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
-import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingPointer, testingSkillSettings } from './testenv'
+import { coordinatorTestingRules, testingPointer, testingSkillSettings } from './testenv'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, prCoordinatorRules, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
@@ -368,7 +368,6 @@ async function pointUserRules($: EngineInterface): Promise<void> {
 async function startQuestions($: EngineInterface): Promise<void> {
   if (await isOffHere($)) return
   await askTeamInstall($)
-  await askTasksInGit($)
   const settings = await settingsNow($)
   if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
@@ -380,31 +379,11 @@ async function startQuestions($: EngineInterface): Promise<void> {
   if (!isChosen) await askGitFlow($)
   else if (hasPrs(settings.gitFlow)) await checkGh($)
   await askIdeExclusion($)
-  await askToTurnOn($, { field: OFFSCREEN_FIELD, question: OFFSCREEN_QUESTION, header: 'Off-screen' })
 }
 
 /** True when better-tasks is off in this project (the user said no to it here). */
 async function isOffHere($: EngineInterface): Promise<boolean> {
   return !(await settingsNow($)).useBetterTasks
-}
-
-/** In a git project: keep the task files in git, or put their folder in .gitignore? */
-async function askTasksInGit($: EngineInterface): Promise<void> {
-  if (!(await isGitRepo($))) return
-  const folder = (await settingsNow($)).tasks.folder
-  const keep = await askToTurnOn($, { field: GIT_SETTING, question: gitQuestion(folder), header: 'Task files', answers: [GIT_YES, GIT_NO] })
-  if (keep === false) await ignoreTasks($, folder)
-}
-
-/** Adds the task folder to .gitignore (not committed); says how to untrack files git has already. */
-async function ignoreTasks($: EngineInterface, folder: string): Promise<void> {
-  const root = await $.session.root()
-  const path = `${root}/.gitignore`
-  const changed = withIgnored(await $.fs.read(path).catch(() => undefined), folder)
-  if (changed !== undefined) await $.fs.write(path, changed)
-  const tracked = await $.process.run(['git', '-C', root, 'ls-files', '--', folder]).then(done => done.stdout.trim(), () => '')
-  const untrack = tracked ? ` git still tracks the ones committed before: git rm -r --cached ${folder}` : ''
-  $.ui.log(`better-tasks: ${folder}/ is in .gitignore now, so the task files stay on this computer.${untrack}`)
 }
 
 async function isGitRepo($: EngineInterface): Promise<boolean> {

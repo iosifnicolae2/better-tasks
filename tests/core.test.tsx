@@ -4,9 +4,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
-import { gitQuestion, GIT_NO } from '../hooks/projectsetup'
 import { TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
-import { OFFSCREEN_QUESTION } from '../hooks/testenv'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -233,7 +231,7 @@ test("our skills load with the plugin's path and the settings in force under its
   const video = await $.skill.prompt({ skill: 'better-tasks:video', text: '# Video\nRun `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh`.' })
   expect(video.text).toMatch(/^# Video\n## Settings\n- Video quality: low\. Capture at 1280x720 or more/)
   expect(video.text).toMatch(/Run `\/.*\/bin\/demo-video\.sh`\.$/)
-  expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain('- Off-screen: off.')
+  expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain('- Off-screen: on.')
   expect((await $.skill.prompt({ skill: 'better-tasks:contribute', text: 'C' })).text).toContain('- Upstream PR: ask.')
   expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toBe('D')
   expect((await $.skill.prompt({ skill: 'commit', text: 'X ${CLAUDE_PLUGIN_ROOT}' })).text).toBe('X ${CLAUDE_PLUGIN_ROOT}')
@@ -992,7 +990,7 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
 
 /** The setup questions a test about other questions leaves alone (dismissed: asked again next time). */
 const isOtherSetupQuestion = (question: string) =>
-  [OFFSCREEN_QUESTION, TEAM_QUESTION, gitQuestion('.claude/tasks')].includes(question)
+  question === TEAM_QUESTION
 
 /** Answers each setup question from `answers` (by question), dismisses the rest; returns the questions asked, in order. */
 function answerSetup(on: On, answers: Record<string, string>): string[] {
@@ -1020,19 +1018,16 @@ test('"useBetterTasks": false in config.json: better-tasks stays quiet (no quest
   expect(composed.sections).toEqual([{ id: 'intro', text: 'You are Claude.', scope: 'shared' }])
 })
 
-test('the setup order: who gets it, then task files in git; "No" puts the task folder in .gitignore', async ($, on) => {
+test('no task files question: the tasks stay in git, .gitignore untouched', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const git = gitQuestion('.claude/tasks')
-  const asked = answerSetup(on, { [TEAM_QUESTION]: TEAM_NO, [git]: GIT_NO })
+  const asked = answerSetup(on, { [TEAM_QUESTION]: TEAM_NO })
   const host = fakeHost(on, [], { [`${ROOT}/.gitignore`]: 'node_modules/' })
-  host.runOutput[`git -C ${ROOT} ls-files -- .claude/tasks`] = '.claude/tasks/T-001-old.md\n'
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked.slice(0, 2)).toEqual([TEAM_QUESTION, git])
-  expect(host.files.get(`${ROOT}/.gitignore`)).toBe('node_modules/\n.claude/tasks/\n')
-  expect(host.notices.at(-1)).toContain('git rm -r --cached .claude/tasks')
-  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toMatchObject({ shareWithTeam: false, tasksInGit: false })
+  expect(asked[0]).toBe(TEAM_QUESTION)
+  expect(asked.some(question => question.includes('task files'))).toBe(false)
+  expect(host.files.get(`${ROOT}/.gitignore`)).toBe('node_modules/')
 })
 
 /** Answers the "who gets better-tasks" question with `answer`, dismisses the rest; returns how often it was asked. */
@@ -1171,36 +1166,25 @@ test('the recommended option comes first, and a dismissed setup question saves n
   expect(asked).toHaveLength(2)
 })
 
-test('startup asks once per project whether to test off-screen; the answer goes in its config.json and the rules follow', async ($, on) => {
+test('off-screen is on by default and never asked; the rules follow', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  let asked = 0
+  const asked: string[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
-    const question = (e as { questions: { question: string }[] }).questions[0]?.question
-    if (question !== OFFSCREEN_QUESTION) return { result: { answers: {} } }
-    asked += 1
-    return { result: { answers: { [question]: ENABLE_OPTION } } }
+    asked.push((e as { questions: { question: string }[] }).questions[0]?.question ?? '')
+    return { result: { answers: {} } }
   })
   const host = fakeHost(on, [], {}, { env: TEAMS_ON, settingsEnv: TEAMS_ON })
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).toBe(1)
-  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).toEqual({ offScreen: true })
-  await $.session.start(SESSION)
-  await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).toBe(1)
+  expect(asked.some(question => /off-screen|background/i.test(question))).toBe(false)
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(host.spawned[0]).toContain('## Testing like a user')
   expect(host.spawned[0]).toContain('nor their screen, mouse or keyboard (off-screen is on)')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('## New bugs from testing')
-
-  host.files.delete(`${TASKS}/config.json`) // another project: asked at its own first start
-  await $.session.start(SESSION)
-  await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).toBe(2)
 })
 
 test('straight to main, the default: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {

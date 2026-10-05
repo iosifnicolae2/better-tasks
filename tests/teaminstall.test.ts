@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { gitQuestion, withIgnored } from '../hooks/projectsetup'
 import { hasTeamInstall, TEAM_QUESTION, withTeamInstall } from '../hooks/teaminstall'
 
 describe('sharing better-tasks with the team', () => {
@@ -23,18 +22,5 @@ describe('sharing better-tasks with the team', () => {
   test('the question is short', () => {
     expect(TEAM_QUESTION.length).toBeLessThan(120)
     expect(TEAM_QUESTION.endsWith('?')).toBe(true)
-  })
-})
-
-describe('task files in git', () => {
-  test('"No" adds the task folder to .gitignore once, keeping what is there', () => {
-    expect(withIgnored(undefined, '.claude/tasks')).toBe('.claude/tasks/\n')
-    expect(withIgnored('dist', '.claude/tasks')).toBe('dist\n.claude/tasks/\n')
-    expect(withIgnored('/.claude/tasks/\n', '.claude/tasks')).toBeUndefined()
-    expect(withIgnored('.claude/tasks\n', '.claude/tasks/')).toBeUndefined()
-  })
-
-  test('the task files question is short and names the folder', () => {
-    expect(gitQuestion('work')).toBe('Keep the task files (work/) in git, so the team sees the same tasks?')
   })
 })

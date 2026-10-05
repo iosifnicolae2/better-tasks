@@ -5,12 +5,6 @@ import { skillCall } from './skills'
 // the user. register.tsx asks the question (askToTurnOn, once per project) and adds the rules to the prompts;
 // the how-to per kind of app is the testing skill (skills/testing/SKILL.md).
 
-/** The project setting, in .claude/tasks/config.json: unset means this project was not asked yet. */
-export const OFFSCREEN_FIELD = 'offScreen'
-
-export const OFFSCREEN_QUESTION =
-  'Should teammates test in the background, so your screen, mouse and keyboard stay yours?'
-
 /** The teammate's prompt keeps the boundaries and the bug report; the recipes are the testing skill. */
 export function testingPointer(isOffScreen: boolean): string {
   const screen = isOffScreen ? ", nor their screen, mouse or keyboard (off-screen is on)" : ''

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { coordinatorTestingRules, OFFSCREEN_QUESTION, testingPointer, testingSkillSettings } from '../hooks/testenv'
+import { coordinatorTestingRules, testingPointer, testingSkillSettings } from '../hooks/testenv'
 
 describe('testing like a user', () => {
   test("every teammate's prompt keeps the boundaries and the bug report, and points at the testing skill", () => {
@@ -25,10 +25,5 @@ describe('testing like a user', () => {
     expect(coordinatorTestingRules(false)).toContain('File it (task_create) only when they say so.')
     expect(coordinatorTestingRules(false)).not.toContain('Off-screen is on')
     expect(coordinatorTestingRules(true)).toContain('Off-screen is on')
-  })
-
-  test('the question says what stays the user\'s and what cannot run off-screen', () => {
-    expect(OFFSCREEN_QUESTION).toContain('your screen, mouse and keyboard stay yours')
-    expect(OFFSCREEN_QUESTION.length).toBeLessThan(120)
   })
 })
