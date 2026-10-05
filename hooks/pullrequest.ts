@@ -50,9 +50,9 @@ You work in your own git worktree, on its own branch; the project's main checkou
 - The project has no GitHub remote (\`git remote -v\`)? No PR: commit as usual and say so in your notes.
 - Done: push to a short branch named for the task, \`git push -u origin HEAD:task/T-004\`, then open the PR against the branch the project's main checkout is on (usually main):
   \`gh pr create --base main --head task/T-004 --title "T-004 <task title>" --body-file <scratchpad>/pr.md\`
-  The body, in plain words: what changed, how to test it, the task file path. With a demo video, show its poster (demo-video.sh made it next to the video, same name, .png) as a picture that opens the video, the browser playing it with sound. Put these two lines where it belongs, the text line right under the picture (alone, GitHub turns the link into its muted player):
+  The body, in plain words: what changed, how to test it, the task file path. With a demo video, show its poster (demo-video.sh made it next to the video, same name, .png) as a picture that opens the video, the browser playing it with sound. Put these two lines where it belongs, the text line right under the picture (alone, GitHub turns the link into its muted player; GitHub drops target="_blank", so the line tells how to get a new tab):
   \`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)\`
-  \`Click the picture to play the video with sound.\`
+  \`Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).\`
   and add \`--attach <poster's absolute path> --attach <video's absolute path>\`: gh uploads both and points the picture and its link at them. gh older than 2.99 has no --attach: leave the video out and say so in your notes.
 - Your notes get the line "PR: <the url gh printed>".
 - Request changes: commit and push to the same branch; the PR follows. A new video: the same two lines and \`gh pr edit <url> --body-file <scratchpad>/pr.md --attach <poster> --attach <video>\`.

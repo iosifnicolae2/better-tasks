@@ -39,7 +39,7 @@ describe('PR per task', () => {
   })
 
   test("the PR shows the video's poster linking to the video, with a text line so GitHub keeps it a picture", () => {
-    expect(PR_TEAMMATE_RULES).toContain("`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)`\n  `Click the picture to play the video with sound.`")
+    expect(PR_TEAMMATE_RULES).toContain("`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)`\n  `Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).`")
     expect(PR_TEAMMATE_RULES).toContain("--attach <poster's absolute path> --attach <video's absolute path>")
     expect(PR_TEAMMATE_RULES).toContain('--attach <poster> --attach <video>')
   })
