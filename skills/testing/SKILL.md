@@ -1,16 +1,16 @@
 ---
 name: testing
 user-invocable: false
-description: How a better-tasks teammate runs, tests and captures its change like a user, in its own environment, off the user's screen when the project says so, and leaves a local build for the user (web, iOS, Android, terminal, Linux and Mac apps, plugins). Load it before you run, test or capture the app.
+description: How a better-tasks teammate runs, tests and captures its change like a user, in its own environment, off the user's screen when the project says so, and makes a local build when the user asks for one (web, iOS, Android, terminal, Linux and Mac apps, plugins). Load it before you run, test or capture the app.
 ---
 
 # Testing like a user
 - Run it, go through the steps, look at the result: passing tests alone don't count.
-- Your own environment: your own instance on its own port, its own data (a fresh database, browser profile or simulator, in your scratchpad); not another teammate's. Stop what you started when done, except the local build you leave for the user.
+- Your own environment: your own instance on its own port, its own data (a fresh database, browser profile or simulator, in your scratchpad); not another teammate's. Stop what you started when done.
 - iPhone/iOS apps: build, run and test through Xcode's own tools (its MCP server; Apple: https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode). Not set up (no xcode tools among yours)? Tell the lead it takes: Xcode > Settings > Intelligence > "Allow external agents to use Xcode tools", then `claude mcp add --transport stdio xcode -- xcrun mcpbridge`, with the project open in Xcode. Until then: `xcodebuild` and `xcrun simctl`.
 
-## Local build for the user
-At done, leave a build the user can try right away, on their machine or device. Say in your notes how to stop or remove it.
+## A local build, only when the user asks
+None at done: the user sees the video and the PR. The lead says the user wants to try it? Make it, open or install it as the lead says (it may do it itself from your notes), and say in your notes how to stop or remove it.
 - Web: your dev server left running on its own port; its URL is the link.
 - iOS / Android: installed on the user's device (`xcrun devicectl device install app --device <id> <app>`, `adb install -r <apk>`), else on a simulator or emulator they can see.
 - Mac app: the built .app's path; the user opens it.
