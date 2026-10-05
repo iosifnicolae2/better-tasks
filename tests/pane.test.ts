@@ -784,3 +784,11 @@ test('a 4-week sprint shows its weeks in the settings preview', { options: { spr
   const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
   expect(await ui.find({ type: 'Text', text: /^Sprint \d+ · Weeks \d+–\d+ · / })).toBeDefined()
 })
+
+test('the settings page shows its rows in groups, each under a heading', async ($, on) => {
+  fakeProject(on)
+  await $.command.run(sprintCommand('config'))
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
+  const headings = (await ui.findAll({ type: 'Text' })).filter(found => found.props.bold === true && found.props.color === 'subtle').map(found => found.text)
+  expect(headings).toEqual(['General', 'Git & PRs', 'Testing & videos', 'Teammate models', 'Sprint', 'This project'])
+})
