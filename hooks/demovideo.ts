@@ -52,7 +52,7 @@ export function setupVerdict(output: string): { isReady: boolean; text: string }
 export const TEAMMATE_POINTER = `## Before/after video (on in this project)
 Finished work that shows on screen comes with one short narrated video, its BEFORE captured before you change anything. Such work: load the \`${skillCall('video')}\` skill before your first change; it says how. Nothing to see (a refactor, a config)? No video; say so in your notes.`
 
-/** What the video skill reads on top: this project's quality and the capture size it needs. */
+/** What the video skill reads under its title: this project's quality and the capture size it needs. */
 export function videoSkillSettings(quality: VideoQuality): string {
   return `- Video quality: ${quality}. Capture at ${VIDEO_SIZE[quality]} or more; make it with \`--quality ${quality}\`.`
 }

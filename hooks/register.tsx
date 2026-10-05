@@ -113,7 +113,7 @@ export const register: Register = (on, options) => {
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
-  // Our skills follow the settings in force: their path filled in, their settings on top (skills.ts).
+  // Our skills follow the settings in force: their path filled in, their settings under their title (skills.ts).
   on('skill.prompt', async ($, e, next) => {
     const computed = await next(e)
     const skill = ourSkill(e.skill)
@@ -325,7 +325,7 @@ async function claudeDirOf($: EngineInterface): Promise<string> {
   return (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
 }
 
-/** The settings a skill follows, as lines for its "## Settings" on top; '' when it follows none. */
+/** The settings a skill follows, as lines for its "## Settings"; '' when it follows none. */
 async function skillSettings($: EngineInterface, skill: SkillName): Promise<string> {
   if (skill === 'contribute') return contributeSkillSettings(await readUpstreamPr(ioOf($), await claudeDirOf($)))
   const settings = await settingsNow($)

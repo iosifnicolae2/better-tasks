@@ -220,13 +220,13 @@ test("the lead pastes the teammate's block: its markdown links above the questio
   expect(lead).not.toContain('gh repo fork')
 })
 
-test("our skills load with the plugin's path and the settings in force on top; others pass through", { options: { demoVideos: true, videoQuality: 'low' } }, async ($, on) => {
+test("our skills load with the plugin's path and the settings in force under its title; others pass through", { options: { demoVideos: true, videoQuality: 'low' } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
   on('skill.prompt', ($, e) => ({ text: e.text }))
-  const video = await $.skill.prompt({ skill: 'better-tasks:video', text: 'Run `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh`.' })
-  expect(video.text).toMatch(/^## Settings\n- Video quality: low\. Capture at 1280x720 or more/)
+  const video = await $.skill.prompt({ skill: 'better-tasks:video', text: '# Video\nRun `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh`.' })
+  expect(video.text).toMatch(/^# Video\n## Settings\n- Video quality: low\. Capture at 1280x720 or more/)
   expect(video.text).toMatch(/Run `\/.*\/bin\/demo-video\.sh`\.$/)
   expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain('- Off-screen: off.')
   expect((await $.skill.prompt({ skill: 'better-tasks:contribute', text: 'C' })).text).toContain('- Upstream PR: ask.')

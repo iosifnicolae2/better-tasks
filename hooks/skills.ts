@@ -1,6 +1,6 @@
 // The plugin's skills (skills/<name>/SKILL.md): how-tos loaded when their step comes, instead of rules
 // pasted into every prompt. The prompts keep a one-line pointer to each. When one loads, register.tsx's
-// skill.prompt hook fills in the plugin's path and puts the settings it follows on top ("## Settings"),
+// skill.prompt hook fills in the plugin's path and puts the settings it follows under its title ("## Settings"),
 // so a skill always follows the settings in force.
 
 /** Our skills that follow settings, by folder name; the model calls them better-tasks:<name>. */
@@ -19,8 +19,18 @@ export function ourSkill(skill: string): SkillName | undefined {
   return SKILLS.find(own => own === name)
 }
 
-/** The skill's text with the plugin's path filled in and its settings on top (none: as it is). */
+const TITLE = /^# .*$/m
+
+/**
+ * The skill's text with the plugin's path filled in and its settings right under its title, so they
+ * read as this skill's even when several load in a row (none: as it is).
+ */
 export function fillSkill(text: string, root: string, settingsLines: string): string {
   const filled = text.replace(PLUGIN_ROOT, root)
-  return settingsLines ? `## Settings\n${settingsLines}\n\n${filled}` : filled
+  if (!settingsLines) return filled
+  const settings = `## Settings\n${settingsLines}`
+  const title = TITLE.exec(filled)
+  if (!title) return `${settings}\n\n${filled}`
+  const end = title.index + title[0].length
+  return `${filled.slice(0, end)}\n${settings}\n${filled.slice(end)}`
 }

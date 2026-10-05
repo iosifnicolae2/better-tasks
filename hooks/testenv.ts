@@ -22,7 +22,7 @@ export function testingPointer(isOffScreen: boolean): string {
 - A new bug you notice, even outside your task: don't fix it unasked. Send the lead one line, "New bug: <what you saw>, <how to see it again>".`
 }
 
-/** What the testing skill reads on top: whether its "Off-screen" or its "On the screen" part applies. */
+/** What the testing skill reads under its title: whether its "Off-screen" or its "On the screen" part applies. */
 export function testingSkillSettings(isOffScreen: boolean): string {
   return isOffScreen
     ? '- Off-screen: on. Follow "Off-screen"; the user\'s screen, mouse and keyboard stay theirs.'

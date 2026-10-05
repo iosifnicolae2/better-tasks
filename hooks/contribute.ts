@@ -73,7 +73,7 @@ export const UPSTREAM_PR_TOOL: ToolSpec = {
 export const CONTRIBUTE_POINTER = `## Changes to better-tasks itself
 The user wants better-tasks (this plugin) changed: load the \`${skillCall('contribute')}\` skill before you file it.`
 
-/** What the contribute skill reads on top: its step 4, which follows the user's saved answer. */
+/** What the contribute skill reads under its title: its step 4, which follows the user's saved answer. */
 export function contributeSkillSettings(choice: UpstreamPr): string {
   return choice === 'never'
     ? '- Upstream PR: never. No PR question: the user chose "Never" (upstream_pr answer ask undoes it, only when the user asks).'
