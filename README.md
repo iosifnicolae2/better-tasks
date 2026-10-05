@@ -4,15 +4,11 @@
 
 A plugin for Claude Code: your tasks live as Markdown files in your project, a team of Claude agents works on them, and you only review the result.
 
-[![Play the before/after demo video](docs/videos/sample-before-after.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)
+<p align="center">
+  <img src="docs/screenshots/board.svg" alt="Claude Code with the sprint board docked on the right">
+</p>
 
-<sub>What a teammate hands in with a fix: an "Add to cart" button that lost every click, before and after. Click for the video; turn the sound on, the subtitles are read aloud.</sub>
-
-## How it works
-
-| 1. You ask | 2. Claude works | 3. You review |
-|---|---|---|
-| "Add a task: the cart button does nothing." | The lead hands the task to a teammate agent. It fixes it, tests it, records a before/after video, opens a PR. | You watch the video, then pick **Mark as resolved** or **Request changes**. |
+<sub>The sprint board docked next to Claude: you ask for a fix, the lead files it as T-007 and hands it to the teammate that owns the shop.</sub>
 
 ## ✨ Features
 
@@ -23,10 +19,6 @@ A plugin for Claude Code: your tasks live as Markdown files in your project, a t
 - 🔀 **Your git flow**: straight to main, a shared `dev` branch, or a worktree and PR per task. Asked once per project.
 - 🗂️ **Sprint board**: `/better-tasks` shows sprints, goals, the backlog and search.
 - 🌙 **`/away`**: screens off, the Mac keeps working.
-
-<p align="center">
-  <img src="docs/screenshots/board.svg" alt="Claude Code with the sprint board docked on the right">
-</p>
 
 ## 📦 Install
 
@@ -52,13 +44,19 @@ This is saved in `.claude/settings.json`: commit it. Each teammate still runs th
 
 ## 🚀 First use
 
-1. **Add a task**: tell Claude what you want, e.g. *"Add a task: the cart button does nothing."*
+1. **Add a task**: tell Claude what you want, e.g. *"Add a task: the Add to cart button loses clicks."*
 2. **Start it**: *"Start T-001."* Claude asks your git flow once, then a teammate takes it.
 3. **Review it**: when it is done, Claude shows the video and the PR and asks: **Mark as resolved** or **Request changes** (or type your own answer).
 
 Open the board any time with `/better-tasks`.
 
 ## ✅ How approval works
+
+Each finished task comes with a short **before/after video**, so you see the fix before you read the code:
+
+[![Play the before/after demo video](docs/videos/sample-before-after.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)
+
+<sub>What the teammate hands in for T-007 from the board above: the "Add to cart" button lost every click, before and after. Click for the video; turn the sound on, the subtitles are read aloud.</sub>
 
 - Claude asks about **one finished task at a time**.
 - With a pull request, it **opens the PR in your browser** first (setting `openPrInBrowser`, on by default).
