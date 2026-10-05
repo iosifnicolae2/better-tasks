@@ -5,7 +5,7 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
-import { GIT_NO, GIT_SETTING, GIT_YES, gitQuestion, OFF_LINE, USE_NO, USE_QUESTION, USE_SETTING, USE_YES, withIgnored } from './projectsetup'
+import { GIT_NO, GIT_SETTING, GIT_YES, gitQuestion, OFF_LINE, withIgnored } from './projectsetup'
 import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
 import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
 import { migrateFolder } from './migrate'
@@ -48,8 +48,6 @@ let loggedMissingTemplate = ''
 let voiceSetup: Promise<void> | undefined
 let ghUpdate: Promise<void> | undefined
 
-/** First in every setup question, so a stray Enter lands on it: nothing is saved, asked again next session. */
-export const LATER_OPTION = 'Decide later'
 const NO_OPTION = 'No'
 /** A setup question waits for an empty prompt box this long (the user is not typing), checked every POLL_MS. */
 const QUIET_MS = 2000
@@ -351,7 +349,7 @@ async function pointUserRules($: EngineInterface): Promise<void> {
  * IntelliJ project, whether IntelliJ may skip them. A setting already on gets what it needs.
  */
 async function startQuestions($: EngineInterface): Promise<void> {
-  if (!(await askToUseHere($))) return
+  if (await isOffHere($)) return
   await askTeamInstall($)
   await askTasksInGit($)
   const settings = await settingsNow($)
@@ -371,18 +369,6 @@ async function startQuestions($: EngineInterface): Promise<void> {
 /** True when better-tasks is off in this project (the user said no to it here). */
 async function isOffHere($: EngineInterface): Promise<boolean> {
   return !(await settingsNow($)).useBetterTasks
-}
-
-/**
- * Use better-tasks here at all? Asked once per project, not in one that has tasks already. False when the
- * answer is no: the other questions are skipped and better-tasks stays quiet from now on.
- */
-async function askToUseHere($: EngineInterface): Promise<boolean> {
-  if ((await listTasks(ioOf($))).length === 0) {
-    const use = await askToTurnOn($, { field: USE_SETTING, question: USE_QUESTION, header: 'better-tasks', answers: [USE_YES, USE_NO] })
-    if (use === false) $.ui.log(OFF_LINE)
-  }
-  return !(await isOffHere($))
 }
 
 /** In a git project: keep the task files in git, or put their folder in .gitignore? */
@@ -505,7 +491,7 @@ type TurnOnQuestion = { field: string; question: string; header: string; answers
 
 /**
  * Asks once per project: the answer, on or off, is saved in its config.json, so another project is asked
- * at its own first start. Decided later, dismissed or answered in free text, it is asked again next session.
+ * at its own first start. Dismissed or answered in free text, it is asked again next session.
  * Enable also sets the setting up. Returns the answer just saved; undefined when none was.
  */
 async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<boolean | undefined> {
@@ -523,14 +509,13 @@ async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<boo
 }
 
 /**
- * A setup question pops up on its own, so a key meant for the prompt box can answer it: Enter picks the
- * highlighted option. So it waits until the user is not typing, and "Decide later" (saves nothing) comes
- * first. Returns the answer; undefined for "Decide later", a dismissal, or a user who never stopped typing.
+ * A setup question pops up on its own, so a key meant for the prompt box could answer it: Enter picks the
+ * highlighted option (the recommended one, first). So it waits until the user is not typing. Returns the
+ * answer; undefined for a dismissal (asked again next session) or a user who never stopped typing.
  */
 async function askSetup($: EngineInterface, question: string, options: string[], header: string): Promise<string | undefined> {
   if (!(await untilNotTyping($))) return undefined
-  const answer = await $.ui.ask(question, { options: [LATER_OPTION, ...options], header }).catch(() => undefined)
-  return answer === LATER_OPTION ? undefined : answer
+  return $.ui.ask(question, { options, header }).catch(() => undefined)
 }
 
 /** True once the prompt box has stayed empty for QUIET_MS; false when that never happens within GIVE_UP_MS. */

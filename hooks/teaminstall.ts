@@ -5,20 +5,20 @@
 
 export const TEAM_SETTING = 'shareWithTeam'
 export const SHARED_SETTINGS = '.claude/settings.json'
-export const TEAM_YES = 'Everyone on this project'
-export const TEAM_NO = 'Only me'
+export const TEAM_YES = 'Yes, everyone on this project (recommended)'
+export const TEAM_NO = 'No, only me'
 
 const MARKETPLACE = 'better-tasks'
 const PLUGIN = `better-tasks@${MARKETPLACE}`
 const MARKETPLACE_SOURCE = { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } }
 
 export const TEAM_QUESTION = [
-  'Who on this project should get better-tasks?',
-  `${TEAM_YES}: better-tasks adds itself to this project's shared Claude Code settings (${SHARED_SETTINGS}) and ` +
-    'commits that one file. Push it when you are ready: teammates who open the project in Claude Code then see ' +
-    'better-tasks turned on for it, and install it once.',
-  `${TEAM_NO}: nothing in the project changes. better-tasks stays installed just for you.`,
-  'Who should get better-tasks here?',
+  'Set better-tasks up in this project so other team members can use it too?',
+  `Yes: better-tasks adds itself to this project's shared Claude Code settings (${SHARED_SETTINGS}) and commits ` +
+    'that one file. Push it when you are ready: teammates who open the project in Claude Code then see better-tasks ' +
+    'turned on for it, and install it once.',
+  'No: nothing in the project changes. better-tasks stays installed just for you.',
+  'Set it up for the whole team?',
 ].join('\n\n')
 
 export const TEAMMATE_INSTALL = `claude plugin install ${PLUGIN} --scope project`

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { gitQuestion, USE_QUESTION, withIgnored } from '../hooks/projectsetup'
+import { gitQuestion, withIgnored } from '../hooks/projectsetup'
 import { hasTeamInstall, TEAM_QUESTION, withTeamInstall } from '../hooks/teaminstall'
 
 describe('sharing better-tasks with the team', () => {
@@ -36,7 +36,6 @@ describe('task files in git', () => {
   })
 
   test('the questions say what each answer does and how to undo it', () => {
-    expect(USE_QUESTION).toContain('"useBetterTasks": true')
     expect(gitQuestion('work')).toContain('adds work/ to .gitignore')
   })
 })

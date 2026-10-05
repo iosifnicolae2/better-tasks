@@ -1,23 +1,12 @@
-// The first setup questions in a project, once each (config.json): use better-tasks here at all
-// (useBetterTasks), then who gets it (teaminstall.ts), then whether its task files go in git (tasksInGit).
+// Per-project setup (config.json): who gets better-tasks (teaminstall.ts), then whether its task files go in
+// git (tasksInGit), asked once each. useBetterTasks is not asked: false in config.json keeps better-tasks quiet here.
 
 export const USE_SETTING = 'useBetterTasks'
-export const USE_YES = 'Yes, use it here'
-export const USE_NO = 'No, not in this project'
-export const USE_QUESTION = [
-  'Use better-tasks in this project?',
-  'Yes: it keeps this project\'s tasks as Markdown files in .claude/tasks/, shows the sprint board, and lets Claude ' +
-    'hand work to teammates. A few more setup questions follow.',
-  'No: better-tasks stays quiet here: no board, no task rules, no more questions. To turn it on later, set ' +
-    `"${USE_SETTING}": true in .claude/tasks/config.json (or delete that line to be asked again), then restart Claude Code.`,
-  'Use better-tasks here?',
-].join('\n\n')
-
 export const OFF_LINE = `better-tasks is off in this project ("${USE_SETTING}": false in .claude/tasks/config.json; set it to true and restart to turn it on)`
 
 export const GIT_SETTING = 'tasksInGit'
-export const GIT_YES = 'Yes, keep them in git (recommended)'
-export const GIT_NO = 'No, keep them out of git'
+export const GIT_YES = 'Yes (recommended)'
+export const GIT_NO = 'No'
 
 /** The task folder's question; `folder` is where the task files live (.claude/tasks by default). */
 export function gitQuestion(folder: string): string {
