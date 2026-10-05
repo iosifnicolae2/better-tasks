@@ -225,6 +225,15 @@ test('with worktree on, a named teammate is spawned in a worktree', { options: {
   expect(scout.result).toEqual({ isolation: 'none' })
 })
 
+test("at session start IntelliJ is told to skip the worktrees folder; a project without .idea/ gets nothing", async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
+  await $.session.start(SESSION)
+  expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain('<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />')
+  expect(host.notices).toContain('better-tasks: IntelliJ now skips .claude/worktrees/ (teammate worktrees), so they are not indexed')
+})
+
 test('a new sprint rolls unfinished work over and writes the review', async ($, on) => {
   const clock = mock.clock(on, { now: SUNDAY_OCT_11_LATE })
   mock.store(on)
