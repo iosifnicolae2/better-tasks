@@ -27,5 +27,6 @@ describe('before/after videos', () => {
     expect(rules).toContain('/plugins/better-tasks/bin/demo-video.sh spec.json')
     expect(rules).toContain('/plugins/better-tasks/bin/demo_video.py')
     expect(rules).toContain('Video: [T-004.mp4](../tasks_videos/T-004.mp4)')
+    expect(rules).toContain("with its poster beside it (<task id>.png: an AFTER frame with a big play button, for a PR)")
   })
 })

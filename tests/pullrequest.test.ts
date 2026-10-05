@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { ghProblem, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES } from '../hooks/pullrequest'
+import { ghProblem, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from '../hooks/pullrequest'
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
@@ -34,7 +34,13 @@ describe('PR per task', () => {
     expect(hasGitHub('')).toBe(false)
   })
 
-  test('with a PR the approval question shows only the PR link: the video plays in the PR', () => {
-    expect(PR_COORDINATOR_RULES).toContain('and no video link: the video plays in the PR')
+  test('with a PR the approval question shows only the PR link: its picture opens the video', () => {
+    expect(PR_COORDINATOR_RULES).toContain("and no video link: the PR's picture opens the video")
+  })
+
+  test("the PR shows the video's poster linking to the video, with a text line so GitHub keeps it a picture", () => {
+    expect(PR_TEAMMATE_RULES).toContain("`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)`\n  `Click the picture to play the video with sound.`")
+    expect(PR_TEAMMATE_RULES).toContain("--attach <poster's absolute path> --attach <video's absolute path>")
+    expect(PR_TEAMMATE_RULES).toContain('--attach <poster> --attach <video>')
   })
 })
