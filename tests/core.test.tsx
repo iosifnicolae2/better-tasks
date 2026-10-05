@@ -14,6 +14,8 @@ const SESSION = { cwd: ROOT, surface: 'terminal', isInteractive: true } as const
 const MONDAY_OCT_5 = new Date(2026, 9, 5, 9).getTime()
 const SUNDAY_OCT_11_LATE = new Date(2026, 9, 11, 23, 58).getTime()
 const WINDOW = 200_000
+/** Setup questions wait for a quiet, empty prompt box (2 s) before each one asks. */
+const QUIET_PROMPT_BOX = 10_000
 
 const TEAMS_ON = { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
 
@@ -236,7 +238,7 @@ function answerStartup(on: On, flow: string, ide: string): string[] {
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
     asked.push(question)
-    const answer = question === QUESTION ? 'Not now' : question === IDE_QUESTION ? ide : flow
+    const answer = question === QUESTION ? 'No' : question === IDE_QUESTION ? ide : flow
     return { result: { answers: { [question]: answer } } }
   })
   return asked
@@ -249,7 +251,7 @@ test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may s
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toContain(IDE_QUESTION)
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toMatchObject({ gitFlow: 'worktree-prs', excludeWorktreesFromIde: true })
   expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
@@ -258,7 +260,7 @@ test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may s
   host.files.delete(`${ROOT}/.idea/project.iml`)
   host.files.delete(`${ROOT}/.idea/modules.xml`)
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked.filter(question => question === IDE_QUESTION)).toHaveLength(1)
   expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
 })
@@ -270,9 +272,9 @@ test('"No" to the IntelliJ question is saved: .idea is left as it is and the que
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked.filter(question => question === IDE_QUESTION)).toHaveLength(1)
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toMatchObject({ excludeWorktreesFromIde: false })
   expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
@@ -285,14 +287,14 @@ test('no IntelliJ question without worktrees or without .idea/, and nothing is e
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).not.toContain(IDE_QUESTION)
   expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
 
   host.files.delete(`${ROOT}/.idea/misc.xml`)
   host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ gitFlow: 'worktree-prs' }))
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).not.toContain(IDE_QUESTION)
 })
 
@@ -899,19 +901,19 @@ test('startup asks once per project about before/after videos; the answer goes i
   const host = fakeHost(on)
   host.spawnOutput = 'ready /home/.local/share/better-tasks/kokoro\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toBe(1)
   expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).toEqual({ demoVideos: true })
   expect(host.spawnedArgv.some(argv => argv.at(-1)?.endsWith('/bin/kokoro-setup.sh'))).toBe(true)
   expect(host.toasts).toContain('Kokoro voice ready: before/after videos are on.')
 
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toBe(1)
 
   host.files.delete(`${TASKS}/config.json`) // another project, same machine: asked at its own first start
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toBe(2)
 })
 
@@ -949,7 +951,7 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
   const host = fakeHost(on) // its gh --version prints nothing: gh missing
   host.spawnOutput = 'ready gh version 2.102.0 (2026-09-30)\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(host.spawnedArgv.filter(argv => argv.at(-1)?.endsWith('/bin/gh-update.sh'))).toHaveLength(1)
   expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
 })
@@ -964,20 +966,20 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
     const options = (first?.options ?? []).map(option => option.label)
     if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } } // dismissed: its own test below
     asked.push({ question, options })
-    return { result: { answers: { [question]: question === QUESTION ? 'Not now' : options[0] } } }
+    return { result: { answers: { [question]: question === QUESTION ? 'No' : options[1] } } }
   })
   const host = fakeHost(on, [], { [`${ROOT}/app/pubspec.yaml`]: '', [`${ROOT}/.claude/tasks/config.json`]: '{ "//": "notes", "// gitFlow": "direct" }' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked.map(one => one.question)).toEqual([QUESTION, expect.stringContaining('Recommended here: Shared dev branch, PR per task (a Flutter app to build and install once for every change).')])
-  expect(asked[1]?.options.slice(0, 3)).toEqual(['Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
+  expect(asked[1]?.options.slice(0, 4)).toEqual(['Decide later', 'Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ '//': 'notes', demoVideos: false, gitFlow: 'dev-prs' })
   expect(host.notices).toContain('better-tasks: made the dev branch here, from this commit: teammates land on it, PRs go to main')
   expect(host.spawnedArgv.map(argv => argv.at(-1)?.split('/').pop())).toEqual(['gh-update.sh']) // gh --version printed nothing: gh missing
 
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked.filter(one => one.question !== QUESTION)).toHaveLength(1)
 })
 
@@ -989,17 +991,57 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
     if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } }
     asked.push(question)
-    return { result: { answers: { [question]: 'Not now' } } }
+    return { result: { answers: { [question]: 'No' } } }
   })
   const host = fakeHost(on)
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toEqual([QUESTION])
   host.runOutput['git remote -v'] = 'origin\thttps://github.com/someone/app.git (fetch)\n'
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Straight to main (one person, no app to install and no CI on PRs).')])
-  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ demoVideos: false }) // "Not now" names no flow: asked again next time
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ demoVideos: false }) // "No" names no flow: asked again next time
+})
+
+test('a setup question waits while the user types a prompt, and asks once the prompt box stays empty', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    asked.push((e as { questions: { question: string }[] }).questions[0]?.question ?? '')
+    return { result: { answers: {} } }
+  })
+  const host = fakeHost(on)
+  host.composer = 'fix the login bu'
+  await $.session.start(SESSION)
+  await clock.advance(30_000)
+  expect(asked).toEqual([])
+  host.composer = ''
+  await clock.advance(1000)
+  expect(asked).toEqual([])
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).toContain(QUESTION)
+})
+
+test('"Decide later" comes first, so a stray Enter picks it: nothing is saved and the question comes back next session', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const asked: string[][] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
+    const options = (first?.options ?? []).map(option => option.label)
+    if (first?.question === QUESTION) asked.push(options)
+    return { result: { answers: { [first?.question ?? '']: options[0] } } }
+  })
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).toEqual([['Decide later', ENABLE_OPTION, 'No']])
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).not.toHaveProperty('demoVideos')
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked).toHaveLength(2)
 })
 
 test('startup asks once per project whether to test off-screen; the answer goes in its config.json and the rules follow', async ($, on) => {
@@ -1015,11 +1057,11 @@ test('startup asks once per project whether to test off-screen; the answer goes 
   const host = fakeHost(on, [], {}, { env: TEAMS_ON, settingsEnv: TEAMS_ON })
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toBe(1)
   expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).toEqual({ offScreen: true })
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toBe(1)
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
@@ -1030,7 +1072,7 @@ test('startup asks once per project whether to test off-screen; the answer goes 
 
   host.files.delete(`${TASKS}/config.json`) // another project: asked at its own first start
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(asked).toBe(2)
 })
 
