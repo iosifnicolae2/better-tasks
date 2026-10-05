@@ -88,8 +88,9 @@ describe('IntelliJ skips the teammate worktrees', () => {
   })
 })
 
-test('the IntelliJ question says what happens, why, and how to undo it', () => {
-  expect(IDE_QUESTION).toContain('IntelliJ indexes every copy, which slows it down')
-  expect(IDE_QUESTION).toContain('Cancel Exclusion')
+test('the IntelliJ question is a short recommendation', () => {
+  expect(IDE_QUESTION).toContain('We recommend')
+  expect(IDE_QUESTION).toContain('.claude/worktrees/')
+  expect(IDE_QUESTION.length).toBeLessThan(120)
   expect(IDE_QUESTION.endsWith('?')).toBe(true)
 })
