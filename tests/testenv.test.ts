@@ -18,7 +18,8 @@ describe('testing like a user', () => {
     expect(rules).toContain('booted without the Simulator app')
     expect(rules).toContain('emulator -avd <name> -no-window')
     expect(rules).toContain('tmux capture-pane')
-    expect(rules).toContain("A Mac app that needs clicks or typing can't run off-screen")
+    expect(rules).toContain('CGEvent postToPid')
+    expect(rules).toContain('screencapture -x -o -l <window id>')
     expect(testingRules(false)).not.toContain('headless: true')
     expect(testingRules(false)).toContain('Tell the lead first')
   })
@@ -37,6 +38,6 @@ describe('testing like a user', () => {
 
   test('the question says what stays the user\'s and what cannot run off-screen', () => {
     expect(OFFSCREEN_QUESTION).toContain('your screen, mouse and keyboard stay yours')
-    expect(OFFSCREEN_QUESTION).toContain('A Mac app that needs clicks waits until you are away')
+    expect(OFFSCREEN_QUESTION).toContain('a step that needs a real click waits until you are away')
   })
 })

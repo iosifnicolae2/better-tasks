@@ -10,7 +10,8 @@ export const OFFSCREEN_NO = 'On my screen is fine'
 export const OFFSCREEN_QUESTION =
   'Should teammates test and record off-screen, so your screen, mouse and keyboard stay yours while you work? ' +
   'Web pages run in a hidden browser, iOS and Android in hidden simulators, terminal apps in a hidden terminal. ' +
-  'A Mac app that needs clicks waits until you are away. Change it later in /better-tasks config.'
+  'Mac apps run in the background, on a virtual display if you have one, driven without your pointer; a step that needs a real click waits until you are away. ' +
+  'Change it later in /better-tasks config.'
 
 const OWN_ENVIRONMENT = `## Testing like a user
 - Test your change as a user would: run it, go through the steps, look at the result. Passing tests alone don't count.
@@ -23,8 +24,8 @@ const OFF_SCREEN = `## Off-screen (on in this project): the user's screen, mouse
 - Android: \`emulator -avd <name> -no-window\`; \`adb exec-out screencap -p\`, \`adb shell screenrecord\`.
 - Terminal apps: a detached tmux session (\`tmux new -d -s <name> -x 160 -y 45\`), \`tmux send-keys\` to type, \`tmux capture-pane -p -e\` to read the screen.
 - Linux desktop apps: \`xvfb-run\`.
-- A Mac app that needs clicks or typing can't run off-screen: clicks move the user's pointer and keys go to the front app. Don't do it; tell the lead, who asks the user or waits until they are away.
-- Never: \`screencapture\` of the screen, \`open\` of an app or a URL, AppleScript clicks or keystrokes.`
+- Mac apps: launch without focus (NSWorkspace openApplication with activates = false, or \`open -g\`), move the window to a virtual display (BetterDisplay's, if the user has one) through Accessibility, press buttons and menus with Accessibility actions (AXPress), type with key events posted to the app's process only (CGEvent postToPid), read values through Accessibility, capture the window alone: \`screencapture -x -o -l <window id>\`. No real click (it moves the user's pointer) and no keys to the front app. A step that only works with a real click: tell the lead, who asks the user or waits until they are away.
+- Never: \`screencapture\` of a whole screen, \`open\` of an app or URL without -g, AppleScript clicks or keystrokes.`
 
 const ON_SCREEN = `## Using the screen
 - Off-screen first when the tool allows it (a headless browser, a simulator without its window). Need the user's screen, mouse or keyboard? Tell the lead first: the user may be working.`
@@ -42,7 +43,7 @@ export function testingRules(isOffScreen: boolean): string {
 
 export function coordinatorTestingRules(isOffScreen: boolean): string {
   const waits = isOffScreen
-    ? '\n- Off-screen is on: a teammate that needs the user\'s screen (a Mac app to click through) waits. Ask the user when it may, or run it while they are away.'
+    ? '\n- Off-screen is on: a teammate that needs the user\'s screen (a real click in a Mac app) waits. Ask the user when it may, or run it while they are away.'
     : ''
   return `## New bugs from testing
 - A teammate reports "New bug: ...": tell the user in one line in your next message (what, and how to see it), and ask whether to file it. File it (task_create) only when they say so.${waits}`
