@@ -56,5 +56,16 @@ in_dir "$alpha" "$script" stop "$held"
 sleep 1
 in_dir "$alpha" "$script" status | grep -q "^free" || fail "stop did not free the turn"
 
+# The test screen: a real screen chosen in config.json is used; one not connected falls back with one line.
+mkdir -p "$alpha/.claude/tasks"
+real="$(in_dir "$alpha" "$script" screens | head -1)"
+printf '{ "testScreen": "%s" }\n' "$(echo "$real" | cut -f2)" >"$alpha/.claude/tasks/config.json"
+on_real="$(in_dir "$alpha" "$script" run -- printenv BT_DISPLAY_ID 2>/dev/null)"
+[ "$on_real" = "$(echo "$real" | cut -f1)" ] || fail "the chosen screen \"$real\" was not used (got $on_real)"
+printf '{ "testScreen": "No Such Screen" }\n' >"$alpha/.claude/tasks/config.json"
+on_gone="$(in_dir "$alpha" "$script" run -- printenv BT_DISPLAY_ID 2>"$work/gone")"
+[ "$on_gone" = "$(value a0 start 4)" ] || fail "a screen not connected did not fall back to alpha's display"
+grep -q 'not connected' "$work/gone" || fail "the fallback did not say so"
+
 [ "$failed" = 0 ] && echo ok
 exit "$failed"

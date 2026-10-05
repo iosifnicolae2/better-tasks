@@ -3,6 +3,7 @@ import type { Ui } from './board'
 import { FLOW_LABELS, GIT_FLOWS } from './gitflow'
 import { EFFORTS, LEVELS, MODELS, VIDEO_QUALITIES } from './settings'
 import type { Level, Settings, VideoQuality } from './settings'
+import { VIRTUAL_SCREEN } from './testenv'
 
 // The settings page of the Sprint pane, in the manner of Claude Code's own /config: one row per
 // setting with its value in a fixed column; Enter (or a click) changes it in place; one line at the
@@ -30,6 +31,7 @@ const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satur
 const ON_OFF = ['on', 'off']
 const isOn = (value: string) => value === 'on'
 const asIs = (value: string) => value
+const VIRTUAL_LABEL = 'virtual display'
 const QUALITY_LABELS: Record<VideoQuality, string> = { low: '720p small', medium: '1080p medium', high: '1080p high' }
 
 const LEVEL_ABOUT: Record<Level, { label: string; work: string; effort: string }> = {
@@ -156,6 +158,7 @@ export const FIELDS: readonly Field[] = [
     initial: 'on',
     stored: isOn,
   },
+  testScreenField([]),
   ...LEVELS.flatMap(modelFields),
   {
     group: 'models',
@@ -189,6 +192,27 @@ export const FIELDS: readonly Field[] = [
   },
 ]
 
+/** The "Test screen" row: the virtual display, then each connected real screen by name. */
+export function testScreenField(screens: readonly string[]): Field {
+  const shown = (screen: string) =>
+    screen === VIRTUAL_SCREEN ? VIRTUAL_LABEL : screens.includes(screen) ? screen : `${screen} · not connected`
+  return {
+    group: 'team',
+    field: 'testScreen',
+    label: 'Test screen',
+    describe: 'Where teammates test and record Mac apps: this project’s own virtual display, kept off your screens, or one of your screens. Not connected: the virtual display. Saved in this project.',
+    options: [VIRTUAL_LABEL, ...screens],
+    value: settings => shown(settings.testScreen),
+    initial: VIRTUAL_LABEL,
+    stored: label => (label === VIRTUAL_LABEL ? VIRTUAL_SCREEN : label),
+  }
+}
+
+/** Every row, the "Test screen" one with the screens connected now. */
+export function fieldsWith(screens: readonly string[]): readonly Field[] {
+  return FIELDS.map(field => (field.field === 'testScreen' ? testScreenField(screens) : field))
+}
+
 /** The value after `current`, wrapping round; a value not in the list goes to the first. */
 export function nextOption(options: readonly string[], current: string): string {
   return options[(options.indexOf(current) + 1) % options.length] ?? current
@@ -219,6 +243,8 @@ export type ConfigPageProps = {
   project: ProjectFacts
   /** The key of the row the focus ring is on, for the description line. */
   focusedRow: string
+  /** The real screens connected now, by name (testenv.ts connectedScreens). */
+  screens?: readonly string[]
   onChange: (field: string, value: ConfigValue) => void
   onOpenNative: () => void
   onOpenSprints: () => void
@@ -233,22 +259,23 @@ const FILE_ABOUT: Record<string, string> = {
 }
 
 export function ConfigPage(props: ConfigPageProps) {
-  const { ui, settings, sprintPreview, fromProject, project, focusedRow, onChange, onOpenNative, onOpenSprints, onBack } = props
+  const { ui, settings, sprintPreview, fromProject, project, focusedRow, screens = [], onChange, onOpenNative, onOpenSprints, onBack } = props
   const { Box, Button, Text } = ui
+  const fields = fieldsWith(screens)
   const fieldRow = (field: Field) => (
     <Row ui={ui} rowKey={`cfg-${field.field}`} label={field.label} value={field.value(settings)}
       isChanged={isChanged(field, settings)} isFromProject={fromProject.includes(field.field)}
       onPress={() => onChange(field.field, field.stored(nextOption(field.options, field.value(settings))))} />
   )
-  const describe = describeRow(focusedRow, fromProject, project)
+  const describe = describeRow(fields, focusedRow, fromProject, project)
   return (
     <Box flexDirection="column">
       <Heading ui={ui} title="Team" />
-      {FIELDS.filter(field => field.group === 'team').map(fieldRow)}
+      {fields.filter(field => field.group === 'team').map(fieldRow)}
       <Heading ui={ui} title="Teammate models" />
-      {FIELDS.filter(field => field.group === 'models').map(fieldRow)}
+      {fields.filter(field => field.group === 'models').map(fieldRow)}
       <Heading ui={ui} title="Sprint" />
-      {FIELDS.filter(field => field.group === 'sprint').map(fieldRow)}
+      {fields.filter(field => field.group === 'sprint').map(fieldRow)}
       <Box paddingLeft={4} height={1} overflow="hidden">
         <Text color="subtle" wrap="truncate-end">{sprintPreview}</Text>
       </Box>
@@ -292,8 +319,8 @@ function prTemplateValue(template: ProjectFacts['prTemplate']): string {
 }
 
 /** The description line: what the focused row does, and where its value comes from. */
-function describeRow(rowKey: string, fromProject: readonly string[], project: ProjectFacts): string {
-  const field = FIELDS.find(one => `cfg-${one.field}` === rowKey)
+function describeRow(fields: readonly Field[], rowKey: string, fromProject: readonly string[], project: ProjectFacts): string {
+  const field = fields.find(one => `cfg-${one.field}` === rowKey)
   if (field) {
     const source = fromProject.includes(field.field) ? ' Set by this project’s config.json, which /config does not override.' : ''
     return `${field.label}: ${field.describe}${source}`

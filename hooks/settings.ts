@@ -57,6 +57,8 @@ export type Settings = {
   demoVideos: boolean
   /** Teammates test and record off the user's screen (hooks/testenv.ts); a project setting. */
   offScreen: boolean
+  /** Where Mac apps are tested and recorded: "virtual" (the project's own display) or a real screen's name (testenv.ts). */
+  testScreen: string
   videoQuality: VideoQuality
   /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
   gitFlow: GitFlow
@@ -95,6 +97,7 @@ export const FIELDS: Record<string, Field> = {
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
   offScreen: { kind: 'boolean' },
+  testScreen: { kind: 'string' },
   videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
   pullRequests: { kind: 'boolean' },
   gitFlow: { kind: 'string', values: GIT_FLOWS },
@@ -131,6 +134,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   keepAwake: true,
   demoVideos: false,
   offScreen: true,
+  testScreen: 'virtual',
   videoQuality: 'medium',
   pullRequests: false,
   gitFlow: 'direct',
@@ -171,6 +175,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
     offScreen: value('offScreen') === true,
+    testScreen: String(value('testScreen')).trim() || 'virtual',
     videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
@@ -205,7 +210,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 export const CONFIG_FILE = '.claude/tasks/config.json'
 
 /** Settings that belong to the project only: the settings page writes them to its config.json, never to /config. */
-export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen', 'prTemplate']
+export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen', 'testScreen', 'prTemplate']
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }

@@ -7,7 +7,9 @@
 //       until stopped, until its time is up, or until the parent process ends.
 //   info <display id>      prints "x=.. y=.. w=.. h=.. capture=.." (capture: screencapture -D's number)
 //   arrange                moves every virtual display into the row below the lowest physical screen
+//   screens                prints each real screen as "<display id><tab><name>", e.g. "2<tab>DELL U2720Q"
 // Each prints "ready ..." once it holds what it asked for, or "failed: why".
+import AppKit
 import CoreGraphics
 import Foundation
 import IOKit
@@ -170,6 +172,18 @@ func info(_ id: CGDirectDisplayID) {
   say("x=\(Int(b.minX)) y=\(Int(b.minY)) w=\(Int(b.width)) h=\(Int(b.height)) capture=\(index + 1)")
 }
 
+/** The real screens by the names System Settings shows ("Built-in Retina Display", "DELL U2720Q"). */
+func listScreens() {
+  let screens = hardwareScreens()
+  let names = Dictionary(NSScreen.screens.compactMap { screen -> (CGDirectDisplayID, String)? in
+    guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
+    return (number.uint32Value, screen.localizedName)
+  }, uniquingKeysWith: { first, _ in first })
+  for id in activeDisplays() where isPhysical(id, screens) && CGDisplayMirrorsDisplay(id) == kCGNullDirectDisplay {
+    say("\(id)\t\(names[id] ?? "Display \(id)")")
+  }
+}
+
 func makeDisplay(_ options: Options) -> CGVirtualDisplay {
   let descriptor = CGVirtualDisplayDescriptor()
   descriptor.queue = DispatchQueue.main
@@ -249,5 +263,6 @@ case "display": keepDisplay(parseOptions(arguments.dropFirst()))
 case "turn": holdTurn(parseOptions(arguments.dropFirst()))
 case "info": info(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0)
 case "arrange": arrangeAll()
-default: fail("usage: record_display display|turn|info|arrange ...")
+case "screens": listScreens()
+default: fail("usage: record_display display|turn|info|arrange|screens ...")
 }
