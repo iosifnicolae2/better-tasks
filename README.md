@@ -1,14 +1,12 @@
 # better-tasks
 
-**Delegate tasks to Claude. Get a before/after video of each fix. Approve it or ask for changes.**
-
-A plugin for Claude Code: your tasks live as Markdown files in your project, a team of Claude agents works on them, and you only review the result.
+**Hand tasks to Claude. Approve each fix from a before/after video.**
 
 <p align="center">
   <img src="docs/screenshots/board.svg" alt="Claude Code with the sprint board docked on the right">
 </p>
 
-<sub>The sprint board docked next to Claude: you ask for a fix, the lead files it as T-007 and hands it to the teammate that owns the shop.</sub>
+A Claude Code plugin. Your tasks are Markdown files in your project; a team of Claude agents works on them; you only review the result. Above: you ask for a fix, the lead files it as T-007 and hands it to the teammate that owns the shop.
 
 ## ✨ Features
 
@@ -50,17 +48,22 @@ This is saved in `.claude/settings.json`: commit it. Each teammate still runs th
 
 Open the board any time with `/better-tasks`.
 
-## ✅ How approval works
+## 👀 Review a finished task
 
-Each finished task comes with a short **before/after video**, so you see the fix before you read the code:
+You watch a short video instead of reading the code first. Here is the one for T-007 above:
 
 [![Play the before/after demo video](docs/videos/sample-before-after.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)
 
-<sub>What the teammate hands in for T-007 from the board above: the "Add to cart" button lost every click, before and after. Click for the video; turn the sound on, the subtitles are read aloud.</sub>
+<sub>Click to play, with sound: the subtitles are read aloud.</sub>
 
-- Claude asks about **one finished task at a time**.
-- With a pull request, it **opens the PR in your browser** first (setting `openPrInBrowser`, on by default).
-- **Mark as resolved** closes the task. **Request changes**: your words go to the same teammate, who pushes to the same PR.
+Then you answer one question:
+
+| You pick | What happens |
+|---|---|
+| **Mark as resolved** | The task closes. |
+| **Request changes** | Type what to change. The same teammate fixes it and sends it back to you. |
+
+Claude asks about one task at a time. With a PR per task, it opens the PR in your browser first (setting `openPrInBrowser`).
 
 ## ⚙️ Settings
 

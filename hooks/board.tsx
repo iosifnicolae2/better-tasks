@@ -285,7 +285,7 @@ function resultLines({ ui, search, selected, hasKeys, canSpin, actions }: BoardP
 
 type ResultProps = { ui: Ui; hit: Hit; isSelected: boolean; hasKeys: boolean; isStill: boolean; canSpin: boolean; actions: BoardActions }
 
-/** "▌✻ T-007  Login loops after password reset   ⚡ Currently working on", the matched words lit. */
+/** "▌✻ T-007  Add to cart loses clicks   ⚡ Currently working on", the matched words lit. */
 function ResultRow({ ui, hit, isSelected, hasKeys, isStill, canSpin, actions }: ResultProps) {
   const { Box, Button, Text } = ui
   const { task } = hit
