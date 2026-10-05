@@ -4,9 +4,9 @@ import { ghProblem, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMAT
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
-  test('off until chosen', () => {
-    expect(settingsOf({}).pullRequests).toBe(false)
-    expect(settingsOf({ pullRequests: true }).pullRequests).toBe(true)
+  test('off until chosen; the old switch reads as the worktree flow', () => {
+    expect(settingsOf({}).gitFlow).toBe('direct')
+    expect(settingsOf({ pullRequests: true }).gitFlow).toBe('worktree-prs')
   })
 
   test('gh 2.99 or newer will do; older or missing gets one line saying what to run', () => {

@@ -1,5 +1,7 @@
 import type { PluginOptions } from 'claude-code'
 
+import { flowOf, GIT_FLOWS } from './gitflow'
+import type { GitFlow } from './gitflow'
 import type { Files } from './io'
 import type { SprintConfig } from './sprints'
 
@@ -54,8 +56,12 @@ export type Settings = {
   /** Teammates make a narrated before/after video of finished work. */
   demoVideos: boolean
   videoQuality: VideoQuality
-  /** A teammate's finished work goes up as a GitHub pull request, merged when the user approves. */
-  pullRequests: boolean
+  /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
+  gitFlow: GitFlow
+  /** The shared branch of the dev-prs flow. */
+  devBranch: string
+  /** The project's own instructions for tasks: paths to files or folders, comma-separated (instructions.ts). */
+  instructions: string
   models: TeammateModels
   sprint: SprintConfig
   tasks: TaskNaming
@@ -80,6 +86,9 @@ export const FIELDS: Record<string, Field> = {
   demoVideos: { kind: 'boolean' },
   videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
   pullRequests: { kind: 'boolean' },
+  gitFlow: { kind: 'string', values: GIT_FLOWS },
+  devBranch: { kind: 'string' },
+  instructions: { kind: 'string' },
   easyModel: { kind: 'string', values: MODELS },
   easyEffort: { kind: 'string', values: EFFORTS },
   normalModel: { kind: 'string', values: MODELS },
@@ -107,6 +116,9 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   demoVideos: false,
   videoQuality: 'medium',
   pullRequests: false,
+  gitFlow: 'direct',
+  devBranch: 'dev',
+  instructions: '',
   easyModel: 'opus',
   easyEffort: 'low',
   normalModel: 'opus',
@@ -137,7 +149,9 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
     videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
-    pullRequests: value('pullRequests') === true,
+    gitFlow: flowOf(options),
+    devBranch: String(value('devBranch')).trim() || 'dev',
+    instructions: String(value('instructions')),
     models: {
       easy: choiceOf('easy'),
       normal: choiceOf('normal'),
@@ -162,6 +176,9 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 // ---- The project's config.json ----
 
 export const CONFIG_FILE = '.claude/tasks/config.json'
+
+/** Settings that belong to the project only: the settings page writes them to its config.json, never to /config. */
+export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions']
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }
@@ -208,4 +225,21 @@ export async function projectSettings(files: Files, options: PluginOptions): Pro
 /** What the parts read: the project's settings when `files` knows them, else the shipped defaults. */
 export async function settingsFrom(files: Files): Promise<Settings> {
   return files.config ? files.config() : settingsOf({})
+}
+
+/** Sets one key in the project's config.json, keeping every other key (comments too); refuses a file that isn't JSON. */
+export async function saveProjectValue(files: Pick<Files, 'root' | 'read' | 'write'>, key: string, value: unknown): Promise<string | undefined> {
+  const path = `${await files.root()}/${CONFIG_FILE}`
+  const text = await files.read(path).catch(() => undefined)
+  let json: Record<string, unknown> = {}
+  if (text !== undefined) {
+    try {
+      json = JSON.parse(text) as Record<string, unknown>
+    } catch (error) {
+      return `${CONFIG_FILE} is not valid JSON (${(error as Error).message}); set "${key}" there by hand`
+    }
+  }
+  const { [`// ${key}`]: _example, ...rest } = json
+  await files.write(path, `${JSON.stringify({ ...rest, [key]: value }, null, 2)}\n`)
+  return undefined
 }

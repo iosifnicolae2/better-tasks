@@ -3,7 +3,6 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
-import { PR_QUESTION } from '../hooks/pullrequest'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -824,7 +823,7 @@ test('a task the user resolved is named to the lead until it is closed', async (
   expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('status: doing')
 })
 
-test('startup asks once about before/after videos; Enable turns them on and sets up the voice', async ($, on) => {
+test('startup asks once per project about before/after videos; the answer goes in its config.json; Enable sets up the voice', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   let asked = 0
@@ -832,23 +831,23 @@ test('startup asks once about before/after videos; Enable turns them on and sets
     asked += 1
     return { result: { answers: { [QUESTION]: ENABLE_OPTION } } }
   })
-  const set: unknown[] = []
-  on('config.set', ($, e) => {
-    set.push([e.key, e.value])
-    return { value: e.value }
-  })
   const host = fakeHost(on)
   host.spawnOutput = 'ready /home/.local/share/better-tasks/kokoro\n'
   await $.session.start(SESSION)
   await clock.advance(0)
   expect(asked).toBe(1)
-  expect(set).toEqual([['better-tasks.demoVideos', true]])
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '{}')).toEqual({ demoVideos: true })
   expect(host.spawnedArgv.some(argv => argv.at(-1)?.endsWith('/bin/kokoro-setup.sh'))).toBe(true)
   expect(host.toasts).toContain('Kokoro voice ready: before/after videos are on.')
 
   await $.session.start(SESSION)
   await clock.advance(0)
   expect(asked).toBe(1)
+
+  host.files.delete(`${TASKS}/config.json`) // another project, same machine: asked at its own first start
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(asked).toBe(2)
 })
 
 test('with before/after videos on, teammates get the video rules and the lead the showing rules', { options: { demoVideos: true } }, async ($, on) => {
@@ -891,35 +890,33 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
   expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
 })
 
-test('in a GitHub project startup asks about videos, then PR per task; Enable on both sets each up', async ($, on) => {
+test('in a GitHub project startup asks about videos, then the git flow; the flow is saved in config.json and set up', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked: string[] = []
+  const asked: { question: string; options: string[] }[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
-    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
-    asked.push(question)
-    return { result: { answers: { [question]: ENABLE_OPTION } } }
+    const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
+    const question = first?.question ?? ''
+    const options = (first?.options ?? []).map(option => option.label)
+    asked.push({ question, options })
+    return { result: { answers: { [question]: question === QUESTION ? 'Not now' : options[0] } } }
   })
-  const set: unknown[] = []
-  on('config.set', ($, e) => {
-    set.push([e.key, e.value])
-    return { value: e.value }
-  })
-  const host = fakeHost(on)
+  const host = fakeHost(on, [], { [`${ROOT}/app/pubspec.yaml`]: '', [`${ROOT}/.claude/tasks/config.json`]: '{ "//": "notes", "// gitFlow": "direct" }' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(0)
-  expect(asked).toEqual([QUESTION, PR_QUESTION])
-  expect(set).toEqual([['better-tasks.demoVideos', true], ['better-tasks.pullRequests', true]])
-  const scripts = host.spawnedArgv.map(argv => argv.at(-1)?.split('/').pop())
-  expect(scripts).toEqual(['kokoro-setup.sh', 'gh-update.sh']) // gh --version printed nothing: gh missing
+  expect(asked.map(one => one.question)).toEqual([QUESTION, expect.stringContaining('Recommended here: Shared dev branch, PR per task (a Flutter app to install).')])
+  expect(asked[1]?.options.slice(0, 3)).toEqual(['Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ '//': 'notes', demoVideos: false, gitFlow: 'dev-prs' })
+  expect(host.notices).toContain('better-tasks: made the dev branch here, from this commit: teammates land on it, PRs go to main')
+  expect(host.spawnedArgv.map(argv => argv.at(-1)?.split('/').pop())).toEqual(['gh-update.sh']) // gh --version printed nothing: gh missing
 
   await $.session.start(SESSION)
   await clock.advance(0)
-  expect(asked).toHaveLength(2)
+  expect(asked.filter(one => one.question !== QUESTION)).toHaveLength(1)
 })
 
-test('without a GitHub remote startup does not ask about PRs, and asks in a later GitHub project', async ($, on) => {
+test('without a GitHub remote startup does not ask for the git flow, and asks in a later GitHub project', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const asked: string[] = []
@@ -935,7 +932,57 @@ test('without a GitHub remote startup does not ask about PRs, and asks in a late
   host.runOutput['git remote -v'] = 'origin\thttps://github.com/someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(0)
-  expect(asked).toEqual([QUESTION, PR_QUESTION])
+  expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Straight to main (one person, a light build and no CI on PRs).')])
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ demoVideos: false }) // "Not now" names no flow: asked again next time
+})
+
+test('straight to main, the default: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(named.result).toEqual({ isolation: 'none' })
+  expect(host.spawned[0]).toContain('## Git flow: straight to main (this project)')
+  expect(host.spawned[0]).toMatch(/`\S+\/bin\/land\.sh -m "<what changed> \(T-004\)" -- <your paths>`/)
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections.at(-1)?.text).not.toContain('Git flow')
+})
+
+test('the shared dev branch flow: no worktree, land on dev, the PR from task_pr.py; the lead merges and syncs dev', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ gitFlow: 'dev-prs', devBranch: 'develop' }) })
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(named.result).toEqual({ isolation: 'none' })
+  expect(host.spawned[0]).toContain('/bin/land.sh -b develop -m')
+  expect(host.spawned[0]).toContain('/bin/task_pr.py open T-004 --body-file <scratchpad>/pr.md')
+  expect(host.spawned[0]).toContain('"Asked for": the user\'s request')
+  const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
+  expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
+  expect(lead).toContain('/bin/task_pr.py sync')
+  expect(lead).toContain('Like every link, it also goes above the question') // the PR flow's Finishing line, shared
+})
+
+test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], {
+    [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ instructions: 'docs/workflow.md, docs/gone.md' }),
+    [`${ROOT}/docs/workflow.md`]: '# Workflow\nCommits land on dev.\n\n## Details\nA long text the prompts never carry.\n',
+  })
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(host.spawned[0]).toContain('## Project instructions')
+  expect(host.spawned[0]).toContain('- docs/workflow.md: Workflow: Commits land on dev.')
+  expect(host.spawned[0]).not.toContain('never carry')
+  const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
+  expect(lead).toContain('- docs/workflow.md: Workflow: Commits land on dev.')
+  expect(host.notices.filter(line => line === 'better-tasks: project instructions not found: docs/gone.md')).toHaveLength(1)
 })
 
 // ---- Teammate models: Opus at low, medium and high effort for easy, normal and hard tasks (models.ts) ----

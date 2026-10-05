@@ -9,13 +9,16 @@ import { excludeWorktrees } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
-import { ASKED_KEY, COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
-import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_ASKED_KEY, PR_COORDINATOR_RULES, PR_QUESTION, PR_SETTING_KEY, PR_TEAMMATE_RULES } from './pullrequest'
+import { COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
+import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
+import type { GitFlow, Probe } from './gitflow'
+import { instructionLines, instructionsBlock } from './instructions'
+import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
 import { hasPointer, pointerPrompt, RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine } from './setup'
-import { projectSettings, readOverrides } from './settings'
+import { projectSettings, readOverrides, saveProjectValue } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
@@ -35,6 +38,7 @@ const FILING_TOOLS = ['task_create', 'task_update', 'task_note']
 
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
+let loggedMissing = ''
 let voiceSetup: Promise<void> | undefined
 let ghUpdate: Promise<void> | undefined
 
@@ -87,9 +91,10 @@ export const register: Register = (on, options) => {
     if (!(await teamsOn($))) return composed
     const settings = await settingsNow($)
     const videos = settings.demoVideos ? COORDINATOR_RULES : ''
-    const prs = settings.pullRequests ? PR_COORDINATOR_RULES : ''
+    const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, PR_COORDINATOR_RULES)
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
-    const rules = [await projectText(ioOf($), 'coordinator'), models, videos, prs].filter(Boolean).join('\n\n')
+    const instructions = await instructionsNow($, settings)
+    const rules = [await projectText(ioOf($), 'coordinator'), models, videos, flow, instructions].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
@@ -147,9 +152,10 @@ export const register: Register = (on, options) => {
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const videos = settings.demoVideos ? teammateRules($.plugin.root, settings.videoQuality) : ''
-    const prs = settings.pullRequests ? PR_TEAMMATE_RULES : ''
-    const prompt = [named.prompt, handover, teammate, stuck, videos, prs].filter(Boolean).join('\n\n')
-    const isWorktree = (settings.worktree || settings.pullRequests) && !e.isolation
+    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
+    const instructions = await instructionsNow($, settings)
+    const prompt = [named.prompt, handover, teammate, stuck, videos, flow, instructions].filter(Boolean).join('\n\n')
+    const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
     return next({
       ...e,
       description: named.description,
@@ -291,42 +297,105 @@ async function pointUserRules($: EngineInterface): Promise<void> {
 }
 
 /**
- * At startup, one after the other: asks once whether to turn on before/after videos, then PR per task
- * (only in a project with a GitHub remote), each recommending it. A setting already on gets what it needs.
+ * At startup, one after the other: asks once whether to turn on before/after videos, then which git flow
+ * (only in a project with a GitHub remote, until one is saved in its config.json). A setting already on gets what it needs.
  */
 async function startQuestions($: EngineInterface): Promise<void> {
   const settings = await settingsNow($)
   if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
   } else {
-    await askToTurnOn($, { asked: ASKED_KEY, question: QUESTION, header: 'Videos', key: SETTING_KEY })
+    await askToTurnOn($, { field: 'demoVideos', question: QUESTION, header: 'Videos' })
   }
-  if (settings.pullRequests) await checkGh($)
-  else if (await hasGitHubRemote($)) await askToTurnOn($, { asked: PR_ASKED_KEY, question: PR_QUESTION, header: 'PRs', key: PR_SETTING_KEY })
+  const { values } = await readOverrides(ioOf($))
+  const isChosen = FLOW_KEYS.some(key => key in values) || settings.gitFlow !== 'direct'
+  if (!isChosen) await askGitFlow($)
+  else if (hasPrs(settings.gitFlow)) await checkGh($)
 }
 
-type TurnOnQuestion = { asked: string; question: string; header: string; key: string }
+/** The git flow question: the project looked at once for the recommendation, the answer saved in its config.json. */
+/** A project that set any of these chose its flow already (the last two are the old switches). */
+const FLOW_KEYS = ['gitFlow', 'pullRequests', 'worktree']
 
-/** Asks once (again next session if dismissed); Enable turns the setting on as /better-tasks config does. */
+async function askGitFlow($: EngineInterface): Promise<void> {
+  if (!(await hasGitHubRemote($))) return
+  const recommended = recommend(await lookAt(await probeOf($)))
+  const options = { options: flowOptions(recommended.flow), header: FLOW_ASK_HEADER }
+  const answer = await $.ui.ask(flowQuestion(recommended), options).catch(() => undefined)
+  const flow = answer === undefined ? undefined : flowOfAnswer(answer)
+  if (flow === undefined) return
+  const problem = await saveProjectValue(ioOf($), 'gitFlow', flow)
+  if (problem) $.ui.log(`better-tasks: ${problem}`)
+  else await setUpFlow($, flow)
+}
+
+/** What a flow needs: gh for the PRs; for dev-prs, its branch, checked out here when made from this commit. */
+async function setUpFlow($: EngineInterface, flow: GitFlow): Promise<void> {
+  if (flow === 'dev-prs') await useDevBranch($, (await settingsNow($)).devBranch).catch(error => logFailure($, 'making the dev branch', error))
+  if (hasPrs(flow)) await checkGh($)
+}
+
+/** Makes the dev branch at this commit and switches to it: the same commit, so no file changes. One that exists is left alone. */
+async function useDevBranch($: EngineInterface, dev: string): Promise<void> {
+  const git = (...args: string[]) => $.process.run(['git', ...args])
+  if ((await git('branch', '--list', dev)).stdout.trim()) {
+    const current = (await git('symbolic-ref', '--quiet', '--short', 'HEAD')).stdout.trim()
+    if (current !== dev) $.ui.log(`better-tasks: teammates land on ${dev}; this checkout is on ${current || 'no branch'}: git switch ${dev} when you're ready`)
+    return
+  }
+  const switched = await git('switch', '--quiet', '--create', dev)
+  if (switched.exitCode === 0) $.ui.log(`better-tasks: made the ${dev} branch here, from this commit: teammates land on it, PRs go to main`)
+  else $.ui.log(`better-tasks: could not make the ${dev} branch: ${switched.stderr.trim()}`)
+}
+
+/** What looking at the project for the recommendation needs (gitflow.ts). */
+async function probeOf($: EngineInterface): Promise<Probe> {
+  return {
+    root: await $.session.root(),
+    run: (argv, timeoutMs) => $.process.run(argv, timeoutMs ? { timeoutMs } : undefined).then(done => done.stdout, () => undefined),
+    list: path => $.fs.list(path),
+    read: path => $.fs.read(path).catch(() => undefined),
+  }
+}
+
+/** The project's instructions block (instructions.ts); a path that isn't there is one log line, once. */
+async function instructionsNow($: EngineInterface, settings: Settings): Promise<string> {
+  if (!settings.instructions) return ''
+  const reader = { root: await $.session.root(), read: (path: string) => $.fs.read(path).catch(() => undefined), list: (path: string) => $.fs.list(path).catch(() => undefined) }
+  const { lines, missing } = await instructionLines(reader, settings.instructions)
+  const text = missing.join(', ')
+  if (text && text !== loggedMissing) $.ui.log(`better-tasks: project instructions not found: ${text}`)
+  loggedMissing = text
+  return instructionsBlock(lines)
+}
+
+/** The plugin's scripts folder (land.sh, task_pr.py, …). */
+const binOf = ($: EngineInterface) => `${$.plugin.root}/bin`
+
+/** A setting's on/off question: `field` is its key in the project's config.json. */
+type TurnOnQuestion = { field: string; question: string; header: string }
+
+/**
+ * Asks once per project: the answer, on or off, is saved in its config.json, so another project is asked
+ * at its own first start. Dismissed, it is asked again next session. Enable also sets the setting up.
+ */
 async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<void> {
-  if (await $.store.get(ask.asked)) return
+  if (ask.field in (await readOverrides(ioOf($))).values) return
   const answer = await $.ui.ask(ask.question, { options: [ENABLE_OPTION, 'Not now'], header: ask.header }).catch(() => undefined)
   if (answer === undefined) return
-  await $.store.set(ask.asked, true)
-  if (answer !== ENABLE_OPTION) return
-  const { deny } = await $.config.set({ key: ask.key, value: true })
-  if (deny) $.ui.log(`better-tasks: could not turn on ${ask.key}: ${deny}`)
-  else await setUpTurnedOn($, ask.key)
+  const problem = await saveProjectValue(ioOf($), ask.field, answer === ENABLE_OPTION)
+  if (problem) $.ui.log(`better-tasks: ${problem}`)
+  else if (answer === ENABLE_OPTION) await setUpTurnedOn($, `better-tasks.${ask.field}`)
 }
 
 async function hasGitHubRemote($: EngineInterface): Promise<boolean> {
   return $.process.run(['git', 'remote', '-v']).then(done => hasGitHub(done.stdout), () => false)
 }
 
-/** What a setting needs once turned on: the voice for videos, a recent gh for PRs. */
+/** What a setting needs once turned on: the voice for videos; for a git flow chosen on the settings page, its setup. */
 async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === SETTING_KEY) await setUpVoice($)
-  if (key === PR_SETTING_KEY) await checkGh($)
+  if (key === 'better-tasks.gitFlow') await setUpFlow($, (await settingsNow($)).gitFlow)
 }
 
 /** PR per task needs gh, 2.99 or newer for the video: updates it when it is missing or older (bin/gh-update.sh). */

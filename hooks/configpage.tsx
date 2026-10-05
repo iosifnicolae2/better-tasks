@@ -1,5 +1,6 @@
 import { KeyHint } from './board'
 import type { Ui } from './board'
+import { FLOW_LABELS, GIT_FLOWS } from './gitflow'
 import { EFFORTS, LEVELS, MODELS, VIDEO_QUALITIES } from './settings'
 import type { Level, Settings, VideoQuality } from './settings'
 
@@ -77,13 +78,13 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'team',
-    field: 'worktree',
-    label: 'Worktree per teammate',
-    describe: 'Each named teammate works in its own git worktree.',
-    options: ON_OFF,
-    value: settings => (settings.worktree ? 'on' : 'off'),
-    initial: 'off',
-    stored: isOn,
+    field: 'gitFlow',
+    label: 'Git flow',
+    describe: 'How teammates’ work reaches main. Straight to main: one checkout, no PRs. Shared dev branch: one checkout on dev, a PR per task. Worktree: a copy and a PR each. Saved in this project’s config.json.',
+    options: GIT_FLOWS.map(flow => FLOW_LABELS[flow]),
+    value: settings => FLOW_LABELS[settings.gitFlow],
+    initial: FLOW_LABELS.direct,
+    stored: label => GIT_FLOWS.find(flow => FLOW_LABELS[flow] === label) ?? 'direct',
   },
   {
     group: 'team',
@@ -134,16 +135,6 @@ export const FIELDS: readonly Field[] = [
     value: settings => QUALITY_LABELS[settings.videoQuality],
     initial: QUALITY_LABELS.medium,
     stored: label => VIDEO_QUALITIES.find(quality => QUALITY_LABELS[quality] === label) ?? 'medium',
-  },
-  {
-    group: 'team',
-    field: 'pullRequests',
-    label: 'PR per task',
-    describe: 'Each teammate works in its own worktree and finishes with a GitHub PR; approving the task merges it.',
-    options: ON_OFF,
-    value: settings => (settings.pullRequests ? 'on' : 'off'),
-    initial: 'off',
-    stored: isOn,
   },
   ...LEVELS.flatMap(modelFields),
   {
@@ -250,6 +241,8 @@ export function ConfigPage(props: ConfigPageProps) {
           <Text color="warning" wrap="truncate-end">⚠ {project.problems.join(' · ')}</Text>
         </Box>
       )}
+      <Row ui={ui} rowKey="cfg-instructions" label="Project instructions" value={settings.instructions || 'none · set in config.json'}
+        isFromProject={fromProject.includes('instructions')} onPress={() => project.onOpen('instructions')} />
       <Row ui={ui} rowKey="cfg-native" label="All Claude Code settings" value="/config" onPress={onOpenNative} />
       <Box flexDirection="column" marginTop={1}>
         <Box height={1} overflow="hidden">
@@ -281,6 +274,9 @@ function describeRow(rowKey: string, fromProject: readonly string[], project: Pr
   if (file !== undefined) {
     const exists = project.files.find(one => one.label === file)?.exists === true
     return `${file}: ${FILE_ABOUT[file] ?? ''} ⏎ ${exists ? 'opens it' : 'creates it from the shipped text, then opens it'}.`
+  }
+  if (rowKey === 'cfg-instructions') {
+    return 'Project instructions: files or folders every teammate and the lead follow, as "instructions" in config.json (comma-separated). The prompts get each path and its first line. ⏎ opens the first one, or config.json.'
   }
   if (rowKey === 'cfg-sprints') return 'Sprint goals & reviews: opens sprints.md, one section per sprint.'
   if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Better Tasks: …”."

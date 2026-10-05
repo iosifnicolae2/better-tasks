@@ -4,7 +4,6 @@ import type { VideoQuality } from './settings'
 // (bin/kokoro-setup.sh, outside any project) and the rules that have teammates make the video and the
 // lead show it. The video itself is bin/demo-video.sh's work. The parts that need `$` are in register.tsx.
 
-export const ASKED_KEY = 'demoVideosAsked'
 export const ENABLE_OPTION = 'Enable (recommended)'
 export const SETTING_KEY = 'better-tasks.demoVideos'
 /** Where bin/demo-video.sh saves a task's video, <task id>.mp4, relative to the project root; git ignores it. */

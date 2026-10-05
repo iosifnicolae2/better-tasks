@@ -492,19 +492,18 @@ test('inside IntelliJ, Open uses the running IDE', async ($, on) => {
 
 for (const surface of SURFACES) {
   test(`settings are rows like /config: Enter changes a value in place, nothing expands (${surface})`, async ($, on) => {
-    const { settings } = fakeProject(on)
+    const { settings, files } = fakeProject(on)
     await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
-    const shape = async () => JSON.stringify(await ui.drawn(), (key, value) => (key === 'children' || key === 'type' ? value : typeof value === 'string' ? '' : value))
+    const shape = async () => JSON.stringify(await ui.drawn(), (key, value) => (key === 'children' || key === 'type' ? value : typeof value === 'string' || key === 'handle' ? '' : value)) // a redraw gives new press handles
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-worktree', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-videoQuality', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-gitFlow', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-videoQuality', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
       ['better-tasks.editor', 'default'],
-      ['better-tasks.worktree', true],
       ['better-tasks.longCache', false],
       ['better-tasks.statusEvery', 20],
       ['better-tasks.keepAwake', false],
@@ -519,6 +518,8 @@ for (const surface of SURFACES) {
       ['better-tasks.sprintWeeks', '2'],
       ['better-tasks.sprintStart', 'tuesday'],
     ])
+    expect(JSON.parse(files.get(`${ROOT}/.claude/tasks/config.json`) ?? '{}')).toEqual({ gitFlow: 'dev-prs' }) // the project's own, never /config
+    files.delete(`${ROOT}/.claude/tasks/config.json`)
     expect(await shape()).toBe(before)
     settings.length = 0
     await ui.unmount()
@@ -528,8 +529,8 @@ for (const surface of SURFACES) {
     fakeProject(on)
     await $.command.run(sprintCommand('config'))
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
-    await arrowTo($, 'cfg-worktree')
-    expect(await ui.find({ type: 'Text', text: /^Worktree per teammate: Each named teammate works/ })).toBeDefined()
+    await arrowTo($, 'cfg-gitFlow')
+    expect(await ui.find({ type: 'Text', text: /^Git flow: How teammates’ work reaches main/ })).toBeDefined()
     await arrowTo($, 'file-teammate.md')
     expect(await ui.find({ type: 'Text', text: /^teammate\.md: .*creates it/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '↑↓: choose' })).toBeDefined()
@@ -538,7 +539,7 @@ for (const surface of SURFACES) {
   })
 }
 
-test('only settings changed from the default are marked', { options: { worktree: true } }, async ($, on) => {
+test('only settings changed from the default are marked', { options: { keepAwake: false } }, async ($, on) => {
   fakeProject(on)
   await $.command.run(sprintCommand('config'))
   const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'desktop', ...PANE })

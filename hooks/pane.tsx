@@ -12,7 +12,8 @@ import { quickTimePlay, VIDEOS_FOLDER } from './demovideo'
 import { openCommand } from './editor'
 import type { HostApp } from './editor'
 import type { Files } from './io'
-import { CONFIG_FILE, projectSettings, readOverrides, settingsFrom } from './settings'
+import { CONFIG_FILE, PROJECT_KEYS, projectSettings, readOverrides, saveProjectValue, settingsFrom } from './settings'
+import { pathsOf } from './instructions'
 import type { Editor } from './settings'
 import { goalOf, readSprints } from './sprintlog'
 import { daysLeft, daysLeftLabel, nextSprint, sprintEnd, sprintLabel, sprintStart, weekLabel } from './sprints'
@@ -103,7 +104,15 @@ async function videoOf($: EngineInterface, id: string): Promise<string | undefin
   return names.includes(`${id}.mp4`) ? `${folder}/${id}.mp4` : undefined
 }
 
-async function setConfig($: EngineInterface, field: string, value: ConfigValue): Promise<void> {
+/** A value from the settings page: /config, or the project's config.json for a setting only a project has (the git flow). */
+async function setConfig($: EngineInterface, options: PluginOptions, field: string, value: ConfigValue): Promise<void> {
+  if (PROJECT_KEYS.includes(field)) {
+    const problem = await saveProjectValue(filesOf($, options), field, value)
+    if (problem) $.ui.toast(`better-tasks: ${problem}`)
+    else await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
+    $.ui.invalidate('ui.render')
+    return
+  }
   const { deny } = await $.config.set({ key: `better-tasks.${field}`, value })
   if (!deny && value === true) await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
 }
@@ -184,11 +193,13 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
   const starters = Object.keys(starterFiles())
   const present = await Promise.all(starters.map(exists))
   const redraw = () => $.ui.invalidate('ui.render')
-  const fileAt = (label: string) => PROJECT_FILES[label] ?? CONFIG_FILE
+  const instructions = pathsOf(String(overrides.values.instructions ?? ''))[0]
+  const fileAt = (label: string) => (label === 'instructions' ? (instructions ?? CONFIG_FILE) : (PROJECT_FILES[label] ?? CONFIG_FILE))
   /** Opens one of the project's files, writing its starter text first when it is missing. */
   const openOrCreate = async (label: string) => {
     const path = fileAt(label)
-    if (!(await exists(path))) await files.write(`${root}/${path}`, starterFiles()[path] ?? '')
+    const starter = starterFiles()[path]
+    if (starter !== undefined && !(await exists(path))) await files.write(`${root}/${path}`, starter)
     redraw()
     await openFile($, editor, `${root}/${path}`)
   }
@@ -484,7 +495,7 @@ export function registerPane(on: On, options: PluginOptions): void {
         <Box flexDirection="column" paddingX={1}>
           <ConfigPage ui={ui} settings={settings} sprintPreview={sprintLabel(current, settings.sprint)}
             {...await projectFacts($, files, settings.editor)}
-            onChange={(field, value) => void setConfig($, field, value)}
+            onChange={(field, value) => void setConfig($, options, field, value)}
             onOpenNative={() => void $.command.run({ command: 'config' })}
             onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
             focusedRow={String((await $.store.get(CONFIG_ROW_KEY)) ?? '')}

@@ -1,14 +1,7 @@
-// PR per task (setting pullRequests): each teammate works in its own worktree and finishes with a GitHub
-// pull request, its before/after video (demovideo.ts) shown as a picture that opens the video with sound;
-// the lead merges once the user approves.
+// The PR flows (gitflow.ts: worktree-prs, and dev-prs for the Finishing line): in worktree-prs each teammate
+// works in its own worktree and finishes with a GitHub pull request, its before/after video (demovideo.ts)
+// shown as a picture that opens the video with sound; the lead merges once the user approves.
 // The parts that need `$` (the gh check and update) are in register.tsx; bin/gh-update.sh does the update.
-
-export const PR_SETTING_KEY = 'better-tasks.pullRequests'
-export const PR_ASKED_KEY = 'pullRequestsAsked'
-
-export const PR_QUESTION =
-  'Open a GitHub pull request for each finished task? Each teammate works on its own branch and finishes ' +
-  'with a PR, its before/after video one click away; approving the task merges it. Change it later in /better-tasks config.'
 
 /** `git remote -v` names a GitHub remote: only then is a PR per task possible. */
 export const hasGitHub = (remotes: string) => /github\.com[:/]/.test(remotes)

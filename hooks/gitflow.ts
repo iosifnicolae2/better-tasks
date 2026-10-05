@@ -193,17 +193,20 @@ ${PR_BODY_RULES}
 - Your notes get the line "PR: <the url it printed>". Request changes: land the fix on \`${dev}\`, then run open again. Never fix on the task branch; never merge.`
 }
 
-export function devLeadRules(bin: string, dev: string): string {
+/** The lead's Finishing line for a PR (the PR link in the question), taken from the PR flow's rules so both say the same. */
+export const finishingOf = (prLeadRules: string) => prLeadRules.split('\n').filter(line => line.startsWith('- A finished task')).join('\n')
+
+export function devLeadRules(bin: string, dev: string, prLeadRules: string): string {
   return `## Git flow: shared ${dev} branch, a PR per task (on)
 - The project's checkout stays on \`${dev}\`; teammates land there. An install or test for the user builds \`${dev}\`.
-- A finished task's notes hold "PR: <url>". The Finishing question shows that url on a line of its own with nothing else on it, and no video link: the PR's picture opens the video. Like every link, it also goes above the question. "Mark as resolved" merges: its description says "merge the PR and close T-004".
-- Mark as resolved: \`gh pr merge <url> --squash --delete-branch\`, then \`python3 ${bin}/task_pr.py sync\` (main follows origin's main, \`${dev}\` takes it in without a file changing), then close the task with the merge commit. sync refuses: a fix was made on the task branch, not on \`${dev}\`: the owner lands it on \`${dev}\`, then sync again.
+${finishingOf(prLeadRules)}
+- Mark as resolved: \`gh pr merge <url> --squash --delete-branch\`, then \`python3 ${bin}/task_pr.py sync\` (main follows origin's main; \`${dev}\` takes it in without a file changing), then close the task with the merge commit. sync refuses: a fix was made on the task branch, not on \`${dev}\`: the owner lands it on \`${dev}\`, then sync again.
 - The merge fails (a conflict): the owner lands what the PR needs on \`${dev}\` and runs open again.`
 }
 
 /** "Straight to main" adds nothing for the lead: no PR, no merge. */
 export function leadRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
-  if (flow === 'dev-prs') return devLeadRules(bin, dev)
+  if (flow === 'dev-prs') return devLeadRules(bin, dev, prRules)
   return flow === 'worktree-prs' ? prRules : ''
 }
 
