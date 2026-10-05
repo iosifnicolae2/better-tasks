@@ -5,6 +5,7 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
+import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
 import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
@@ -339,6 +340,7 @@ async function pointUserRules($: EngineInterface): Promise<void> {
  * IntelliJ project, whether IntelliJ may skip them. A setting already on gets what it needs.
  */
 async function startQuestions($: EngineInterface): Promise<void> {
+  await askTeamInstall($)
   const settings = await settingsNow($)
   if (settings.demoVideos) {
     if (!(await isVoiceReady($))) await setUpVoice($)
@@ -351,6 +353,30 @@ async function startQuestions($: EngineInterface): Promise<void> {
   else if (hasPrs(settings.gitFlow)) await checkGh($)
   await askIdeExclusion($)
   await askToTurnOn($, { field: OFFSCREEN_FIELD, question: OFFSCREEN_QUESTION, header: 'Off-screen' })
+}
+
+/** In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project? */
+async function askTeamInstall($: EngineInterface): Promise<void> {
+  const shared = await $.fs.read(`${await $.session.root()}/${SHARED_SETTINGS}`).catch(() => undefined)
+  if (hasTeamInstall(shared)) return
+  const isGitRepo = await $.process.run(['git', 'rev-parse', '--is-inside-work-tree']).then(done => done.exitCode === 0, () => false)
+  if (isGitRepo) await askToTurnOn($, { field: TEAM_SETTING, question: TEAM_QUESTION, header: 'Team', answers: [TEAM_YES, TEAM_NO] })
+}
+
+/** Adds better-tasks to the project's shared settings and commits only that file (teaminstall.ts). */
+async function shareWithTeam($: EngineInterface): Promise<void> {
+  const root = await $.session.root()
+  const path = `${root}/${SHARED_SETTINGS}`
+  const shared = await $.fs.read(path).catch(() => undefined)
+  if (hasTeamInstall(shared)) return
+  const changed = withTeamInstall(shared)
+  if (changed === undefined) return $.ui.log(`better-tasks: ${SHARED_SETTINGS} is not one JSON object; better-tasks was not added to it`)
+  await $.fs.write(path, changed)
+  const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
+  const added = await git('add', '--', SHARED_SETTINGS)
+  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
+  if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
+  else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
 }
 
 /** The git flow question: the project looked at once for the recommendation, the answer saved in its config.json. */
@@ -476,6 +502,7 @@ async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === 'better-tasks.gitFlow') await setUpFlow($, (await settingsNow($)).gitFlow)
   if (key === 'better-tasks.gitFlow' || key === 'better-tasks.worktree') await askIdeExclusion($)
   if (key === `better-tasks.${IDE_SETTING}`) await keepWorktreesFromIde($)
+  if (key === `better-tasks.${TEAM_SETTING}`) await shareWithTeam($)
 }
 
 /** PR per task needs gh, 2.99 or newer for the video: updates it when it is missing or older (bin/gh-update.sh). */

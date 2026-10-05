@@ -4,6 +4,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
+import { TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
 import { OFFSCREEN_QUESTION } from '../hooks/testenv'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -39,6 +40,8 @@ type Host = {
   spawnOutput: string
   /** What process.run prints, by its argv joined with spaces. */
   runOutput: Record<string, string>
+  /** Each process.run's argv, joined with spaces. */
+  ran: string[]
   env: Map<string, string>
   composer: string
 }
@@ -52,7 +55,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, env: new Map(), composer: '' }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, ran: [], env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -111,6 +114,7 @@ function fakeHost(
     return { value: names.map(name => ({ name, kind: kindOf(name), size: 1, mtimeMs: 0, isLink: false })) }
   })
   on('process.run', ($, e) => {
+    host.ran.push(e.argv.join(' '))
     const [command, ...args] = e.argv
     const paths = args.filter(arg => !arg.startsWith('-'))
     if (command === 'mv' && paths.length === 2) {
@@ -956,6 +960,55 @@ test('with PR per task on and gh too old or missing, startup updates gh and says
   expect(host.toasts).toContain('GitHub CLI updated (2.102.0): PRs carry their video.')
 })
 
+/** Answers the "who gets better-tasks" question with `answer`, dismisses the rest; returns how often it was asked. */
+function answerTeam(on: On, answer: string): { asked: number } {
+  const count = { asked: 0 }
+  on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
+    const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
+    if (question !== TEAM_QUESTION) return { result: { answers: {} } }
+    count.asked += 1
+    return { result: { answers: { [question]: answer } } }
+  })
+  return count
+}
+
+test('"Everyone on this project": better-tasks goes in the shared .claude/settings.json, committed alone; not asked again', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const team = answerTeam(on, TEAM_YES)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/settings.json`]: JSON.stringify({ permissions: { allow: ['Bash(npm test)'] } }) })
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(team.asked).toBe(1)
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '')).toEqual({
+    permissions: { allow: ['Bash(npm test)'] },
+    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } } },
+    enabledPlugins: { 'better-tasks@better-tasks': true },
+  })
+  expect(host.ran).toContain(`git -C ${ROOT} add -- .claude/settings.json`)
+  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${TEAM_COMMIT} --only -- .claude/settings.json`)
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toEqual({ shareWithTeam: true })
+
+  host.files.delete(`${TASKS}/config.json`) // a teammate's checkout: better-tasks is in the shared settings already
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(team.asked).toBe(1)
+})
+
+test('"Only me": nothing in the project changes, the answer is saved, and it is not asked again', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const team = answerTeam(on, TEAM_NO)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  await $.session.start(SESSION)
+  await clock.advance(0)
+  expect(team.asked).toBe(1)
+  expect(host.files.has(`${ROOT}/.claude/settings.json`)).toBe(false)
+  expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toEqual({ shareWithTeam: false })
+})
+
 test('in a GitHub project startup asks about videos, then the git flow; the flow is saved in config.json and set up', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
@@ -964,7 +1017,7 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
     const first = (e as { questions: { question: string; options: { label: string }[] }[] }).questions[0]
     const question = first?.question ?? ''
     const options = (first?.options ?? []).map(option => option.label)
-    if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } } // dismissed: its own test below
+    if (question === OFFSCREEN_QUESTION || question === TEAM_QUESTION) return { result: { answers: {} } } // dismissed: their own tests
     asked.push({ question, options })
     return { result: { answers: { [question]: question === QUESTION ? 'No' : options[1] } } }
   })
@@ -989,7 +1042,7 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   const asked: string[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
-    if (question === OFFSCREEN_QUESTION) return { result: { answers: {} } }
+    if (question === OFFSCREEN_QUESTION || question === TEAM_QUESTION) return { result: { answers: {} } }
     asked.push(question)
     return { result: { answers: { [question]: 'No' } } }
   })
