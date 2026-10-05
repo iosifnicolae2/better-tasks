@@ -146,7 +146,7 @@ export const register: Register = (on, options) => {
     const hasTypes = (await read($, typesState)) !== ''
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
-    const videos = settings.demoVideos ? teammateRules($.plugin.root) : ''
+    const videos = settings.demoVideos ? teammateRules($.plugin.root, settings.videoQuality) : ''
     const prs = settings.pullRequests ? PR_TEAMMATE_RULES : ''
     const prompt = [named.prompt, handover, teammate, stuck, videos, prs].filter(Boolean).join('\n\n')
     const isWorktree = (settings.worktree || settings.pullRequests) && !e.isolation

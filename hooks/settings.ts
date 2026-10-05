@@ -7,6 +7,10 @@ import type { SprintConfig } from './sprints'
 
 export type Editor = 'auto' | 'default' | 'code' | 'idea' | 'cursor' | 'zed'
 
+/** How the before/after videos are encoded: low = 720p small file, medium = 1080p, high = 1080p sharper. */
+export const VIDEO_QUALITIES = ['low', 'medium', 'high'] as const
+export type VideoQuality = (typeof VIDEO_QUALITIES)[number]
+
 export type TaskNaming = {
   /** "T-" in "T-001". */
   prefix: string
@@ -49,6 +53,7 @@ export type Settings = {
   keepAwake: boolean
   /** Teammates make a narrated before/after video of finished work. */
   demoVideos: boolean
+  videoQuality: VideoQuality
   /** A teammate's finished work goes up as a GitHub pull request, merged when the user approves. */
   pullRequests: boolean
   models: TeammateModels
@@ -73,6 +78,7 @@ export const FIELDS: Record<string, Field> = {
   statusEvery: { kind: 'number' },
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
+  videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
   pullRequests: { kind: 'boolean' },
   easyModel: { kind: 'string', values: MODELS },
   easyEffort: { kind: 'string', values: EFFORTS },
@@ -99,6 +105,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   statusEvery: 10,
   keepAwake: true,
   demoVideos: false,
+  videoQuality: 'medium',
   pullRequests: false,
   easyModel: 'opus',
   easyEffort: 'low',
@@ -129,6 +136,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
+    videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
     pullRequests: value('pullRequests') === true,
     models: {
       easy: choiceOf('easy'),

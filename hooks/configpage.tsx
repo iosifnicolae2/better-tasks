@@ -1,7 +1,7 @@
 import { KeyHint } from './board'
 import type { Ui } from './board'
-import { EFFORTS, LEVELS, MODELS } from './settings'
-import type { Level, Settings } from './settings'
+import { EFFORTS, LEVELS, MODELS, VIDEO_QUALITIES } from './settings'
+import type { Level, Settings, VideoQuality } from './settings'
 
 // The settings page of the Sprint pane, in the manner of Claude Code's own /config: one row per
 // setting with its value in a fixed column; Enter (or a click) changes it in place; one line at the
@@ -29,6 +29,7 @@ const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satur
 const ON_OFF = ['on', 'off']
 const isOn = (value: string) => value === 'on'
 const asIs = (value: string) => value
+const QUALITY_LABELS: Record<VideoQuality, string> = { low: '720p small', medium: '1080p medium', high: '1080p high' }
 
 const LEVEL_ABOUT: Record<Level, { label: string; work: string; effort: string }> = {
   easy: { label: 'Easy-task', work: 'quick, clear work: a typo, a text, a small fix', effort: 'low' },
@@ -123,6 +124,16 @@ export const FIELDS: readonly Field[] = [
     value: settings => (settings.demoVideos ? 'on' : 'off'),
     initial: 'off',
     stored: isOn,
+  },
+  {
+    group: 'team',
+    field: 'videoQuality',
+    label: 'Video quality',
+    describe: 'The before/after videos’ size: 720p small file, 1080p medium (sharp, a few MB a minute), 1080p high (sharper, bigger file).',
+    options: Object.values(QUALITY_LABELS),
+    value: settings => QUALITY_LABELS[settings.videoQuality],
+    initial: QUALITY_LABELS.medium,
+    stored: label => VIDEO_QUALITIES.find(quality => QUALITY_LABELS[quality] === label) ?? 'medium',
   },
   {
     group: 'team',

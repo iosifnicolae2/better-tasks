@@ -1,5 +1,5 @@
 #!/bin/sh
-# Makes a narrated before/after demo video: demo-video.sh spec.json (the spec is described in demo_video.py).
+# Makes a narrated before/after demo video: demo-video.sh spec.json [--quality low|medium|high] (the spec is described in demo_video.py).
 # Runs with the Kokoro install that kokoro-setup.sh made; prints the video's path.
 dir="${BETTER_TASKS_KOKORO:-${XDG_DATA_HOME:-$HOME/.local/share}/better-tasks/kokoro}"
 if [ ! -f "$dir/.ready" ]; then
