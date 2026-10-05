@@ -28,6 +28,9 @@ The user's screen, mouse and keyboard stay theirs.
   - Launch the app without focus (NSWorkspace openApplication with activates = false, or `open -g`), move its window into BT_DISPLAY_BOUNDS through Accessibility, press buttons and menus with Accessibility actions (AXPress), type with key events posted to the app's process only (CGEvent postToPid), read values through Accessibility.
   - Capture the window alone (`screencapture -x -o -l <window id>`) or the display (`screencapture -x -D "$BT_DISPLAY_CAPTURE" shot.png`; video: `-v -V <seconds>`). Quit the app before the turn ends, or its windows land on the user's screens.
   - No real click (it moves the user's pointer) and no keys to the front app. Accessibility not allowed for you (AXIsProcessTrusted is false)? Tell the lead: the user allows it once. A step that only works with a real click: tell the lead, who asks the user or waits until they are away.
+- Mouse last: test and record without it first (the app's test hooks, Accessibility actions, keys posted to the app, URL schemes, CLI flags, a headless browser, capture of the test screen). None works and you are allowed a real click on the test screen? Notify first, save the pointer, move it back the moment you are done:
+  - `osascript -e 'display notification "A teammate is using the mouse for a moment" with title "better-tasks"'`
+  - Save: `osascript -l JavaScript -e 'ObjC.import("CoreGraphics"); var p=$.CGEventGetLocation($.CGEventCreate(null)); p.x+" "+p.y'`; restore: `osascript -l JavaScript -e 'ObjC.import("CoreGraphics"); $.CGWarpMouseCursorPosition({x:X, y:Y})'`.
 - Never: `screencapture` of a whole screen, `open` of an app or URL without -g, AppleScript clicks or keystrokes.
 
 ## On the screen: when off-screen is off

@@ -27,6 +27,7 @@ const MUST_SAY: Record<string, string[]> = {
     '${CLAUDE_PLUGIN_ROOT}/bin/record-display.sh run -- <your script>',
     'never make, move or remove virtual displays yourself',
     'screencapture -x -o -l <window id>',
+    'Notify first, save the pointer, move it back',
     '## On the screen: when off-screen is off',
     '## Local build for the user',
   ],
