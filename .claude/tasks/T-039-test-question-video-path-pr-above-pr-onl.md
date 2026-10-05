@@ -44,3 +44,4 @@ To test: read the new rules in the PR (hooks/texts.ts, skills/done/SKILL.md).
 https://github.com/iosifnicolae2/better-tasks/pull/21
 Is everything OK?
 - 2026-10-05: Finishing rules: video path and PR link above the question, only the PR in the question, one task at a time (rule first, in bold).
+- 2026-10-05: Follow-up (2026-10-05): scripts/skills-check.ts (run by release.sh) still looked for the old done-skill phrases. It now checks the new ones: the video path and the PR under Links, and the PR as the question's only link. Commit bc44f26 is pushed straight to main. skills-check passes; 288 tests pass. Release not run.
