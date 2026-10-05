@@ -5,7 +5,7 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
-import { excludeWorktrees } from './intellij'
+import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { contributeRules, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
@@ -246,11 +246,23 @@ async function declareAll($: EngineInterface): Promise<void> {
   }
 }
 
-/** IntelliJ skips .claude/worktrees/ (intellij.ts); a project without .idea/ is left as it is. */
+/** IntelliJ skips .claude/worktrees/ once the user said yes (intellij.ts); a project without .idea/ is left as it is. */
 async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
-  const ideaFiles = await $.fs.list(`${await $.session.root()}/.idea`).then(entries => entries.map(entry => entry.name), () => undefined)
-  const line = await excludeWorktrees(ioOf($), ideaFiles)
+  if (!(await settingsNow($)).excludeWorktreesFromIde) return
+  const line = await excludeWorktrees(ioOf($), await ideaFilesOf($))
   if (line) $.ui.log(line)
+}
+
+/** The names in the project's .idea/; undefined when it has none (no JetBrains IDE). */
+async function ideaFilesOf($: EngineInterface): Promise<string[] | undefined> {
+  return $.fs.list(`${await $.session.root()}/.idea`).then(entries => entries.map(entry => entry.name), () => undefined)
+}
+
+/** Teammates in worktrees and an IntelliJ project: asks once per project whether IntelliJ may skip the worktrees. */
+async function askIdeExclusion($: EngineInterface): Promise<void> {
+  const settings = await settingsNow($)
+  if (!usesWorktree(settings.gitFlow, settings.worktree) || (await ideaFilesOf($)) === undefined) return
+  await askToTurnOn($, { field: IDE_SETTING, question: IDE_QUESTION, header: 'IntelliJ', answers: [IDE_YES, IDE_NO] })
 }
 
 function logFailure($: EngineInterface, what: string, error: unknown): void {
@@ -312,7 +324,8 @@ async function pointUserRules($: EngineInterface): Promise<void> {
 
 /**
  * At startup, one after the other: asks once whether to turn on before/after videos, then which git flow
- * (only in a project with a GitHub remote, until one is saved in its config.json). A setting already on gets what it needs.
+ * (only in a project with a GitHub remote, until one is saved in its config.json), then, with worktrees in an
+ * IntelliJ project, whether IntelliJ may skip them. A setting already on gets what it needs.
  */
 async function startQuestions($: EngineInterface): Promise<void> {
   const settings = await settingsNow($)
@@ -325,6 +338,7 @@ async function startQuestions($: EngineInterface): Promise<void> {
   const isChosen = FLOW_KEYS.some(key => key in values) || settings.gitFlow !== 'direct'
   if (!isChosen) await askGitFlow($)
   else if (hasPrs(settings.gitFlow)) await checkGh($)
+  await askIdeExclusion($)
   await askToTurnOn($, { field: OFFSCREEN_FIELD, question: OFFSCREEN_QUESTION, header: 'Off-screen' })
 }
 
@@ -388,7 +402,8 @@ async function instructionsNow($: EngineInterface, settings: Settings): Promise<
 const binOf = ($: EngineInterface) => `${$.plugin.root}/bin`
 
 /** A setting's on/off question: `field` is its key in the project's config.json. */
-type TurnOnQuestion = { field: string; question: string; header: string }
+/** `answers`: the yes and no labels, when "Enable (recommended)" and "Not now" don't say what happens. */
+type TurnOnQuestion = { field: string; question: string; header: string; answers?: [yes: string, no: string] }
 
 /**
  * Asks once per project: the answer, on or off, is saved in its config.json, so another project is asked
@@ -396,21 +411,27 @@ type TurnOnQuestion = { field: string; question: string; header: string }
  */
 async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<void> {
   if (ask.field in (await readOverrides(ioOf($))).values) return
-  const answer = await $.ui.ask(ask.question, { options: [ENABLE_OPTION, 'Not now'], header: ask.header }).catch(() => undefined)
+  const [yes, no] = ask.answers ?? [ENABLE_OPTION, 'Not now']
+  const answer = await $.ui.ask(ask.question, { options: [yes, no], header: ask.header }).catch(() => undefined)
   if (answer === undefined) return
-  const problem = await saveProjectValue(ioOf($), ask.field, answer === ENABLE_OPTION)
+  const problem = await saveProjectValue(ioOf($), ask.field, answer === yes)
   if (problem) $.ui.log(`better-tasks: ${problem}`)
-  else if (answer === ENABLE_OPTION) await setUpTurnedOn($, `better-tasks.${ask.field}`)
+  else if (answer === yes) await setUpTurnedOn($, `better-tasks.${ask.field}`)
 }
 
 async function hasGitHubRemote($: EngineInterface): Promise<boolean> {
   return $.process.run(['git', 'remote', '-v']).then(done => hasGitHub(done.stdout), () => false)
 }
 
-/** What a setting needs once turned on: the voice for videos; for a git flow chosen on the settings page, its setup. */
+/**
+ * What a setting needs once turned on: the voice for videos; for a git flow chosen on the settings page, its setup;
+ * worktrees in an IntelliJ project, the IntelliJ question; a yes to it, the exclusion now.
+ */
 async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === SETTING_KEY) await setUpVoice($)
   if (key === 'better-tasks.gitFlow') await setUpFlow($, (await settingsNow($)).gitFlow)
+  if (key === 'better-tasks.gitFlow' || key === 'better-tasks.worktree') await askIdeExclusion($)
+  if (key === `better-tasks.${IDE_SETTING}`) await keepWorktreesFromIde($)
 }
 
 /** PR per task needs gh, 2.99 or newer for the video: updates it when it is missing or older (bin/gh-update.sh). */
