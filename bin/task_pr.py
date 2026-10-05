@@ -150,9 +150,19 @@ def default_body(task: str, path: Path | None, commits: list[str]) -> str:
     lines = ["## Asked for", "", asked, "", "## What changed", ""]
     lines += [f"- {git('log', '-1', '--format=%s', c)}" for c in commits]
     lines += ["", "## To test", "", to_test or "The steps are in the task file.", ""]
+    lines += ["## Commits", ""] + [f"- {c[:8]}" for c in commits] + [""]
     if path:
         lines += [f"Task file: `{path.relative_to(MAIN_CHECKOUT)}`", ""]
     return "\n".join(lines)
+
+
+def with_video(body: str, shown: list[str]) -> str:
+    """The video goes after the request and why it was needed: right before "## What changed", else at the end."""
+    if not shown:
+        return body
+    block = "\n".join(shown) + "\n"
+    at = re.search(r"^## What changed\b", body, re.M)
+    return body[:at.start()] + block + body[at.start():] if at else body.rstrip("\n") + "\n\n" + block
 
 
 def open_pr(task: str, options: argparse.Namespace) -> int:
@@ -188,7 +198,7 @@ def open_pr(task: str, options: argparse.Namespace) -> int:
     shown, attach = video_lines(task)
     body = Path(options.body_file).read_text() if options.body_file else default_body(task, path, commits)
     created = run("gh", "pr", "create", "--base", main, "--head", branch,
-                  "--title", f"{task} {task_title(path, task)}", "--body", "\n".join(shown) + body, *attach)
+                  "--title", f"{task} {task_title(path, task)}", "--body", with_video(body, shown), *attach)
     print(created.stdout.strip() or created.stderr.strip())
     return created.returncode
 

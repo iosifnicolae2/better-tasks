@@ -83,8 +83,10 @@ describe('git flow', () => {
     const dev = devTeammateRules('/bin', 'develop')
     expect(dev).toContain('`/bin/land.sh -b develop -m')
     expect(dev).toContain('python3 /bin/task_pr.py open T-004 --body-file <scratchpad>/pr.md')
-    expect(dev).toContain('"Asked for": the user\'s request')
+    expect(dev).toContain('"## Asked for": the user\'s request')
     expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toMatch(/^PR RULES\n- The PR's description/)
+    const order = ['## Asked for', '## Why', 'the video', '## What changed', '## To test', '## Commits'].map(part => dev.indexOf(part))
+    expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true) // the request, why, the solution, then the rest
   })
 
   test("the dev flow's lead rules take the PR flow's Finishing line as it is", () => {
