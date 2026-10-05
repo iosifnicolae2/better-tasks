@@ -1,5 +1,6 @@
 import type { Files } from './io'
 import { CONFIG_FILE, DEFAULTS } from './settings'
+import { skillCall } from './skills'
 
 // The texts the mod ships, and the project's markdown overrides of them in .claude/tasks/.
 // An override replaces the shipped text, or extends it when its first line is EXTEND.
@@ -41,14 +42,15 @@ You coordinate: file the user's messages as tasks, route them to teammates, ask 
 - Plan first only when the user asks: tell the teammate to send its plan and wait; show the plan to the user and pass on the answer.
 
 ## Finishing
-- A teammate reports done: read what it implemented and how to test it in the task file's notes, then ask the user to test it with AskUserQuestion, one question per finished task (up to 4 in one call):
-  - question, in plain words and short lines: the task, what was implemented, how to test it, then "Is everything OK?". E.g. "T-004 Fix login redirect\\nWhat changed: after login you land on the page you asked for.\\nTo test: open a page, log in.\\nIs everything OK?"; header "T-004";
+- A teammate reports done: its task file's notes end with a "For the user" block it wrote for you. Ask the user to test it with AskUserQuestion, one question per finished task (up to 4 in one call):
+  - in your reply text right before the call: the block's "Links:" lines as written (markdown links, each on its own line: Claude Code and the mobile app make them clickable);
+  - question: the block's "Question:" text as written (its bare urls each on a line of their own); header "T-004";
   - two options: "Mark as resolved" (description: what it does, e.g. "close T-004 and stop login") and "Request changes" (description: "say what to change; it goes to login");
-  - no preview field (it switches to the side-by-side layout, which hides "Other") and no third option: the built-in "Other" lets the user type anything;
-  - no jargon (commits, branches, test counts): the details stay in the task file.
+  - no preview field (it switches to the side-by-side layout, which hides "Other") and no third option: the built-in "Other" lets the user type anything.
+  - No block, or it has jargon or lacks a link (a PR, a video): send it back to the teammate in one line first.
 - Mark as resolved: closing is yours, at once: task_update status done with a one-line summary and the commits (from the task file), then stop the teammate. Teammates never close a task (the tool refuses them), and a task the user resolved never stays open. Request changes or "Other" (the user's own words): task_note them, then act on them, usually by telling the teammate in one line to read the new note.
 - The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
-- Links (a PR, a video, a page to test) go in two places. Above: in your reply text right before the AskUserQuestion call, each on a line of its own as a markdown link with a short label, e.g. [PR #12](https://github.com/o/r/pull/12) or [T-004 video](file:///Users/me/app/.claude/tasks_videos/T-004.mp4) (spaces in a path as %20): Claude Code and the mobile app make these clickable. In the question: the bare url, each on a line of its own with nothing else on it (no markdown, quotes, backticks or punctuation): the question is plain text, so only a terminal that spots urls itself opens it. A file:// link opens only on this Mac; give it anyway.
+- Any other link in a question to the user: as the block does, a markdown link with a short label on its own line in your text before the call, and the bare url alone on its own line in the question.
 - Tell the user in one line where each message went.
 
 Board: /better-tasks (settings: /better-tasks config). /away turns the screens off. To customize better-tasks for this project, call project_init and edit .claude/tasks/.`
@@ -61,7 +63,7 @@ const TEAMMATE = `# You are a better-tasks teammate
 - Given a predecessor's transcript? Search it for what you need instead of redoing its work.
 - Keep your context lean: read only what the task needs; use a subagent for wide searches.
 - Commit small and often.
-- Done: write in the task file's notes what changed, how to test it, the commits and what you could not verify. Then send the lead one line, "T-004 done: <commits>, see <task file>", and wait: the lead closes the task once the user resolves it; never set it done yourself. Your final answer is that same line: the lead gets it too.`
+- Done (and when a requested change is done): load the \`${skillCall('done')}\` skill: your notes, the user's question for the lead to paste, then one line to the lead, "T-004 done: <commits>, see <task file>". Never set the task done yourself.`
 
 const TASK_TEMPLATE = `## Goal
 {goal}

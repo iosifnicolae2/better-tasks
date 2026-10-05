@@ -206,16 +206,32 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
-test("the lead puts links above the question as labeled markdown links, and in the question as bare urls", async ($, on) => {
+test("the lead pastes the teammate's block: its markdown links above the question, its question (bare urls) inside", async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
-  expect(lead).toContain('Above: in your reply text right before the AskUserQuestion call')
-  expect(lead).toContain('[PR #12](https://github.com/o/r/pull/12)')
-  expect(lead).toContain('In the question: the bare url, each on a line of its own')
+  expect(lead).toContain('in your reply text right before the call: the block\'s "Links:" lines as written')
+  expect(lead).toContain('question: the block\'s "Question:" text as written (its bare urls each on a line of their own)')
+  expect(lead).toContain('the bare url alone on its own line in the question')
+  expect(lead).toContain('load the `better-tasks:contribute` skill')
+  expect(lead).not.toContain('gh repo fork')
+})
+
+test("our skills load with the plugin's path and the settings in force on top; others pass through", { options: { demoVideos: true, videoQuality: 'low' } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on)
+  on('skill.prompt', ($, e) => ({ text: e.text }))
+  const video = await $.skill.prompt({ skill: 'better-tasks:video', text: 'Run `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh`.' })
+  expect(video.text).toMatch(/^## Settings\n- Video quality: low\. Capture at 1280x720 or more/)
+  expect(video.text).toMatch(/Run `\/.*\/bin\/demo-video\.sh`\.$/)
+  expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain('- Off-screen: off.')
+  expect((await $.skill.prompt({ skill: 'better-tasks:contribute', text: 'C' })).text).toContain('- Upstream PR: ask.')
+  expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toBe('D')
+  expect((await $.skill.prompt({ skill: 'commit', text: 'X ${CLAUDE_PLUGIN_ROOT}' })).text).toBe('X ${CLAUDE_PLUGIN_ROOT}')
 })
 
 test('with worktree on, a named teammate is spawned in a worktree', { options: { worktree: true } }, async ($, on) => {
@@ -917,7 +933,7 @@ test('startup asks once per project about before/after videos; the answer goes i
   expect(asked).toBe(2)
 })
 
-test('with before/after videos on, teammates get the video rules and the lead the showing rules', { options: { demoVideos: true } }, async ($, on) => {
+test('with before/after videos on, teammates get the pointer to the video skill', { options: { demoVideos: true } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const teams = { env: { ...TEAMS_ON, HOME: '/home' }, settingsEnv: TEAMS_ON }
@@ -925,9 +941,9 @@ test('with before/after videos on, teammates get the video rules and the lead th
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).toContain('/bin/demo-video.sh spec.json')
+  expect(host.spawned[0]).toContain('load the `better-tasks:video` skill before your first change')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain('file://<project root>/.claude/tasks_videos/<task id>.mp4 goes above and in the question like every link')
+  expect(composed.sections.at(-1)?.text).not.toContain('Before/after video')
   expect(host.toasts).toEqual([])
 })
 
@@ -1066,7 +1082,7 @@ test('startup asks once per project whether to test off-screen; the answer goes 
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(host.spawned[0]).toContain('## Testing like a user')
-  expect(host.spawned[0]).toContain('## Off-screen (on in this project)')
+  expect(host.spawned[0]).toContain('nor their screen, mouse or keyboard (off-screen is on)')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('## New bugs from testing')
 

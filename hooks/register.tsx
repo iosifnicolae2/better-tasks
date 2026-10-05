@@ -8,14 +8,14 @@ import { subagentTtl } from './cache'
 import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
-import { contributeRules, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
+import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
-import { COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
+import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, TEAMMATE_POINTER, videoSkillSettings, voiceDir } from './demovideo'
 import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
-import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingRules } from './testenv'
+import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingPointer, testingSkillSettings } from './testenv'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
@@ -26,6 +26,8 @@ import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
 import { contextTokens, isActive, predecessorOf, refreshTeam } from './team'
+import { fillSkill, ourSkill } from './skills'
+import type { SkillName } from './skills'
 import { projectText } from './texts'
 import { spawnTask, withSummary } from './spawn'
 import { fingerprintOf, NO_CHECK, statusDecision, statusPrompt } from './status'
@@ -103,14 +105,20 @@ export const register: Register = (on, options) => {
     const composed = await next(e)
     if (!(await teamsOn($))) return composed
     const settings = await settingsNow($)
-    const videos = settings.demoVideos ? COORDINATOR_RULES : ''
     const testing = coordinatorTestingRules(settings.offScreen)
     const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, PR_COORDINATOR_RULES)
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
     const instructions = await instructionsNow($, settings)
-    const contribute = contributeRules(await readUpstreamPr(ioOf($), await claudeDirOf($)))
-    const rules = [await projectText(ioOf($), 'coordinator'), models, testing, videos, flow, instructions, contribute].filter(Boolean).join('\n\n')
+    const rules = [await projectText(ioOf($), 'coordinator'), models, testing, flow, instructions, CONTRIBUTE_POINTER].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
+  })
+
+  // Our skills follow the settings in force: their path filled in, their settings on top (skills.ts).
+  on('skill.prompt', async ($, e, next) => {
+    const computed = await next(e)
+    const skill = ourSkill(e.skill)
+    if (!skill) return computed
+    return { text: fillSkill(computed.text, $.plugin.root, await skillSettings($, skill)) }
   })
 
   // A setting turned on in /config (composer) or on our settings page (turnedOn): set up what it needs.
@@ -166,8 +174,8 @@ export const register: Register = (on, options) => {
     const hasTypes = (await read($, typesState)) !== ''
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
-    const testing = testingRules(settings.offScreen)
-    const videos = settings.demoVideos ? teammateRules($.plugin.root, settings.videoQuality) : ''
+    const testing = testingPointer(settings.offScreen)
+    const videos = settings.demoVideos ? TEAMMATE_POINTER : ''
     const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES, await prBodyNow($, settings))
     const instructions = await instructionsNow($, settings)
     const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, instructions].filter(Boolean).join('\n\n')
@@ -315,6 +323,14 @@ async function transcriptOf($: EngineInterface, agentId: string): Promise<string
 /** The user's Claude Code folder: CLAUDE_CONFIG_DIR, else ~/.claude. */
 async function claudeDirOf($: EngineInterface): Promise<string> {
   return (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
+}
+
+/** The settings a skill follows, as lines for its "## Settings" on top; '' when it follows none. */
+async function skillSettings($: EngineInterface, skill: SkillName): Promise<string> {
+  if (skill === 'contribute') return contributeSkillSettings(await readUpstreamPr(ioOf($), await claudeDirOf($)))
+  const settings = await settingsNow($)
+  if (skill === 'video') return videoSkillSettings(settings.videoQuality)
+  return skill === 'testing' ? testingSkillSettings(settings.offScreen) : ''
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { setupVerdict, teammateRules, voiceDir } from '../hooks/demovideo'
+import { setupVerdict, TEAMMATE_POINTER, videoSkillSettings, voiceDir } from '../hooks/demovideo'
 import { settingsOf } from '../hooks/settings'
 
 describe('before/after videos', () => {
@@ -9,14 +9,17 @@ describe('before/after videos', () => {
     expect(settingsOf({ demoVideos: true }).demoVideos).toBe(true)
   })
 
-  test('video quality: 1080p medium unless chosen; the rules pass it to the script', () => {
+  test('video quality: 1080p medium unless chosen; the video skill reads it and its capture size', () => {
     expect(settingsOf({}).videoQuality).toBe('medium')
     expect(settingsOf({ videoQuality: 'low' }).videoQuality).toBe('low')
     expect(settingsOf({ videoQuality: '4k' }).videoQuality).toBe('medium')
-    expect(teammateRules('/p')).toContain('/p/bin/demo-video.sh spec.json --quality medium')
-    expect(teammateRules('/p')).toContain('Capture at 1920x1080 or more')
-    expect(teammateRules('/p', 'low')).toContain('--quality low')
-    expect(teammateRules('/p', 'low')).toContain('Capture at 1280x720 or more')
+    expect(videoSkillSettings('medium')).toBe('- Video quality: medium. Capture at 1920x1080 or more; make it with `--quality medium`.')
+    expect(videoSkillSettings('low')).toContain('Capture at 1280x720 or more')
+  })
+
+  test("the teammate's prompt keeps a pointer: the how-to is the video skill, loaded before the first change", () => {
+    expect(TEAMMATE_POINTER).toContain('load the `better-tasks:video` skill before your first change')
+    expect(TEAMMATE_POINTER).not.toContain('demo-video.sh')
   })
 
   test('the voice lives outside any project: its own folder, else XDG data, else ~/.local/share', () => {
@@ -30,14 +33,5 @@ describe('before/after videos', () => {
     const failed = setupVerdict('failed: uv is missing: brew install uv (log: /tmp/setup.log)\n')
     expect(failed).toEqual({ isReady: false, text: 'better-tasks: the Kokoro voice setup failed: uv is missing: brew install uv (log: /tmp/setup.log)' })
     expect(setupVerdict('').isReady).toBe(false)
-  })
-
-  test('the teammate rules point at the installed scripts', () => {
-    const rules = teammateRules('/plugins/better-tasks')
-    expect(rules).toContain('/plugins/better-tasks/bin/demo-video.sh spec.json')
-    expect(rules).toContain('/plugins/better-tasks/bin/demo_video.py')
-    expect(rules).toContain('Video: [T-004.mp4](../tasks_videos/T-004.mp4)')
-    expect(rules).toContain("with its poster beside it (<task id>.png: an AFTER frame with a big play button, for a PR)")
-    expect(rules).toContain('/plugins/better-tasks/bin/video-branch.sh <video> <poster>')
   })
 })

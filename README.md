@@ -69,6 +69,7 @@ Installed per project? Add the same `--scope project` to `update` and `uninstall
 ## 🧩 More
 
 - **Settings:** `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`. Every setting, its choices, default and where it lives: [skills/settings/SKILL.md](skills/settings/SKILL.md); Claude loads it when you ask what you can configure.
+- **Skills, loaded only when their step comes:** teammates load `testing` before they run the app, `video` before a change that shows on screen, `done` to report; the lead loads `contribute` for a change to better-tasks itself. The prompts keep a one-line pointer to each; a loaded skill gets the settings in force on top. In [skills/](skills/).
 - **Optional tools:** before/after videos need `ffmpeg` and `uv` (`brew install ffmpeg uv`); pull requests need `gh`; the shared-dev-branch flow uses `python3`.
 - **Project setup:** ask "set up better-tasks for this project", then edit the files in `.claude/tasks/`.
 - **Changing better-tasks:** ask Claude for the change. It forks this repo, makes the change there, runs the fork as a linked install (an edit applies on `/reload-plugins`, no reinstall), then asks whether to open a PR here: Yes, Not now or Never (kept per user in `~/.claude/better-tasks/user.json`).
