@@ -53,6 +53,6 @@ You work in your own git worktree, on its own branch; the project's main checkou
 - Never merge it yourself: the lead merges once the user approves.`
 
 export const PR_COORDINATOR_RULES = `## Pull request per task (on)
-- A finished task's notes hold "PR: <url>". The Finishing question shows that url on a line of its own with nothing else on it, and no video link: the PR's picture opens the video. Like every link, it also goes above the question (Finishing). "Mark as resolved" merges: its description says "merge the PR and close T-004".
+- A finished task's notes hold "PR: <url>". In Finishing, that url goes above and in the question like every link (Finishing), labeled "PR #<number>" above, and no video link: the PR's picture opens the video. "Mark as resolved" merges: its description says "merge the PR and close T-004".
 - Mark as resolved: \`gh pr merge <url> --squash --delete-branch\`, then \`git pull --ff-only\` in the project, then close the task with the merge commit. The merge fails (a conflict)? The teammate updates its branch from main and pushes; then merge.
 - Request changes: the teammate pushes to the same PR.`
