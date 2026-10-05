@@ -44,6 +44,15 @@ let loggedMissing = ''
 let voiceSetup: Promise<void> | undefined
 let ghUpdate: Promise<void> | undefined
 
+/** First in every setup question, so a stray Enter lands on it: nothing is saved, asked again next session. */
+export const LATER_OPTION = 'Decide later'
+const NO_OPTION = 'No'
+/** A setup question waits for an empty prompt box this long (the user is not typing), checked every POLL_MS. */
+const QUIET_MS = 2000
+const POLL_MS = 250
+/** Still typing after this long: the questions wait for the next session. */
+const GIVE_UP_MS = 10 * 60_000
+
 const tasksState = atom({ plugin: 'better-tasks', key: 'tasks' } as const, [] as Task[])
 const teamState = atom({ plugin: 'better-tasks', key: 'team' } as const, [] as Teammate[])
 const tokensState = atom({ plugin: 'better-tasks', key: 'tokens' } as const, {} as Record<string, number>)
@@ -349,8 +358,7 @@ const FLOW_KEYS = ['gitFlow', 'pullRequests', 'worktree']
 async function askGitFlow($: EngineInterface): Promise<void> {
   if (!(await hasGitHubRemote($))) return
   const recommended = recommend(await lookAt(await probeOf($)))
-  const options = { options: flowOptions(recommended.flow), header: FLOW_ASK_HEADER }
-  const answer = await $.ui.ask(flowQuestion(recommended), options).catch(() => undefined)
+  const answer = await askSetup($, flowQuestion(recommended), flowOptions(recommended.flow), FLOW_ASK_HEADER)
   const flow = answer === undefined ? undefined : flowOfAnswer(answer)
   if (flow === undefined) return
   const problem = await saveProjectValue(ioOf($), 'gitFlow', flow)
@@ -402,21 +410,45 @@ async function instructionsNow($: EngineInterface, settings: Settings): Promise<
 const binOf = ($: EngineInterface) => `${$.plugin.root}/bin`
 
 /** A setting's on/off question: `field` is its key in the project's config.json. */
-/** `answers`: the yes and no labels, when "Enable (recommended)" and "Not now" don't say what happens. */
+/** `answers`: the yes and no labels, when "Enable (recommended)" and "No" don't say what happens. */
 type TurnOnQuestion = { field: string; question: string; header: string; answers?: [yes: string, no: string] }
 
 /**
  * Asks once per project: the answer, on or off, is saved in its config.json, so another project is asked
- * at its own first start. Dismissed, it is asked again next session. Enable also sets the setting up.
+ * at its own first start. Decided later, dismissed or answered in free text, it is asked again next session.
+ * Enable also sets the setting up.
  */
 async function askToTurnOn($: EngineInterface, ask: TurnOnQuestion): Promise<void> {
   if (ask.field in (await readOverrides(ioOf($))).values) return
-  const [yes, no] = ask.answers ?? [ENABLE_OPTION, 'Not now']
-  const answer = await $.ui.ask(ask.question, { options: [yes, no], header: ask.header }).catch(() => undefined)
-  if (answer === undefined) return
+  const [yes, no] = ask.answers ?? [ENABLE_OPTION, NO_OPTION]
+  const answer = await askSetup($, ask.question, [yes, no], ask.header)
+  if (answer !== yes && answer !== no) return
   const problem = await saveProjectValue(ioOf($), ask.field, answer === yes)
   if (problem) $.ui.log(`better-tasks: ${problem}`)
   else if (answer === yes) await setUpTurnedOn($, `better-tasks.${ask.field}`)
+}
+
+/**
+ * A setup question pops up on its own, so a key meant for the prompt box can answer it: Enter picks the
+ * highlighted option. So it waits until the user is not typing, and "Decide later" (saves nothing) comes
+ * first. Returns the answer; undefined for "Decide later", a dismissal, or a user who never stopped typing.
+ */
+async function askSetup($: EngineInterface, question: string, options: string[], header: string): Promise<string | undefined> {
+  if (!(await untilNotTyping($))) return undefined
+  const answer = await $.ui.ask(question, { options: [LATER_OPTION, ...options], header }).catch(() => undefined)
+  return answer === LATER_OPTION ? undefined : answer
+}
+
+/** True once the prompt box has stayed empty for QUIET_MS; false when that never happens within GIVE_UP_MS. */
+async function untilNotTyping($: EngineInterface): Promise<boolean> {
+  const start = await $.clock.now()
+  let quietSince = start
+  for (let now = start; now - start < GIVE_UP_MS; now = await $.clock.now()) {
+    if ((await $.prompt.read()).text !== '') quietSince = now
+    else if (now - quietSince >= QUIET_MS) return true
+    await $.clock.sleep(POLL_MS)
+  }
+  return false
 }
 
 async function hasGitHubRemote($: EngineInterface): Promise<boolean> {
