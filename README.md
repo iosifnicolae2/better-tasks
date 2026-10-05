@@ -41,9 +41,7 @@ Restart Claude Code.
 
 A video better-tasks made of its own change: the settings page before and after the "Before/after videos" row. Turn the sound on: the subtitles are read aloud.
 
-https://github.com/user-attachments/assets/8a4dc144-ff65-4e8b-a2dd-c2dfd205ceac
-
-**[▶ Play with sound](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@24f713a11783dd8ccc503f74adad448c4108aa79/docs/videos/before-after.mp4)** (opens the video file from this repo, [`docs/videos/before-after.mp4`](docs/videos/before-after.mp4)).
+[![Play the before/after demo video](docs/videos/before-after-poster.png)](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@24f713a11783dd8ccc503f74adad448c4108aa79/docs/videos/before-after.mp4)
 
 ## 🔄 Update / uninstall
 
