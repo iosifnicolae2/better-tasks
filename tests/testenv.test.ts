@@ -9,6 +9,7 @@ describe('testing like a user', () => {
       expect(rules).toContain('Your own test environment')
       expect(rules).toContain('never the user\'s running apps, data or accounts')
       expect(rules).toContain('"New bug: <what you saw>, <how to see it again>"')
+      expect(rules).toContain('claude mcp add --transport stdio xcode -- xcrun mcpbridge')
     }
   })
 
