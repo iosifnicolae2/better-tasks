@@ -4,3 +4,5 @@
 .claude-plugin/types/
 # Local Claude Code permissions, per machine
 .claude/settings.local.json
+# Python bytecode from running bin/demo_video.py
+__pycache__/

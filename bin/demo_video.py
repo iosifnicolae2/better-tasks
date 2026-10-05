@@ -5,8 +5,11 @@ Quality (the setting videoQuality, medium by default): low fits 1280x720 in a sm
 1920x1080, high fits 1920x1080 sharper in a bigger file. The video is scaled to fit, up or down.
 The video goes to <project>/.claude/tasks_videos/<name> (the main checkout's, also from a worktree;
 $BETTER_TASKS_VIDEOS overrides the folder), which git ignores; its file:// link is printed last.
-Next to it, <name>.png: the poster, a frame of the AFTER clip with a big play button in the middle,
-for a PR to show as a picture that opens the video (its link is printed first).
+Next to it, <name>.png: the poster, for a PR to show as a picture that opens the video (its link is
+printed first). BEFORE and AFTER side by side, each labeled and zoomed on what the task changed, its
+sentence under it, a big play button between them. Each half is one step of the first and the last
+clip: the step marked "poster", else the last one with a box. It shows that step's "focus" area, else
+its boxes and arrows with room around them (never less than a third of the frame wide).
 Each clip gets its BEFORE/AFTER label top-left, red boxes and arrows, burned-in subtitles
 and the subtitles read aloud by Kokoro. Overlays are drawn with Pillow, so ffmpeg needs no
 libass or freetype. The spec (paths relative to the spec file):
@@ -21,7 +24,9 @@ libass or freetype. The spec (paths relative to the spec file):
        {"say": "After login you land on the home page.",
         "at": 1.5,                              optional: start no earlier than this second of the clip
         "image": "before-1.png",                image clips only; a step without one keeps the last
-        "marks": [{"box": [x, y, w, h]}, {"arrow": [x1, y1, x2, y2]}]}  pixels of the video or image
+        "marks": [{"box": [x, y, w, h]}, {"arrow": [x1, y1, x2, y2]}],  pixels of the video or image
+        "poster": true,                         optional: this step's frame goes in the poster
+        "focus": [x, y, w, h]}                  optional: the poster shows this area of it
      ]},
     {"label": "AFTER", ...}
   ]
@@ -54,7 +59,13 @@ LEAD_IN = 0.6
 GAP = 0.5
 TAIL = 0.8
 TITLE_SECONDS = 2.5
-POSTER_DELAY = 1.0  # the poster frame: this long into the last clip's first step, its marks on screen
+POSTER_DELAY = 1.0  # a video clip's poster frame: this long into its poster step
+POSTER_WIDTH = 1920  # at every quality: GitHub shows it about 880 px wide, so its text stays readable
+POSTER_GAP = 48
+POSTER_BUTTON = 180  # the play button's size on the poster
+FOCUS_ROOM = 0.35  # room around the marks a poster half zooms on, as a share of their size
+FOCUS_MIN = 1 / 3  # a poster half shows at least this share of the frame's width
+POSTER_BACKGROUND = (22, 24, 29, 255)
 LOUD_PEAK = 0.89  # -1 dBFS
 RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
@@ -79,10 +90,9 @@ def main(spec_path: str, quality_name: str) -> None:
     with tempfile.TemporaryDirectory(prefix='demo-video-') as tmp:
         work = Path(tmp)
         parts = [title_card(work, canvas, spec['title'])] if spec.get('title') else []
-        parts += [render_clip(work / f'clip{i}', base, clip, canvas, voice) for i, clip in enumerate(clips)]
-        join(work, parts, output)
-        moment = sum(probe(part)['duration'] for part in parts[:-1]) + first_step_start(clips[-1]) + POSTER_DELAY
-        poster = make_poster(work, output, moment)
+        rendered = [render_clip(work / f'clip{i}', base, clip, canvas, voice) for i, clip in enumerate(clips)]
+        join(work, parts + [path for path, _ in rendered], output)
+        poster = make_poster(work, base, clips, [starts for _, starts in rendered], output)
     print(poster.as_uri())
     print(output.as_uri())
 
@@ -286,10 +296,6 @@ def fitted(path: Path, canvas: tuple) -> tuple:
 
 # ---- Timeline and rendering ----
 
-def first_step_start(clip: dict) -> float:
-    return max(LEAD_IN, float(clip['steps'][0].get('at', 0)))
-
-
 def timeline(steps: list, voice: Voice) -> tuple:
     """Each step's start and narration, and the narration's end."""
     clock, timed = LEAD_IN, []
@@ -301,7 +307,8 @@ def timeline(steps: list, voice: Voice) -> tuple:
     return timed, clock - GAP
 
 
-def render_clip(work: Path, base: Path, clip: dict, canvas: tuple, voice: Voice) -> Path:
+def render_clip(work: Path, base: Path, clip: dict, canvas: tuple, voice: Voice) -> tuple:
+    """The clip as an mp4, and the second each of its steps starts at."""
     work.mkdir()
     steps, label = clip['steps'], clip['label']
     timed, spoken_until = timeline(steps, voice)
@@ -342,7 +349,7 @@ def render_clip(work: Path, base: Path, clip: dict, canvas: tuple, voice: Voice)
         inputs = ['-f', 'concat', '-safe', '0', '-i', str(frame_list)]
         audio_input = '1:a'
     encode(inputs + ['-i', str(work / 'voice.wav')], graph, audio_input, length, out)
-    return out
+    return out, starts
 
 
 def write_narration(path: Path, timed: list, length: float) -> None:
@@ -400,18 +407,132 @@ def join(work: Path, parts: list, output: Path) -> None:
          '-c', 'copy', '-movflags', '+faststart', str(output)])
 
 
-def make_poster(work: Path, video: Path, moment: float) -> Path:
-    """The video's frame at `moment` with a big play button in the middle, saved as <video>.png."""
-    frame_path = work / 'poster-frame.png'
-    moment = min(moment, probe(video)['duration'] - 0.1)
-    run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{moment:.3f}', '-i', str(video), '-frames:v', '1', str(frame_path)])
-    with Image.open(frame_path) as frame:
-        poster = frame.convert('RGBA')
-    size = round(min(poster.size) * 0.25)
-    button = play_button(size)
-    poster.alpha_composite(button, ((poster.width - size) // 2, (poster.height - size) // 2))
+# ---- Poster: BEFORE and AFTER side by side, zoomed on what changed ----
+
+def make_poster(work: Path, base: Path, clips: list, starts: list, video: Path) -> Path:
+    """The first and the last clip's poster steps side by side, a play button between them, as <video>.png."""
+    chosen = [0, len(clips) - 1] if len(clips) > 1 else [0]
+    halves = [poster_half(work, base, clips[i], starts[i]) for i in chosen]
+    button = POSTER_BUTTON
+    middle = button + POSTER_GAP if len(halves) > 1 else 0  # the play button sits between the halves, over neither
+    panel_w = (POSTER_WIDTH - 2 * POSTER_GAP - middle) // len(halves)
+    frame = halves[0]['frame']
+    shape = min(max(frame.width / frame.height, 3 / 4), 16 / 9) if len(halves) > 1 else 16 / 9  # one half: never taller than wide
+    panel_h = round(panel_w / shape)
+    unit = POSTER_WIDTH / 1000
+    label_font, caption_font = font(round(24 * unit)), font(round(17 * unit))
+    measure = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
+    captions = [wrap(measure, half['say'], caption_font, panel_w)[:3] for half in halves]
+    line_h = round(caption_font.size * 1.3)
+    label_h = round(label_font.size * 1.9)
+    panel_top = POSTER_GAP + label_h + POSTER_GAP // 2
+    caption_top = panel_top + panel_h + POSTER_GAP // 2
+    height = caption_top + max(len(lines) for lines in captions) * line_h + POSTER_GAP
+    poster = Image.new('RGBA', (POSTER_WIDTH, height), POSTER_BACKGROUND)
+    draw = ImageDraw.Draw(poster)
+    for index, (half, lines) in enumerate(zip(halves, captions)):
+        left = POSTER_GAP + index * (panel_w + middle)
+        color = LABEL_COLORS.get(half['label'].upper(), (90, 90, 90, 235))
+        draw_pill(draw, half['label'], label_font, (left, POSTER_GAP), label_h, color)
+        poster.alpha_composite(zoomed(half['frame'], half['area'], (panel_w, panel_h)), (left, panel_top))
+        draw.rectangle((left - 5, panel_top - 5, left + panel_w + 4, panel_top + panel_h + 4), outline=color, width=6)
+        for row, line in enumerate(lines):
+            draw.text((left, caption_top + row * line_h), line, font=caption_font, fill=WHITE)
+    poster.alpha_composite(play_button(button), ((POSTER_WIDTH - button) // 2, panel_top + (panel_h - button) // 2))
     out = video.with_suffix('.png')
     poster.convert('RGB').save(out, optimize=True)
+    return out
+
+
+def draw_pill(draw: ImageDraw.ImageDraw, text: str, text_font, origin: tuple, height: int, color: tuple) -> None:
+    """A label in a rounded box `height` tall, its top-left at `origin`."""
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=text_font)
+    pad = height * 0.45
+    draw.rounded_rectangle((origin[0], origin[1], origin[0] + right - left + 2 * pad, origin[1] + height), radius=height * 0.22, fill=color)
+    draw.text((origin[0] + pad - left, origin[1] + (height - (bottom - top)) / 2 - top), text, font=text_font, fill=WHITE)
+
+
+def poster_step(clip: dict) -> int:
+    """The step a poster half shows: the one marked "poster", else the last with a box, else the last."""
+    steps = clip['steps']
+    marked = [i for i, step in enumerate(steps) if step.get('poster')]
+    boxed = [i for i, step in enumerate(steps) if any('box' in mark for mark in step.get('marks', []))]
+    if marked:
+        return marked[0]
+    return boxed[-1] if boxed else len(steps) - 1
+
+
+def poster_half(work: Path, base: Path, clip: dict, starts: list) -> dict:
+    """One half: the poster step's frame at source size with its marks, the area to show, its label and sentence."""
+    index = poster_step(clip)
+    step = clip['steps'][index]
+    frame = step_frame(work, base, clip, index, starts[index])
+    draw = ImageDraw.Draw(frame)
+    for mark in step.get('marks', []):
+        draw_mark(draw, mark, Fit(frame.size, frame.size), max(frame.size) / 1000)
+    return {'frame': frame, 'area': focus_area(step, frame.size), 'label': clip['label'], 'say': step['say']}
+
+
+def step_frame(work: Path, base: Path, clip: dict, index: int, start: float) -> Image.Image:
+    """The source picture under a step: its image (or the last one before it), or the video's frame then."""
+    if not clip.get('video'):
+        image = next(step['image'] for step in reversed(clip['steps'][:index + 1]) if step.get('image'))
+        with Image.open(base / image) as source:
+            return source.convert('RGBA')
+    video = base / clip['video']
+    moment = min(start + POSTER_DELAY, probe(video)['duration'] - 0.1)
+    path = work / f'poster-{clip["label"]}-{index}.png'
+    run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{moment:.3f}', '-i', str(video), '-frames:v', '1', str(path)])
+    with Image.open(path) as source:
+        return source.convert('RGBA')
+
+
+def focus_area(step: dict, size: tuple) -> tuple:
+    """(left, top, right, bottom) a poster half shows: the step's "focus", else its marks with room, else all."""
+    if step.get('focus'):
+        x, y, w, h = step['focus']
+        return clamp_area((x, y, x + w, y + h), size)
+    points = []
+    for mark in step.get('marks', []):
+        if 'box' in mark:
+            x, y, w, h = mark['box']
+            points += [(x, y), (x + w, y + h)]
+        if 'arrow' in mark:
+            x1, y1, x2, y2 = mark['arrow']
+            points += [(x1, y1), (x2, y2)]
+    if not points:
+        return (0, 0, size[0], size[1])
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
+    room = FOCUS_ROOM * max(max(xs) - min(xs), max(ys) - min(ys))
+    left, top, right, bottom = min(xs) - room, min(ys) - room, max(xs) + room, max(ys) + room
+    least = size[0] * FOCUS_MIN / 2
+    middle = (left + right) / 2
+    left, right = min(left, middle - least), max(right, middle + least)
+    return clamp_area((left, top, right, bottom), size)
+
+
+def clamp_area(area: tuple, size: tuple) -> tuple:
+    """The area moved, then cut, to lie inside the frame."""
+    left, top, right, bottom = area
+    width, height = min(right - left, size[0]), min(bottom - top, size[1])
+    left = min(max(left, 0), size[0] - width)
+    top = min(max(top, 0), size[1] - height)
+    return (left, top, left + width, top + height)
+
+
+def zoomed(frame: Image.Image, area: tuple, panel: tuple) -> Image.Image:
+    """The area grown to the panel's shape where the frame allows, scaled into the panel, centered on the background."""
+    left, top, right, bottom = area
+    width, height = right - left, bottom - top
+    shape = panel[0] / panel[1]
+    grown_w, grown_h = max(width, height * shape), max(height, width / shape)
+    middle_x, middle_y = (left + right) / 2, (top + bottom) / 2
+    area = clamp_area((middle_x - grown_w / 2, middle_y - grown_h / 2, middle_x + grown_w / 2, middle_y + grown_h / 2), frame.size)
+    crop = frame.crop(tuple(round(side) for side in area))
+    scale = min(panel[0] / crop.width, panel[1] / crop.height)
+    resized = crop.resize((max(1, round(crop.width * scale)), max(1, round(crop.height * scale))), Image.LANCZOS)
+    out = Image.new('RGBA', panel, POSTER_BACKGROUND)
+    out.alpha_composite(resized, ((panel[0] - resized.width) // 2, (panel[1] - resized.height) // 2))
     return out
 
 

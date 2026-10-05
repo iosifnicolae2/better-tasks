@@ -16,8 +16,9 @@ Not loaded `better-tasks:testing` yet? Load it now, before you capture: it says 
 
 ## Make it
 - Spec: a JSON file (format at the top of `${CLAUDE_PLUGIN_ROOT}/bin/demo_video.py`), its "name" the task id ("T-004.mp4"): a BEFORE clip and an AFTER clip, 1–4 steps each. Per step one short, plain sentence (shown and read aloud), a red box around what matters and an arrow pointing at it, in the pixels of the image or video.
-- Run `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh spec.json --quality <the quality "Settings" names>`. Inputs stay in your scratchpad; the video goes to the project's `.claude/tasks_videos/` (git ignores it), with its poster beside it (<task id>.png: an AFTER frame with a big play button, for a PR). The script prints the poster's file:// link, then the video's.
-- Check a frame or two (`ffmpeg -ss <second> -i video.mp4 -frames:v 1 frame.png`): the boxes and arrows land on target.
+- Run `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh spec.json --quality <the quality "Settings" names>`. Inputs stay in your scratchpad; the video goes to the project's `.claude/tasks_videos/` (git ignores it), with its poster beside it (<task id>.png: BEFORE and AFTER side by side with a big play button, for a PR). The script prints the poster's file:// link, then the video's.
+- The poster is what people see first, in the PR, about 880 px wide: each half shows the most important thing the task solved. Pick, in the BEFORE clip and in the AFTER clip, the step where it shows clearest, best the same spot in both (the error, then the fixed screen), and give it `"poster": true` and a `"focus": [x, y, w, h]` around that spot, a third to half of the frame wide, so it reads when small. Left out: the last step with a box, zoomed on its marks.
+- Check a frame or two (`ffmpeg -ss <second> -i video.mp4 -frames:v 1 frame.png`): the boxes and arrows land on target. Open the poster too: both halves show the difference, and their text reads at half size.
 - Online copy, when gh can't upload it (the `better-tasks:pull-request` skill says when): `${CLAUDE_PLUGIN_ROOT}/bin/video-branch.sh <video> <poster>` commits both to the branch better-tasks-videos (its own history, never merged: videos stay out of main and out of the task's branch), pushes it and prints their web links (video first), then the caption that fits them.
 
 ## Report it
