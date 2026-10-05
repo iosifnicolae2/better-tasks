@@ -66,6 +66,8 @@ export type Settings = {
   instructions: string
   /** The user said yes to "may IntelliJ skip the worktrees folder?", asked once per project (intellij.ts). */
   excludeWorktreesFromIde: boolean
+  /** The PR description's template, relative to the project root; empty: the project's own, else better-tasks' (prtemplate.ts). */
+  prTemplate: string
   models: TeammateModels
   sprint: SprintConfig
   tasks: TaskNaming
@@ -95,6 +97,7 @@ export const FIELDS: Record<string, Field> = {
   devBranch: { kind: 'string' },
   instructions: { kind: 'string' },
   excludeWorktreesFromIde: { kind: 'boolean' },
+  prTemplate: { kind: 'string' },
   easyModel: { kind: 'string', values: MODELS },
   easyEffort: { kind: 'string', values: EFFORTS },
   normalModel: { kind: 'string', values: MODELS },
@@ -127,6 +130,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   devBranch: 'dev',
   instructions: '',
   excludeWorktreesFromIde: false,
+  prTemplate: '',
   easyModel: 'opus',
   easyEffort: 'low',
   normalModel: 'opus',
@@ -162,6 +166,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     devBranch: String(value('devBranch')).trim() || 'dev',
     instructions: String(value('instructions')),
     excludeWorktreesFromIde: value('excludeWorktreesFromIde') === true,
+    prTemplate: String(value('prTemplate')).trim(),
     models: {
       easy: choiceOf('easy'),
       normal: choiceOf('normal'),
@@ -188,7 +193,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 export const CONFIG_FILE = '.claude/tasks/config.json'
 
 /** Settings that belong to the project only: the settings page writes them to its config.json, never to /config. */
-export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen']
+export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen', 'prTemplate']
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }

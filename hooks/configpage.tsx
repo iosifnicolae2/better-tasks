@@ -194,6 +194,8 @@ export type ProjectFacts = {
   problems: readonly string[]
   /** The project's own files by label (config.json, coordinator.md, …) and whether each exists. */
   files: readonly { label: string; exists: boolean }[]
+  /** The PR description's template (prtemplate.ts): its path as shown, and whose it is. */
+  prTemplate: { shown: string; source: 'custom' | 'project' | 'shipped' }
   onOpen: (label: string) => void
 }
 
@@ -253,6 +255,8 @@ export function ConfigPage(props: ConfigPageProps) {
       )}
       <Row ui={ui} rowKey="cfg-instructions" label="Project instructions" value={settings.instructions || 'none · set in config.json'}
         isFromProject={fromProject.includes('instructions')} onPress={() => project.onOpen('instructions')} />
+      <Row ui={ui} rowKey="cfg-pr-template" label="PR template" value={prTemplateValue(project.prTemplate)}
+        isFromProject={fromProject.includes('prTemplate')} onPress={() => project.onOpen('pr-template')} />
       <Row ui={ui} rowKey="cfg-native" label="All Claude Code settings" value="/config" onPress={onOpenNative} />
       <Box flexDirection="column" marginTop={1}>
         <Box height={1} overflow="hidden">
@@ -273,6 +277,10 @@ function fileValue(file: { label: string; exists: boolean }, projectValues: numb
   return file.exists ? 'custom · open' : 'default · create'
 }
 
+function prTemplateValue(template: ProjectFacts['prTemplate']): string {
+  return template.source === 'shipped' ? 'better-tasks’ · add to repo' : `${template.shown} · open`
+}
+
 /** The description line: what the focused row does, and where its value comes from. */
 function describeRow(rowKey: string, fromProject: readonly string[], project: ProjectFacts): string {
   const field = FIELDS.find(one => `cfg-${one.field}` === rowKey)
@@ -287,6 +295,12 @@ function describeRow(rowKey: string, fromProject: readonly string[], project: Pr
   }
   if (rowKey === 'cfg-instructions') {
     return 'Project instructions: files or folders every teammate and the lead follow, as "instructions" in config.json (comma-separated). The prompts get each path and its first line. ⏎ opens the first one, or config.json.'
+  }
+  if (rowKey === 'cfg-pr-template') {
+    const action = project.prTemplate.source === 'shipped'
+      ? 'This project has none, so PRs use better-tasks’ own. ⏎ adds it as .github/pull_request_template.md and opens it.'
+      : '⏎ opens it.'
+    return `PR template: what every PR description fills in: the request and why at the top, then the video, what changed, how to test. A path of your own: "prTemplate" in config.json; else the project’s, else better-tasks’. ${action}`
   }
   if (rowKey === 'cfg-sprints') return 'Sprint goals & reviews: opens sprints.md, one section per sprint.'
   if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Better Tasks: …”."

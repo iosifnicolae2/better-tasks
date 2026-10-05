@@ -8,7 +8,7 @@
 origin's main plus those commits, each picked with `git merge-tree`, so no file in any checkout changes.
 It pushes the branch and opens the PR, or adds to the open one. A commit already on the branch (its
 "(cherry picked from commit ...)" line) or already in main is skipped. The task's before/after video
-(.claude/tasks_videos/T-004.mp4 and its .png poster) goes on top of the description: attached by gh
+(.claude/tasks_videos/T-004.mp4 and its .png poster) goes right after the request and why: attached by gh
 2.99+, else on the videos branch (video-branch.sh, next to this script).
 
 `sync`, after the lead merged a PR: local main follows origin's main, then dev takes origin's main in
@@ -156,13 +156,31 @@ def default_body(task: str, path: Path | None, commits: list[str]) -> str:
     return "\n".join(lines)
 
 
+INTRO = re.compile(r"asked|request|why|problem|motivation|context|background|summary|description|overview|about", re.I)
+
+
+def video_spot(body: str) -> int:
+    """Right after the request and why: before the first heading that follows them. Any template's headings
+    count ("## Why", "### Motivation"); no such heading: at the top."""
+    headings = list(re.finditer(r"^#{1,6} +(.*)$", body, re.M))
+    seen_intro = False
+    for heading in headings:
+        if INTRO.search(heading.group(1)):
+            seen_intro = True
+        elif seen_intro:
+            return heading.start()
+    return len(body) if seen_intro else 0
+
+
 def with_video(body: str, shown: list[str]) -> str:
-    """The video goes after the request and why it was needed: right before "## What changed", else at the end."""
+    """The video goes right after the request and why it was needed (the PR template's order)."""
     if not shown:
         return body
     block = "\n".join(shown) + "\n"
-    at = re.search(r"^## What changed\b", body, re.M)
-    return body[:at.start()] + block + body[at.start():] if at else body.rstrip("\n") + "\n\n" + block
+    at = video_spot(body)
+    if at == len(body):
+        return body.rstrip("\n") + "\n\n" + block
+    return body[:at] + block + body[at:]
 
 
 def open_pr(task: str, options: argparse.Namespace) -> int:

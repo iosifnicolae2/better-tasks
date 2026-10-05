@@ -35,6 +35,7 @@ Restart Claude Code.
 - ✅ **You approve** finished work before a task closes.
 - 🎥 **Before/after videos** of each change, narrated.
 - 🔀 **Your git flow, asked once per project:** straight to main; a shared `dev` branch with a pull request per task (one build, one install for everything); or a worktree and pull request per teammate. Recommended from a quick look at the project.
+- 📝 **PR descriptions from a template:** the project's own (`.github/pull_request_template.md` and the other places GitHub and GitLab look), a path of your choice (`prTemplate` in `.claude/tasks/config.json`), else better-tasks' short one: the request and why on top, then the video, what changed, how to test. The settings page's "PR template" row adds it to your repo when you press Enter.
 - 📌 **Your own instructions** for every task: point `instructions` in `.claude/tasks/config.json` at a file or folder; prompts carry its path and first line.
 - 🧘 **A quiet IDE:** with teammates in worktrees, an IntelliJ project is asked once whether IntelliJ may skip them (`.claude/worktrees/`), so they don't set off re-indexing; the answer is `excludeWorktreesFromIde` in `.claude/tasks/config.json`.
 - 🌙 **`/away`:** screens off, the Mac keeps working.
