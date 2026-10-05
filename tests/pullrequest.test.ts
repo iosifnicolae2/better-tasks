@@ -22,7 +22,7 @@ describe('PR per task', () => {
     expect(ghUpdateVerdict('==> Upgrading gh\nready gh version 2.102.0 (2026-09-30)\n')).toEqual({ isReady: true, text: 'GitHub CLI updated (2.102.0): PRs carry their video.' })
     expect(ghUpdateVerdict('login gh version 2.102.0 (2026-09-30)')).toEqual({ isReady: false, text: 'GitHub CLI updated (2.102.0): PRs carry their video. Sign in once: gh auth login.' })
     expect(ghUpdateVerdict('failed: no Homebrew to update gh with; update it by hand: https://github.com/cli/cli#installation').text)
-      .toBe('better-tasks: failed: no Homebrew to update gh with; update it by hand: https://github.com/cli/cli#installation. PRs still work, without the video.')
+      .toBe('better-tasks: failed: no Homebrew to update gh with; update it by hand: https://github.com/cli/cli#installation. PRs still work; their video goes on a branch.')
     expect(ghUpdateVerdict('ready gh version 2.98.0 (2026-08-20)').isReady).toBe(false) // another, older gh comes first on PATH
     expect(ghUpdateVerdict('').isReady).toBe(false)
   })
@@ -42,5 +42,10 @@ describe('PR per task', () => {
     expect(PR_TEAMMATE_RULES).toContain("`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)`\n  `Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).`")
     expect(PR_TEAMMATE_RULES).toContain("--attach <poster's absolute path> --attach <video's absolute path>")
     expect(PR_TEAMMATE_RULES).toContain('--attach <poster> --attach <video>')
+  })
+
+  test("when gh can't attach, the video goes on the videos branch and the PR links there", () => {
+    expect(PR_TEAMMATE_RULES).toContain("gh can't attach (older than 2.99, or the upload failed)? Put the video on the videos branch")
+    expect(PR_TEAMMATE_RULES).toContain("No PR: commit as usual and say so in your notes. A video goes on the videos branch")
   })
 })
