@@ -6,7 +6,7 @@ description: How a better-tasks teammate records the before/after video of its t
 
 # Before/after video
 One short narrated video per finished task that shows on screen: the bug or missing feature (BEFORE), then your change (AFTER). Nothing to see (a refactor, a config)? Skip it and say so in your notes.
-How to run and capture the app (your own environment, off-screen or not): the `better-tasks:testing` skill.
+Not loaded `better-tasks:testing` yet? Load it now, before you capture: it says how to run and capture the app (your own environment, off-screen or not).
 
 ## Capture
 - BEFORE first: before you change anything, capture the bug or the missing feature. Forgot? Capture it from the last commit before yours (`git worktree add <scratchpad>/before <commit>`).

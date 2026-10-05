@@ -18,7 +18,7 @@ export const OFFSCREEN_QUESTION =
 export function testingPointer(isOffScreen: boolean): string {
   const screen = isOffScreen ? ", nor their screen, mouse or keyboard (off-screen is on)" : ''
   return `## Testing like a user
-- Test your change as a user would, in your own environment: never the user's running apps, data or accounts${screen}. Before you run, test or capture the app, load the \`${skillCall('testing')}\` skill: how, per kind of app.
+- Test your change as a user would, in your own environment: never the user's running apps, data or accounts${screen}. Before you first run, test or capture the app (a BEFORE capture too), load the \`${skillCall('testing')}\` skill: how, per kind of app.
 - A new bug you notice, even outside your task: don't fix it unasked. Send the lead one line, "New bug: <what you saw>, <how to see it again>".`
 }
 
