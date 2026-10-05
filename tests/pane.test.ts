@@ -661,7 +661,7 @@ test('a task being worked on spins; the phone shows a still ✻', async ($, on) 
 
 // ---- Teammates ----
 
-const AUTH = { id: 'a1', name: 'auth', description: 'auth', type: 'teammate', status: 'running' } as const
+const AUTH = { id: 'a1', name: 'auth', description: 'auth', type: 'better-tasks:teammate-normal', status: 'running' } as const
 
 /** The auth teammate running T-001, its context at 63 %, its session two messages long. */
 async function withTeammate($: Engine, on: On) {
@@ -679,11 +679,13 @@ async function withTeammate($: Engine, on: On) {
 }
 
 for (const surface of SURFACES) {
-  test(`a task in progress shows its teammate's state, activity and context (${surface})`, async ($, on) => {
+  test(`a task in progress shows its teammate's effort, state, activity and context (${surface})`, async ($, on) => {
     await withTeammate($, on)
     const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
     expect(await ui.find({ type: 'Text', text: /^⎿$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'idle' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'auth · medium · ' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'medium · ' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /63%/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: / · cache warm \d+m$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^cold$/ })).toBeUndefined()

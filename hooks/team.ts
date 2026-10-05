@@ -1,9 +1,13 @@
 import type { AgentInfo, ModelUsage } from 'claude-code'
 
 import type { Activity, CacheStep, Teammate } from '../types'
+import { stateWord } from './activity'
 import { warmthOf } from './cache'
 import type { CacheTtl } from './cache'
 import type { Io } from './io'
+import { typeOf } from './models'
+import { LEVELS, settingsFrom } from './settings'
+import type { TeammateModels } from './settings'
 
 // Teammates: who they are, how full their context is, whether their prompt cache is warm, and whom a successor takes over from.
 
@@ -18,6 +22,12 @@ export function percentOf(tokens: number | undefined, window: number): number | 
   return tokens === undefined || window <= 0 ? undefined : Math.round((tokens / window) * 100)
 }
 
+/** The effort its agent type runs at ("medium" for better-tasks:teammate-normal); undefined for any other type. */
+export function effortOf(type: string, models: TeammateModels | undefined): string | undefined {
+  const level = LEVELS.find(one => typeOf(one) === type)
+  return level && models?.[level].effort
+}
+
 export type CacheFacts = { steps: Record<string, CacheStep>; now: number; ttl: CacheTtl }
 
 /** The named agents of the session: context fill, what they do now, and their cache warmth. */
@@ -27,6 +37,7 @@ export function teamOf(
   window: number,
   activities: Record<string, Activity> = {},
   cache?: CacheFacts,
+  models?: TeammateModels,
 ): Teammate[] {
   return agents
     .filter(agent => agent.name !== undefined || agent.type === 'teammate')
@@ -36,6 +47,7 @@ export function teamOf(
         id: agent.id,
         name: agent.name ?? agent.description,
         status: agent.status,
+        effort: effortOf(agent.type, models),
         percent: percentOf(tokens[agent.id], window),
         activity: activities[agent.id]?.text,
         activeAt: activities[agent.id]?.at,
@@ -47,7 +59,8 @@ export function teamOf(
 
 export async function refreshTeam(io: Io): Promise<Teammate[]> {
   const cache = { steps: await io.cacheSteps(), now: await io.now(), ttl: await io.cacheTtl() }
-  const team = teamOf(await io.agents(), await io.tokens(), await io.window(), await io.activities(), cache)
+  const { models } = await settingsFrom(io)
+  const team = teamOf(await io.agents(), await io.tokens(), await io.window(), await io.activities(), cache, models)
   await io.publishTeam(team)
   return team
 }
@@ -67,9 +80,12 @@ export function predecessorOf(team: readonly Teammate[], name: string): Teammate
 
 const areaOf = (name: string) => name.replace(/-\d+$/, '')
 
-/** "idle" for a running teammate between turns, "working" during one. */
+export const WAITING = 'waiting for your answer'
+
+/** One word for what it does: working, idle (between turns), waiting (for the user's answer), done, stopped, failed. */
 export function stateOf(mate: Teammate): string {
-  if (mate.status !== 'running') return mate.status
+  if (mate.activity === WAITING) return 'waiting'
+  if (mate.status !== 'running') return stateWord(mate.status)
   return mate.activity ? 'working' : 'idle'
 }
 
@@ -80,5 +96,5 @@ export function cacheText(mate: Teammate): string | undefined {
 
 export function mateLine(mate: Teammate): string {
   const fill = mate.percent === undefined ? 'context ?' : `context ${mate.percent} %`
-  return [mate.name, stateOf(mate), fill, cacheText(mate), mate.activity].filter(Boolean).join(' · ')
+  return [mate.name, mate.effort, stateOf(mate), fill, cacheText(mate), mate.activity].filter(Boolean).join(' · ')
 }

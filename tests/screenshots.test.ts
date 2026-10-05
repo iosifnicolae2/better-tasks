@@ -59,7 +59,7 @@ async function demo($: Engine, on: On): Promise<void> {
   on('session.root', () => ({ value: ROOT }))
   on('session.id', () => ({ value: 'demo' }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000, percent: 10 }, rateLimits: [] } }))
-  on('agent.list', () => ({ value: [{ id: 'a1', name: 'shop', description: 'shop', type: 'teammate', status: 'running' }] }))
+  on('agent.list', () => ({ value: [{ id: 'a1', name: 'shop', description: 'shop', type: 'better-tasks:teammate-normal', status: 'running' }] }))
   on('fs.list', ($, e) => ({
     value: [...files.keys()]
       .filter(path => path.startsWith(`${e.path}/`))
