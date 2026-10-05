@@ -221,7 +221,8 @@ test("the lead pastes the teammate's block: the video and PR above the question,
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
   expect(lead).toContain('Reply text, right before the call: the block\'s "Links:" lines as written: the video file\'s path (Claude Code opens it on click) and the PR')
   expect(lead).toContain('question: the block\'s "Question:" text as written (its only link the PR, a bare url on its own line; never the video)')
-  expect(lead).toContain('No local build to try unless the user asks for one')
+  expect(lead).toContain('The teammate also leaves a local build ready, not opened: the block\'s "Local build:" line.')
+  expect(lead).toContain('the user asks for it: open or install it for them right away')
   expect(lead).toContain('Mark as resolved: closing is yours, at once, with no new question to the user')
   expect(lead).toContain('It changes, updates its PR and video, and reports done again.')
   expect(lead).not.toContain('accepted: finish it')

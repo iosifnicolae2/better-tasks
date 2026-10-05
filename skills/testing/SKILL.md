@@ -1,7 +1,7 @@
 ---
 name: testing
 user-invocable: false
-description: How a better-tasks teammate runs, tests and captures its change like a user, in its own environment, off the user's screen when the project says so, and makes a local build when the user asks for one (web, iOS, Android, terminal, Linux and Mac apps, plugins). Load it before you run, test or capture the app.
+description: How a better-tasks teammate runs, tests and captures its change like a user, in its own environment, off the user's screen when the project says so, and leaves a local build ready for the user (web, iOS, Android, terminal, Linux and Mac apps, plugins). Load it before you run, test or capture the app.
 ---
 
 # Testing like a user
@@ -9,13 +9,13 @@ description: How a better-tasks teammate runs, tests and captures its change lik
 - Your own environment: your own instance on its own port, its own data (a fresh database, browser profile or simulator, in your scratchpad); not another teammate's. Stop what you started when done.
 - iPhone/iOS apps: build, run and test through Xcode's own tools (its MCP server; Apple: https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode). Not set up (no xcode tools among yours)? Tell the lead it takes: Xcode > Settings > Intelligence > "Allow external agents to use Xcode tools", then `claude mcp add --transport stdio xcode -- xcrun mcpbridge`, with the project open in Xcode. Until then: `xcodebuild` and `xcrun simctl`.
 
-## A local build, only when the user asks
-None at done: the user sees the video and the PR. The lead says the user wants to try it? Make it, open or install it as the lead says (it may do it itself from your notes), and say in your notes how to stop or remove it.
-- Web: your dev server left running on its own port; its URL is the link.
-- iOS / Android: installed on the user's device (`xcrun devicectl device install app --device <id> <app>`, `adb install -r <apk>`), else on a simulator or emulator they can see.
+## A local build, ready at done
+Built and ready, not installed, opened or left running: the user sees the video and the PR first; the lead opens it only when they ask. Your block's "Local build" line says where it is and how to open it, and how to stop or remove it after.
+- Web: the command that starts your dev server on its own port, and its URL.
+- iOS / Android: the built app and its install command (`xcrun devicectl device install app --device <id> <app>`, `adb install -r <apk>`), for the user's device, else a simulator or emulator they can see.
 - Mac app: the built .app's path; the user opens it.
 - Terminal app or CLI: the command that runs your build.
-- A Claude Code plugin (better-tasks itself): the user's linked install (the `better-tasks:contribute` skill) runs your checkout: they run /reload-plugins. Your work is in a worktree? Give them `claude --plugin-dir <worktree>` for a new session.
+- A Claude Code plugin (better-tasks itself): `claude --plugin-dir <your worktree>` for a new session (or, with the user's linked install running your checkout, /reload-plugins).
 
 ## Off-screen: when "Settings" above says it is on
 The user's screen, mouse and keyboard stay theirs.
