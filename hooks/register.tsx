@@ -7,7 +7,7 @@ import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { OFF_LINE } from './projectsetup'
 import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
-import { excludeWorktrees, IDE_NO, IDE_QUESTION, IDE_SETTING, IDE_YES } from './intellij'
+import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
@@ -275,9 +275,10 @@ async function declareCommands($: EngineInterface): Promise<void> {
   }
 }
 
-/** IntelliJ skips .claude/worktrees/ once the user said yes (intellij.ts); a project without .idea/ is left as it is. */
+/** With worktrees, IntelliJ skips .claude/worktrees/ (intellij.ts; on by default); a project without .idea/ is left as it is. */
 async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
-  if (!(await settingsNow($)).excludeWorktreesFromIde) return
+  const settings = await settingsNow($)
+  if (!settings.excludeWorktreesFromIde || !usesWorktree(settings.gitFlow, settings.worktree)) return
   const line = await excludeWorktrees(ioOf($), await ideaFilesOf($))
   if (line) $.ui.log(line)
 }
@@ -285,13 +286,6 @@ async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
 /** The names in the project's .idea/; undefined when it has none (no JetBrains IDE). */
 async function ideaFilesOf($: EngineInterface): Promise<string[] | undefined> {
   return $.fs.list(`${await $.session.root()}/.idea`).then(entries => entries.map(entry => entry.name), () => undefined)
-}
-
-/** Teammates in worktrees and an IntelliJ project: asks once per project whether IntelliJ may skip the worktrees. */
-async function askIdeExclusion($: EngineInterface): Promise<void> {
-  const settings = await settingsNow($)
-  if (!usesWorktree(settings.gitFlow, settings.worktree) || (await ideaFilesOf($)) === undefined) return
-  await askToTurnOn($, { field: IDE_SETTING, question: IDE_QUESTION, header: 'IntelliJ', answers: [IDE_YES, IDE_NO] })
 }
 
 function logFailure($: EngineInterface, what: string, error: unknown): void {
@@ -378,7 +372,6 @@ async function startQuestions($: EngineInterface): Promise<void> {
   const isChosen = FLOW_KEYS.some(key => key in values) || settings.gitFlow !== 'direct'
   if (!isChosen) await askGitFlow($)
   else if (hasPrs(settings.gitFlow)) await checkGh($)
-  await askIdeExclusion($)
 }
 
 /** True when better-tasks is off in this project (the user said no to it here). */
@@ -432,6 +425,7 @@ async function askGitFlow($: EngineInterface): Promise<void> {
 async function setUpFlow($: EngineInterface, flow: GitFlow): Promise<void> {
   if (flow === 'dev-prs') await useDevBranch($, (await settingsNow($)).devBranch).catch(error => logFailure($, 'making the dev branch', error))
   if (hasPrs(flow)) await checkGh($)
+  await keepWorktreesFromIde($)
 }
 
 /** Makes the dev branch at this commit and switches to it: the same commit, so no file changes. One that exists is left alone. */
@@ -537,8 +531,7 @@ async function hasGitHubRemote($: EngineInterface): Promise<boolean> {
 async function setUpTurnedOn($: EngineInterface, key: string): Promise<void> {
   if (key === SETTING_KEY) await setUpVoice($)
   if (key === 'better-tasks.gitFlow') await setUpFlow($, (await settingsNow($)).gitFlow)
-  if (key === 'better-tasks.gitFlow' || key === 'better-tasks.worktree') await askIdeExclusion($)
-  if (key === `better-tasks.${IDE_SETTING}`) await keepWorktreesFromIde($)
+  if (['better-tasks.gitFlow', 'better-tasks.worktree', `better-tasks.${IDE_SETTING}`].includes(key)) await keepWorktreesFromIde($)
   if (key === `better-tasks.${TEAM_SETTING}`) await shareWithTeam($)
 }
 

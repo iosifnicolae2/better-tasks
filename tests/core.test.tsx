@@ -3,7 +3,6 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
-import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
 import { TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -251,28 +250,26 @@ test('with worktree on, a named teammate is spawned in a worktree', { options: {
 const EXCLUDED = '<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />'
 const IDE_NOTICE = 'better-tasks: IntelliJ now skips .claude/worktrees/ (teammate worktrees), so they are not indexed'
 
-/** Answers every startup question: videos "Not now", the git flow `flow`, IntelliJ `ide`; returns the questions asked. */
-function answerStartup(on: On, flow: string, ide: string): string[] {
+/** Answers every startup question: videos "No", the git flow `flow`; returns the questions asked. */
+function answerStartup(on: On, flow: string): string[] {
   const asked: string[] = []
   on('tool.call', { tool: 'AskUserQuestion' }, ($, e) => {
     const question = (e as { questions: { question: string }[] }).questions[0]?.question ?? ''
     asked.push(question)
-    const answer = question === QUESTION ? 'No' : question === IDE_QUESTION ? ide : flow
-    return { result: { answers: { [question]: answer } } }
+    return { result: { answers: { [question]: question === QUESTION ? 'No' : flow } } }
   })
   return asked
 }
 
-test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may skip them; yes excludes them now and at each start', async ($, on) => {
+test('worktrees in an IntelliJ project: IntelliJ skips them by default, unasked, now and at each start', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerStartup(on, 'Worktree and PR per task', IDE_YES)
+  const asked = answerStartup(on, 'Worktree and PR per task')
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).toContain(IDE_QUESTION)
-  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toMatchObject({ gitFlow: 'worktree-prs', excludeWorktreesFromIde: true })
+  expect(asked.some(question => question.includes('IntelliJ'))).toBe(false)
   expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
   expect(host.notices).toContain(IDE_NOTICE)
 
@@ -280,41 +277,31 @@ test('worktrees chosen in an IntelliJ project: asked once whether IntelliJ may s
   host.files.delete(`${ROOT}/.idea/modules.xml`)
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked.filter(question => question === IDE_QUESTION)).toHaveLength(1)
   expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
 })
 
-test('"No" to the IntelliJ question is saved: .idea is left as it is and the question is not asked again', async ($, on) => {
+test('"excludeWorktreesFromIde": false leaves .idea as it is', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerStartup(on, 'Worktree and PR per task', IDE_NO)
-  const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
-  host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
+  answerStartup(on, 'Worktree and PR per task')
+  const host = fakeHost(on, [], {
+    [`${ROOT}/.idea/misc.xml`]: '<project />',
+    [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ gitFlow: 'worktree-prs', excludeWorktreesFromIde: false }),
+  })
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  await $.session.start(SESSION)
-  await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked.filter(question => question === IDE_QUESTION)).toHaveLength(1)
-  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toMatchObject({ excludeWorktreesFromIde: false })
   expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
 })
 
-test('no IntelliJ question without worktrees or without .idea/, and nothing is excluded unasked', async ($, on) => {
+test('without worktrees, .idea is left as it is', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerStartup(on, 'Straight to main', IDE_YES)
+  answerStartup(on, 'Straight to main')
   const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).not.toContain(IDE_QUESTION)
   expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
-
-  host.files.delete(`${ROOT}/.idea/misc.xml`)
-  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ gitFlow: 'worktree-prs' }))
-  await $.session.start(SESSION)
-  await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).not.toContain(IDE_QUESTION)
 })
 
 test('a new sprint rolls unfinished work over and writes the review', async ($, on) => {

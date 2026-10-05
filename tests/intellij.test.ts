@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { excludeWorktrees, folderModule, IDE_QUESTION, isBuildToolProject, moduleDir, modulePaths, withWorktreesExcluded } from '../hooks/intellij'
+import { excludeWorktrees, folderModule, isBuildToolProject, moduleDir, modulePaths, withWorktreesExcluded } from '../hooks/intellij'
 import type { IdeFiles } from '../hooks/intellij'
 
 const ROOT = '/Users/a/shop'
@@ -86,10 +86,4 @@ describe('IntelliJ skips the teammate worktrees', () => {
     expect(isBuildToolProject(['misc.xml'], '<component name="MavenProjectsManager">')).toBe(true)
     expect(io.files.size).toBe(1)
   })
-})
-
-test('the IntelliJ question is short', () => {
-  expect(IDE_QUESTION).toBe('Should we add worktrees to the IntelliJ ignore list?')
-  expect(IDE_QUESTION.length).toBeLessThan(120)
-  expect(IDE_QUESTION.endsWith('?')).toBe(true)
 })
