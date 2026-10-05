@@ -6,7 +6,7 @@ import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { OFF_LINE } from './projectsetup'
-import { hasTeamInstall, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
+import { AUTO_UPDATE_COMMIT, hasTeamInstall, lacksAutoUpdate, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, withTeamInstall } from './teaminstall'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
@@ -383,26 +383,32 @@ async function isGitRepo($: EngineInterface): Promise<boolean> {
   return $.process.run(['git', 'rev-parse', '--is-inside-work-tree']).then(done => done.exitCode === 0, () => false)
 }
 
-/** In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project? */
+/**
+ * In a git project whose shared settings don't have better-tasks yet: only me, or everyone on the project?
+ * Shared before auto-update existed: turns it on (the team said yes to sharing then).
+ */
 async function askTeamInstall($: EngineInterface): Promise<void> {
   const shared = await $.fs.read(`${await $.session.root()}/${SHARED_SETTINGS}`).catch(() => undefined)
+  if (lacksAutoUpdate(shared)) return shareWithTeam($)
   if (hasTeamInstall(shared)) return
   if (await isGitRepo($)) await askToTurnOn($, { field: TEAM_SETTING, question: TEAM_QUESTION, header: 'Team', answers: [TEAM_YES, TEAM_NO] })
 }
 
-/** Adds better-tasks to the project's shared settings and commits only that file (teaminstall.ts). */
+/** Adds better-tasks (auto-updating) to the project's shared settings and commits only that file (teaminstall.ts). */
 async function shareWithTeam($: EngineInterface): Promise<void> {
   const root = await $.session.root()
   const path = `${root}/${SHARED_SETTINGS}`
   const shared = await $.fs.read(path).catch(() => undefined)
-  if (hasTeamInstall(shared)) return
+  const upgrade = lacksAutoUpdate(shared)
+  if (hasTeamInstall(shared) && !upgrade) return
   const changed = withTeamInstall(shared)
   if (changed === undefined) return $.ui.log(`better-tasks: ${SHARED_SETTINGS} is not one JSON object; better-tasks was not added to it`)
   await $.fs.write(path, changed)
   const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
   const added = await git('add', '--', SHARED_SETTINGS)
-  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
-  if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
+  const committed = added.exitCode === 0 ? await git('commit', '--quiet', '-m', upgrade ? AUTO_UPDATE_COMMIT : TEAM_COMMIT, '--only', '--', SHARED_SETTINGS) : added
+  if (committed.exitCode === 0 && upgrade) $.ui.log(`better-tasks: turned on auto-update in ${SHARED_SETTINGS} and committed it. Push it; teammates then get new releases by themselves.`)
+  else if (committed.exitCode === 0) $.ui.log(`better-tasks: added to ${SHARED_SETTINGS} and committed it. Push it; each teammate then installs it once: ${TEAMMATE_INSTALL}`)
   else $.ui.log(`better-tasks: added to ${SHARED_SETTINGS}, but committing it failed: ${committed.stderr.trim()}. Commit it yourself.`)
 }
 
