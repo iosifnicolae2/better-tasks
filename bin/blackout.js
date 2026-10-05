@@ -1,29 +1,39 @@
-// Covers every screen in black until the first mouse move or key press.
-// Run:     osascript -l JavaScript bin/blackout.js <statusFile> [safetySeconds]
-// Restore: osascript -l JavaScript bin/blackout.js --restore <statusFile>
-// Writes "black" (or "failed: why") to <statusFile> once the windows are up, and the
-// brightness it lowers to <statusFile>.brightness first, so --restore can put it back
-// even if this process is killed (JXA cannot catch signals). bin/away.sh runs both.
+// Darkens the physical screens until the first mouse move or key press: black windows, brightness 0
+// (built-in and Apple screens through DisplayServices, other external screens over DDC/CI). Never
+// DDC standby or power off (see bin/record_display.swift). Virtual displays (the projects' test and
+// recording displays) stay on, so teammates keep working.
+// Run:     osascript -l JavaScript bin/blackout.js <statusFile> <physicalIds> <displayHelper> [safetySeconds]
+//          physicalIds: the real screens' display ids, "1,2"; empty: guessed (not our virtual vendor id).
+//          displayHelper: bin/record-display.sh, for "dim|undim"; empty: no DDC dimming.
+// Plan:    osascript -l JavaScript bin/blackout.js --plan <physicalIds>  prints the screens it would cover
+// Restore: osascript -l JavaScript bin/blackout.js --restore <statusFile> <displayHelper>
+// Writes "black" (or "failed: why") to <statusFile> once the windows are up. What it changes it notes
+// first (<statusFile>.brightness, <statusFile>.ddc), so --restore can undo it even if this
+// process is killed (JXA cannot catch signals). bin/away.sh runs both.
 ObjC.import('Cocoa')
 ObjC.import('CoreGraphics')
 
 const ANY_INPUT = 4294967295 // kCGAnyInputEventType
-const COMBINED_SESSION = 0 // kCGEventSourceStateCombinedSessionState
+const HARDWARE_INPUT = 1 // kCGEventSourceStateHIDSystemState: the user's own mouse and keys, not posted events
+const VIRTUAL_VENDOR = 0xB7A5 // record_display.swift's virtual displays
 const GRACE_SECONDS = 1 // ignores the key-up of the command that started us
 const DISPLAY_SERVICES = '/System/Library/PrivateFrameworks/DisplayServices.framework'
 
 function run(argv) {
-  if (argv[0] === '--restore') return restoreBrightness(argv[1])
-  const [statusFile, safety] = argv
+  if (argv[0] === '--restore') return restore(argv[1], argv[2])
+  if (argv[0] === '--plan') return physicalScreens(argv[1]).map(describe).join('\n')
+  const [statusFile, physicalIds, displayHelper, safety] = argv
   const safetySeconds = Number(safety) || Infinity
   const app = $.NSApplication.sharedApplication
   app.setActivationPolicy($.NSApplicationActivationPolicyAccessory)
 
-  const windows = $.NSScreen.screens.js.map(blackWindow)
-  if (windows.length === 0) return writeFile(statusFile, 'failed: no screens')
+  const screens = physicalScreens(physicalIds)
+  if (screens.length === 0) return writeFile(statusFile, 'failed: no physical screens')
+  const windows = screens.map(blackWindow)
   app.activateIgnoringOtherApps(true)
   $.NSCursor.hide
-  dimDisplays(statusFile)
+  dimDisplays(statusFile, screens.map(displayId))
+  runHelper(displayHelper, 'dim', statusFile)
   writeFile(statusFile, 'black')
 
   const shownAt = Date.now()
@@ -31,9 +41,27 @@ function run(argv) {
     $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.25))
   }
 
-  restoreBrightness(statusFile)
-  $.NSCursor.unhide
+  // Quickest first: the windows and the Mac's own brightness go at once, then the DDC screens.
   windows.forEach(window => window.orderOut(null))
+  $.NSCursor.unhide
+  $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.01)) // shows it now
+  restore(statusFile, displayHelper)
+}
+
+function physicalScreens(physicalIds) {
+  const listed = String(physicalIds || '').split(',').filter(Boolean).map(Number)
+  const isPhysical = listed.length > 0
+    ? id => listed.includes(id)
+    : id => $.CGDisplayVendorNumber(id) !== VIRTUAL_VENDOR
+  return $.NSScreen.screens.js.filter(screen => isPhysical(displayId(screen)))
+}
+
+function displayId(screen) {
+  return screen.deviceDescription.objectForKey('NSScreenNumber').unsignedIntValue
+}
+
+function describe(screen) {
+  return `${displayId(screen)}\t${screen.localizedName.js}`
 }
 
 function blackWindow(screen) {
@@ -52,7 +80,7 @@ function blackWindow(screen) {
 
 /** Asks how long since the last input, so no Accessibility permission is needed. */
 function userIsBack(shownAt) {
-  const idle = $.CGEventSourceSecondsSinceLastEventType(COMBINED_SESSION, ANY_INPUT)
+  const idle = $.CGEventSourceSecondsSinceLastEventType(HARDWARE_INPUT, ANY_INPUT)
   return idle < secondsSince(shownAt) - GRACE_SECONDS
 }
 
@@ -72,15 +100,31 @@ function readFile(path) {
 
 // Brightness through Apple's private DisplayServices (what the brightness keys use).
 // Best effort: displays it cannot read are skipped.
-function dimDisplays(statusFile) {
+function dimDisplays(statusFile, displays) {
   if (!loadDisplayServices()) return
   const saved = []
-  for (const display of displayIds()) {
+  for (const display of displays) {
     const level = Ref()
     if ($.DisplayServicesGetBrightness(display, level) === 0) saved.push([display, level[0]])
   }
   writeFile(`${statusFile}.brightness`, JSON.stringify(saved))
   for (const [display] of saved) $.DisplayServicesSetBrightness(display, 0)
+}
+
+function restore(statusFile, displayHelper) {
+  restoreBrightness(statusFile)
+  runHelper(displayHelper, 'undim', statusFile)
+}
+
+// External screens' backlight over DDC/CI (a black window alone keeps an LCD lit); the helper saves
+// the levels to <statusFile>.ddc, and undim does nothing when that file is gone.
+function runHelper(displayHelper, command, statusFile) {
+  if (!displayHelper) return
+  const task = $.NSTask.alloc.init
+  task.launchPath = '/bin/sh'
+  task.arguments = [displayHelper, command, `${statusFile}.ddc`]
+  task.launch
+  task.waitUntilExit
 }
 
 function restoreBrightness(statusFile) {
@@ -99,9 +143,4 @@ function loadDisplayServices() {
   } catch (error) {
     return false
   }
-}
-
-function displayIds() {
-  return $.NSScreen.screens.js.map(screen =>
-    screen.deviceDescription.objectForKey('NSScreenNumber').unsignedIntValue)
 }
