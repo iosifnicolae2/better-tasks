@@ -41,7 +41,7 @@ Restart Claude Code.
 
 A video better-tasks made of its own change: the settings page before and after the "Before/after videos" row. Turn the sound on: the subtitles are read aloud.
 
-https://github.com/user-attachments/assets/8a4dc144-ff65-4e8b-a2dd-c2dfd205ceac
+[![Before/after demo video: click to open it](docs/videos/before-after-poster.png)](docs/videos/before-after.mp4)
 
 ## 🔄 Update / uninstall
 
