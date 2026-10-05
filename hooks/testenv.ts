@@ -9,10 +9,7 @@ import { skillCall } from './skills'
 export const OFFSCREEN_FIELD = 'offScreen'
 
 export const OFFSCREEN_QUESTION =
-  'Should teammates test and record off-screen, so your screen, mouse and keyboard stay yours while you work? ' +
-  'Web pages run in a hidden browser, iOS and Android in hidden simulators, terminal apps in a hidden terminal. ' +
-  'Mac apps run in the background, on a virtual display if you have one, driven without your pointer; a step that needs a real click waits until you are away. ' +
-  'Change it later in /better-tasks config.'
+  'Should teammates test in the background, so your screen, mouse and keyboard stay yours?'
 
 /** The teammate's prompt keeps the boundaries and the bug report; the recipes are the testing skill. */
 export function testingPointer(isOffScreen: boolean): string {

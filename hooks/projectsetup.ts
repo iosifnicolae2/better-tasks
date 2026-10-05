@@ -10,12 +10,7 @@ export const GIT_NO = 'No'
 
 /** The task folder's question; `folder` is where the task files live (.claude/tasks by default). */
 export function gitQuestion(folder: string): string {
-  return [
-    `Keep the task files (${folder}/) in git?`,
-    'Yes: they are committed like code, so the task history is kept and teammates see the same tasks.',
-    `No: better-tasks adds ${folder}/ to .gitignore, so the tasks stay on this computer only.`,
-    'Keep the task files in git?',
-  ].join('\n\n')
+  return `Keep the task files (${folder}/) in git, so the team sees the same tasks?`
 }
 
 /** .gitignore's text with the folder added; undefined when it is ignored already. */
