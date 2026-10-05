@@ -8,6 +8,7 @@ import { subagentTtl } from './cache'
 import { excludeWorktrees } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
+import { contributeRules, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
 import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
@@ -94,7 +95,8 @@ export const register: Register = (on, options) => {
     const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, PR_COORDINATOR_RULES)
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
     const instructions = await instructionsNow($, settings)
-    const rules = [await projectText(ioOf($), 'coordinator'), models, videos, flow, instructions].filter(Boolean).join('\n\n')
+    const contribute = contributeRules(await readUpstreamPr(ioOf($), await claudeDirOf($)))
+    const rules = [await projectText(ioOf($), 'coordinator'), models, videos, flow, instructions, contribute].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
@@ -216,6 +218,10 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__better-tasks__project_init' }, ($, e) => serveTool($, e, 'project_init'))
   on('tool.call', { tool: 'mcp__better-tasks__task_note' }, ($, e) => serveTool($, e, 'task_note'))
   on('tool.call', { tool: 'mcp__better-tasks__task_search' }, ($, e) => serveTool($, e, 'task_search'))
+  on('tool.call', { tool: 'mcp__better-tasks__upstream_pr' }, async ($, e) => {
+    const answer = String((e as { answer?: unknown }).answer ?? 'ask')
+    return { result: await saveUpstreamPr(ioOf($), await claudeDirOf($), answer) }
+  })
 }
 
 /** The teammate agent types follow the settings: registered again when they change, in force from the next turn (models.ts). */
@@ -229,7 +235,7 @@ async function syncTeammateTypes($: EngineInterface, settings: Settings): Promis
 
 /** Registers every tool and command on its own: one refusal (a taken name) leaves the rest working. */
 async function declareAll($: EngineInterface): Promise<void> {
-  for (const tool of [...TOOLS, ...SCREEN_TOOLS]) {
+  for (const tool of [...TOOLS, ...SCREEN_TOOLS, UPSTREAM_PR_TOOL]) {
     await $.tool.register(tool).catch(error => logFailure($, `tool ${tool.name}`, error))
   }
   for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) {
@@ -278,6 +284,11 @@ async function transcriptOf($: EngineInterface, agentId: string): Promise<string
   const files = await $.fs.list(folder).catch(() => [])
   const file = files.find(entry => entry.name.includes(agentId) && entry.name.endsWith('.jsonl'))
   return file ? `${folder}/${file.name}` : `${folder}/ (the .jsonl file whose name holds ${agentId})`
+}
+
+/** The user's Claude Code folder: CLAUDE_CONFIG_DIR, else ~/.claude. */
+async function claudeDirOf($: EngineInterface): Promise<string> {
+  return (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {

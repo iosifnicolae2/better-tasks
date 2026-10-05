@@ -39,7 +39,8 @@ export async function readUpstreamPr(files: UserFiles, claudeDir: string): Promi
 }
 
 /** Saves the answer (only "never" sticks; the rest mean ask next time), keeping the file's other keys. */
-export async function saveUpstreamPr(files: UserFiles, claudeDir: string, answer: UpstreamAnswer): Promise<string> {
+export async function saveUpstreamPr(files: UserFiles, claudeDir: string, given: string): Promise<string> {
+  const answer: UpstreamAnswer = UPSTREAM_ANSWERS.find(known => known === given) ?? 'ask'
   const path = userFile(claudeDir)
   const user = parseUser(await files.read(path).catch(() => undefined))
   const choice: UpstreamPr = answer === 'never' ? 'never' : 'ask'
