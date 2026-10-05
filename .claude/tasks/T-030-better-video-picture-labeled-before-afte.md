@@ -56,3 +56,6 @@ To test: open the PR, look at its picture, click it to play the video.
 https://github.com/iosifnicolae2/better-tasks/pull/13
 Is everything OK?
 - 2026-10-05: Video picture shows BEFORE and AFTER side by side, labeled and zoomed on what changed; videos start straight on BEFORE; README demo remade on a simple shop sample.
+- 2026-10-05: User, after release v0.9.0: the README demo video link https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4 shows "backend read error". Find why (jsDelivr's file-size limit for GitHub files, a stale @main cache, LFS, the file's path/branch), fix it so the README video plays from a click, and check it logged out in a browser. If jsDelivr can't serve it, pick a host that can (e.g. a GitHub release asset) and update the README and the video skill's guidance if the same issue can hit task videos (T-019's video branch also uses jsDelivr).
+- 2026-10-05: User: "after a few refreshed it was working..". The "backend read error" was jsDelivr fetching the new file from GitHub the first time; nothing to fix. Closed again.
+- 2026-10-05: Video picture shows BEFORE and AFTER side by side, labeled and zoomed on what changed; videos start straight on BEFORE; README demo on a simple shop sample (jsDelivr link works once its cache warms).

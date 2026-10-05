@@ -1,0 +1,6 @@
+{
+  "shareWithTeam": true,
+  "tasksInGit": true,
+  "excludeWorktreesFromIde": true,
+  "offScreen": true
+}
