@@ -48,7 +48,7 @@ export function setupVerdict(output: string): { isReady: boolean; text: string }
 
 /** The teammate's pointer: the how-to is the video skill, loaded only by work that shows on screen. */
 export const TEAMMATE_POINTER = `## Before/after video (on in this project)
-Finished work that shows on screen comes with one short narrated video, its BEFORE captured before you change anything. Such work: load the \`${skillCall('video')}\` skill before your first change; it says how. Nothing to see (a refactor, a config)? No video; say so in your notes.`
+Finished work that shows on screen comes with one short narrated video, its BEFORE captured before you change anything, made once the user accepts. Such work: load the \`${skillCall('video')}\` skill before your first change; it says how. Nothing to see (a refactor, a config)? No video; say so in your notes.`
 
 /** What the video skill reads under its title: this project's quality and the capture size it needs. */
 export function videoSkillSettings(quality: VideoQuality): string {

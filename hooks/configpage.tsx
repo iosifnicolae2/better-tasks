@@ -120,7 +120,7 @@ export const FIELDS: readonly Field[] = [
     group: 'team',
     field: 'openPrInBrowser',
     label: 'Open PRs in the browser',
-    describe: 'When the manager asks you to approve a finished task, it first opens that task’s PR in your default browser.',
+    describe: 'Before the manager merges a task you accepted, it opens that task’s PR in your default browser.',
     options: ON_OFF,
     value: settings => (settings.openPrInBrowser ? 'on' : 'off'),
     initial: 'on',

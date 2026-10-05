@@ -6,9 +6,18 @@ description: How a better-tasks teammate tests its change like a user, in its ow
 
 # Testing like a user
 - Test your change as a user would: run it, go through the steps, look at the result. Passing tests alone don't count.
+- Before done, quick checks only: the tests near your change. The full suite runs at the finish, after the user accepts (the `better-tasks:done` skill).
 - Your own test environment: your own app instance on its own port, its own data (a fresh database, browser profile or simulator, kept in your scratchpad), never the user's running apps, data or accounts, nor another teammate's. When done, stop what you started (servers, simulators).
 - iPhone/iOS apps: build, run and test through Xcode's own tools (its MCP server; Apple: https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode). Not set up (no xcode tools among yours)? Tell the lead it takes: Xcode > Settings > Intelligence > "Allow external agents to use Xcode tools", then `claude mcp add --transport stdio xcode -- xcrun mcpbridge`, with the project open in Xcode. Until then: `xcodebuild` and `xcrun simctl`.
 - A new bug you notice, even outside your task: don't fix it unasked. Send the lead one line, "New bug: <what you saw>, <how to see it again>", plus a screenshot path if you have one.
+
+## Local build for the user
+At done, leave a build the user can try right away, on their machine or device: the one thing you start for them, not in your own test environment. Say in your notes how to stop or remove it.
+- Web: your dev server left running on its own port; its URL is the link.
+- iOS / Android: installed on the user's device (`xcrun devicectl device install app --device <id> <app>`, `adb install -r <apk>`), else on a simulator or emulator they can see.
+- Mac app: the built .app's path; the user opens it.
+- Terminal app or CLI: the command that runs your build.
+- A Claude Code plugin (better-tasks itself): the user's linked install (the `better-tasks:contribute` skill) runs your checkout: they run /reload-plugins. Your work is in a worktree? Give them `claude --plugin-dir <worktree>` for a new session.
 
 ## Off-screen: when "Settings" above says it is on
 The user's screen, mouse and keyboard stay theirs.

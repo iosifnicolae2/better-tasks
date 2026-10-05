@@ -209,15 +209,17 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
-test("the lead pastes the teammate's block: the video path and the PR above the question, only the PR inside", async ($, on) => {
+test("the lead pastes the teammate's block: the local build's link above the question and inside it; the finish comes after the yes", async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
-  expect(lead).toContain('Reply text, right before the call: the block\'s "Links:" lines as written: the video file\'s path (Claude Code opens it on click) and the PR')
-  expect(lead).toContain('question: the block\'s "Question:" text as written (its only link the PR, a bare url on its own line; never the video)')
+  expect(lead).toContain('Reply text, right before the call: the block\'s "Links:" lines as written (the local build\'s link, when there is one)')
+  expect(lead).toContain('question: the block\'s "Question:" text as written (its only link the local build\'s, a bare url on its own line)')
+  expect(lead).toContain('Mark as resolved: tell the teammate at once, in one line, "T-004 accepted: finish it"')
+  expect(lead).toContain('It changes, rebuilds locally and reports done again; full tests still wait.')
   expect(lead).toContain('the bare url alone on its own line in the question')
   expect(lead).toContain('load the `better-tasks:contribute` skill')
   expect(lead).not.toContain('gh repo fork')
@@ -900,7 +902,7 @@ test('only the lead closes a task: a teammate setting done or cancelled is refus
   const host = fakeHost(on, [mate('a1', 'login')], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
   await $.session.start(SESSION)
   const done = await $.tool.call({ ...updateT1, status: 'done', agentId: 'a1' } as never)
-  expect(done.deny).toContain('Only the lead closes T-001, once the user marks it resolved.')
+  expect(done.deny).toContain('Only the lead closes T-001, once the user marks it resolved and you finish it.')
   expect((await $.tool.call({ ...updateT1, status: 'cancelled', agentId: 'a1' } as never)).deny).toBeDefined()
   expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).toContain('status: doing')
 
@@ -919,7 +921,7 @@ test('a task the user resolved is named to the lead until it is closed', async (
   await $.prompt.submit(prompt('T-001 is ready'))
   await $.tool.call({ tool: 'AskUserQuestion', tool_use_id: 'q1', questions: [] } as never)
   const reminded = await $.prompt.submit(prompt('anything else?'))
-  expect(reminded.context?.at(-1)).toContain('The user marked T-001 resolved, still open: close each now')
+  expect(reminded.context?.at(-1)).toContain('The user marked T-001 resolved, still open: its teammate was told "accepted: finish it"?')
 
   await $.tool.call({ ...updateT1, status: 'done', note: 'Works', commits: 'abc123' } as never)
   expect((await $.prompt.submit(prompt('thanks'))).context?.at(-1)).not.toContain('marked T-001 resolved')
@@ -979,14 +981,14 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'worktree' })
-  expect(host.spawned[0]).toContain('first load the `better-tasks:pull-request` skill')
+  expect(host.spawned[0]).toContain('"Accepted: finish it": load the `better-tasks:pull-request` skill')
   expect(host.spawned[0]).toContain('## gh and git in your worktree')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
-  expect(composed.sections.at(-1)?.text).toContain('its question links only the PR')
+  expect(composed.sections.at(-1)?.text).toContain('PR opens after the user accepts')
 })
 
-test('with PR per task on, the lead opens each PR in the browser before its question, unless openPrInBrowser is off', { options: { pullRequests: true } }, async ($, on) => {
+test('with PR per task on, the lead opens each PR in the browser before merging it, unless openPrInBrowser is off', { options: { pullRequests: true } }, async ($, on) => {
   mock.store(on)
   const host = fakeHost(on)
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
@@ -1256,7 +1258,7 @@ test('the shared dev branch flow: no worktree, land on dev, the PR from the pull
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
   expect(lead).toContain('/bin/task_pr.py sync')
-  expect(lead).toContain('its question links only the PR') // the PR flow's Finishing line, shared
+  expect(lead).toContain('PR opens after the user accepts') // the PR flow's Finishing line, shared
 })
 
 test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {

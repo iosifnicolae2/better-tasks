@@ -44,7 +44,7 @@ export function statusPrompt(idleMinutes: number): string {
     `better-tasks status check: no activity for ${idleMinutes} min. Move the work forward.\n` +
     '1. Call team_status.\n' +
     '2. For each task currently working on or in this sprint, act:\n' +
-    '   - the user marked it resolved but it is still open: close it now (task_update status done, summary, commits), stop the teammate;\n' +
+    '   - the user marked it resolved but it is still open: the teammate finished? close it now (task_update status done, summary, commits), stop the teammate; else tell it "accepted: finish it";\n' +
     '   - teammate working: leave it;\n' +
     '   - teammate reported done: read its task file notes, then ask the user to test it (the Finishing question);\n' +
     '   - teammate idle but the task still open: check whether the work is done; if not, tell it to go on;\n' +

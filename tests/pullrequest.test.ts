@@ -34,12 +34,13 @@ describe('PR per task', () => {
     expect(hasGitHub('')).toBe(false)
   })
 
-  test('with a PR the approval question links only the PR; the video path and the PR sit above it', () => {
-    expect(prCoordinatorRules(true, '/bin')).toContain("its question links only the PR; the video's path and the PR sit above it, in Links.")
+  test('the PR opens after the user accepts the local build; the lead merges once the teammate finishes', () => {
+    expect(prCoordinatorRules(true, '/bin')).toContain("A finished task's PR opens after the user accepts")
+    expect(prCoordinatorRules(true, '/bin')).toContain('Request changes: no PR yet; the teammate rebuilds locally.')
     expect(prCoordinatorRules(true, '/bin')).toContain('gh pr merge <url> --squash --delete-branch')
   })
 
-  test('openPrInBrowser: the lead opens the PR right before its question; off, it does not', () => {
+  test('openPrInBrowser: the lead opens the PR right before merging it; off, it does not', () => {
     expect(prCoordinatorRules(true, '/bin')).toContain(openPrLine('/bin'))
     expect(openPrLine('/bin')).toContain('`/bin/open-pr.sh <url>`')
     expect(prCoordinatorRules(false, '/bin')).not.toContain('default browser')
@@ -48,7 +49,8 @@ describe('PR per task', () => {
 
   test("the teammate's prompt keeps the worktree and a pointer: the how-to is the pull-request skill", () => {
     expect(PR_TEAMMATE_RULES).toContain('You work in your own git worktree')
-    expect(PR_TEAMMATE_RULES).toContain('first load the `better-tasks:pull-request` skill: it opens the PR; then the done skill')
+    expect(PR_TEAMMATE_RULES).toContain('No PR at done: the user tries your local build first.')
+    expect(PR_TEAMMATE_RULES).toContain('load the `better-tasks:pull-request` skill: it opens the PR; then the done skill\'s "Finish"')
     expect(PR_TEAMMATE_RULES).not.toContain('gh pr create')
   })
 })
