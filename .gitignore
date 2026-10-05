@@ -6,3 +6,5 @@
 .claude/settings.local.json
 # Python bytecode from running bin/demo_video.py
 __pycache__/
+# Teammates' git worktrees
+.claude/worktrees/

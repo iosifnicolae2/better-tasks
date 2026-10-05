@@ -4,6 +4,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { AUTO_UPDATE_COMMIT, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
+import { IGNORE_COMMIT } from '../hooks/ignoreworktrees'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
 
@@ -293,15 +294,30 @@ test('"excludeWorktreesFromIde": false leaves .idea as it is', async ($, on) => 
   expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
 })
 
-test('without worktrees, .idea is left as it is', async ($, on) => {
+test('first run, any git flow: IntelliJ skips the worktrees and .gitignore gets them, committed alone', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   answerStartup(on, 'Straight to main')
-  const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />' })
+  const host = fakeHost(on, [], { [`${ROOT}/.idea/misc.xml`]: '<project />', [`${ROOT}/.gitignore`]: 'dist' })
   host.runOutput['git remote -v'] = 'origin\tgit@github.com:someone/app.git (fetch)\n'
+  host.runOutput[`git -C ${ROOT} check-ignore -n -v .claude/worktrees/`] = '::\t.claude/worktrees/\n'
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(host.files.has(`${ROOT}/.idea/project.iml`)).toBe(false)
+  expect(host.files.get(`${ROOT}/.idea/project.iml`)).toContain(EXCLUDED)
+  expect(host.files.get(`${ROOT}/.gitignore`)).toBe('dist\n.claude/worktrees/\n')
+  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${IGNORE_COMMIT} --only -- .gitignore`)
+})
+
+test('worktrees already ignored by git: .gitignore is left as it is', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  answerStartup(on, 'Straight to main')
+  const host = fakeHost(on, [], { [`${ROOT}/.gitignore`]: '.claude/\n' })
+  host.runOutput[`git -C ${ROOT} check-ignore -n -v .claude/worktrees/`] = '.gitignore:1:.claude/\t.claude/worktrees/\n'
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(host.files.get(`${ROOT}/.gitignore`)).toBe('.claude/\n')
+  expect(host.ran.some(command => command.includes(IGNORE_COMMIT))).toBe(false)
 })
 
 test('a new sprint rolls unfinished work over and writes the review', async ($, on) => {
