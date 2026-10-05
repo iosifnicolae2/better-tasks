@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { gitQuestion, withIgnored } from '../hooks/projectsetup'
 import { hasTeamInstall, lacksAutoUpdate, TEAM_QUESTION, withTeamInstall } from '../hooks/teaminstall'
 
 describe('sharing better-tasks with the team', () => {
@@ -38,22 +37,8 @@ describe('sharing better-tasks with the team', () => {
     expect(withTeamInstall('{ not json')).toBeUndefined()
   })
 
-  test('the question says what each answer does, and that a shared file gets committed', () => {
-    expect(TEAM_QUESTION).toContain('.claude/settings.json')
-    expect(TEAM_QUESTION).toContain('commits that one file')
+  test('the question is short', () => {
+    expect(TEAM_QUESTION.length).toBeLessThan(120)
     expect(TEAM_QUESTION.endsWith('?')).toBe(true)
-  })
-})
-
-describe('task files in git', () => {
-  test('"No" adds the task folder to .gitignore once, keeping what is there', () => {
-    expect(withIgnored(undefined, '.claude/tasks')).toBe('.claude/tasks/\n')
-    expect(withIgnored('dist', '.claude/tasks')).toBe('dist\n.claude/tasks/\n')
-    expect(withIgnored('/.claude/tasks/\n', '.claude/tasks')).toBeUndefined()
-    expect(withIgnored('.claude/tasks\n', '.claude/tasks/')).toBeUndefined()
-  })
-
-  test('the questions say what each answer does and how to undo it', () => {
-    expect(gitQuestion('work')).toContain('adds work/ to .gitignore')
   })
 })

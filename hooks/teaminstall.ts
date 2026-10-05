@@ -13,14 +13,7 @@ const MARKETPLACE = 'better-tasks'
 const PLUGIN = `better-tasks@${MARKETPLACE}`
 const MARKETPLACE_ENTRY = { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' }, autoUpdate: true }
 
-export const TEAM_QUESTION = [
-  'Set better-tasks up in this project so other team members can use it too?',
-  `Yes: better-tasks adds itself to this project's shared Claude Code settings (${SHARED_SETTINGS}) and commits ` +
-    'that one file. Push it when you are ready: teammates who open the project in Claude Code then see better-tasks ' +
-    'turned on for it, install it once, and get new releases by themselves.',
-  'No: nothing in the project changes. better-tasks stays installed just for you.',
-  'Set it up for the whole team?',
-].join('\n\n')
+export const TEAM_QUESTION = 'Should we set up better-tasks in this project for other team members?'
 
 export const TEAMMATE_INSTALL = `claude plugin install ${PLUGIN} --scope project`
 export const TEAM_COMMIT = 'Share better-tasks with everyone on this project: Claude Code turns it on here; each teammate installs it once'
