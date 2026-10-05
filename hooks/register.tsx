@@ -11,7 +11,7 @@ import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from 
 import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, TEAMMATE_POINTER, videoSkillSettings, voiceDir } from './demovideo'
-import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
+import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, prSkillSettings, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
@@ -176,7 +176,7 @@ export const register: Register = (on, options) => {
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const testing = testingPointer(settings.offScreen)
     const videos = settings.demoVideos ? TEAMMATE_POINTER : ''
-    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES, await prBodyNow($, settings))
+    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
     const instructions = await instructionsNow($, settings)
     const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, instructions].filter(Boolean).join('\n\n')
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
@@ -329,6 +329,7 @@ async function claudeDirOf($: EngineInterface): Promise<string> {
 async function skillSettings($: EngineInterface, skill: SkillName): Promise<string> {
   if (skill === 'contribute') return contributeSkillSettings(await readUpstreamPr(ioOf($), await claudeDirOf($)))
   const settings = await settingsNow($)
+  if (skill === 'pull-request') return prSkillSettings(settings.gitFlow, settings.devBranch, await prBodyNow($, settings))
   if (skill === 'video') return videoSkillSettings(settings.videoQuality)
   return skill === 'testing' ? testingSkillSettings(settings.offScreen) : ''
 }

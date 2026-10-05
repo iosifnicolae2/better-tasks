@@ -35,17 +35,13 @@ describe('PR per task', () => {
   })
 
   test('with a PR the approval question shows only the PR link: its picture opens the video', () => {
-    expect(PR_COORDINATOR_RULES).toContain("and no video link: the PR's picture opens the video")
+    expect(PR_COORDINATOR_RULES).toContain("links the PR, not the video (the PR's picture opens it)")
+    expect(PR_COORDINATOR_RULES).toContain('gh pr merge <url> --squash --delete-branch')
   })
 
-  test("the PR shows the video's poster linking to the video, with a text line so GitHub keeps it a picture", () => {
-    expect(PR_TEAMMATE_RULES).toContain("`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)`\n  `Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).`")
-    expect(PR_TEAMMATE_RULES).toContain("--attach <poster's absolute path> --attach <video's absolute path>")
-    expect(PR_TEAMMATE_RULES).toContain('--attach <poster> --attach <video>')
-  })
-
-  test("when gh can't attach, the video goes on the videos branch and the PR links there", () => {
-    expect(PR_TEAMMATE_RULES).toContain("gh can't attach (older than 2.99, or the upload failed)? Put the video on the videos branch")
-    expect(PR_TEAMMATE_RULES).toContain("No PR: commit as usual and say so in your notes. A video goes on the videos branch")
+  test("the teammate's prompt keeps the worktree and a pointer: the how-to is the pull-request skill", () => {
+    expect(PR_TEAMMATE_RULES).toContain('You work in your own git worktree')
+    expect(PR_TEAMMATE_RULES).toContain('first load the `better-tasks:pull-request` skill: it opens the PR; then the done skill')
+    expect(PR_TEAMMATE_RULES).not.toContain('gh pr create')
   })
 })

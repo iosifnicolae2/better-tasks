@@ -2,7 +2,7 @@ import type { FsEntry } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
 import {
-  appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf,
+  appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf, prBodyRules, prSkillSettings,
   recommend, teammateRules, usesWorktree,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
@@ -78,13 +78,21 @@ describe('git flow', () => {
     expect(flowOfAnswer('let me think')).toBeUndefined()
   })
 
-  test("each flow's teammate rules say how to commit; the PR flows say what a PR's description holds", () => {
+  test("each flow's teammate rules say how to commit; the PR flows point at the pull-request skill", () => {
     expect(teammateRules('direct', '/bin', 'dev', 'PR')).toContain('`/bin/land.sh -m "<what changed> (T-004)" -- <your paths>`')
+    expect(teammateRules('direct', '/bin', 'dev', 'PR')).not.toContain('pull-request')
     const dev = devTeammateRules('/bin', 'develop')
     expect(dev).toContain('`/bin/land.sh -b develop -m')
-    expect(dev).toContain('python3 /bin/task_pr.py open T-004 --body-file <scratchpad>/pr.md')
-    expect(dev).toContain('"## Asked for": the user\'s request')
-    expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toMatch(/^PR RULES\n- The PR's description/)
+    expect(dev).toContain('first load the `better-tasks:pull-request` skill: it opens the PR')
+    expect(dev).not.toContain('task_pr.py open')
+    expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toBe('PR RULES')
+  })
+
+  test("the pull-request skill reads its flow's part and the description rule, in the request-why-solution order", () => {
+    const dev = prSkillSettings('dev-prs', 'develop', prBodyRules())
+    expect(dev).toMatch(/^- Git flow: shared dev branch `develop`: follow "Shared dev branch"\.\n- The PR's description/)
+    expect(prSkillSettings('worktree-prs', 'dev', 'BODY')).toBe('- Git flow: worktree and PR per task: follow "Worktree and PR per task".\nBODY')
+    expect(prSkillSettings('direct', 'dev', '')).toContain('this project has no PRs')
     const order = ['## Asked for', '## Why', 'the video', '## What changed', '## To test', '## Commits'].map(part => dev.indexOf(part))
     expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true) // the request, why, the solution, then the rest
   })

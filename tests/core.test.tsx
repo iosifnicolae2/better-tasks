@@ -955,10 +955,10 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'worktree' })
-  expect(host.spawned[0]).toContain('git push -u origin HEAD:task/T-004')
+  expect(host.spawned[0]).toContain('first load the `better-tasks:pull-request` skill')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
-  expect(composed.sections.at(-1)?.text).toContain('that url goes above and in the question like every link')
+  expect(composed.sections.at(-1)?.text).toContain('links the PR, not the video')
 })
 
 test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {
@@ -1106,21 +1106,24 @@ test('straight to main, the default: one checkout, and teammates commit only the
   expect(composed.sections.at(-1)?.text).not.toContain('Git flow')
 })
 
-test('the shared dev branch flow: no worktree, land on dev, the PR from task_pr.py; the lead merges and syncs dev', async ($, on) => {
+test('the shared dev branch flow: no worktree, land on dev, the PR from the pull-request skill; the lead merges and syncs dev', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ gitFlow: 'dev-prs', devBranch: 'develop' }) })
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  on('skill.prompt', ($, e) => ({ text: e.text }))
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'none' })
   expect(host.spawned[0]).toContain('/bin/land.sh -b develop -m')
-  expect(host.spawned[0]).toContain('/bin/task_pr.py open T-004 --body-file <scratchpad>/pr.md')
-  expect(host.spawned[0]).toContain('"## Asked for": the user\'s request')
+  expect(host.spawned[0]).toContain('## Git flow: shared develop branch, a PR per task (this project)')
+  const skill = (await $.skill.prompt({ skill: 'better-tasks:pull-request', text: '# PR' })).text
+  expect(skill).toContain('- Git flow: shared dev branch `develop`: follow "Shared dev branch".')
+  expect(skill).toContain('"## Asked for": the user\'s request')
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
   expect(lead).toContain('/bin/task_pr.py sync')
-  expect(lead).toContain('that url goes above and in the question like every link') // the PR flow's Finishing line, shared
+  expect(lead).toContain('links the PR, not the video') // the PR flow's Finishing line, shared
 })
 
 test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {

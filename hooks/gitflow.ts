@@ -1,6 +1,6 @@
 import type { FsEntry } from 'claude-code'
 
-import { hasGitHub } from './pullrequest'
+import { hasGitHub, PR_DONE_LINE } from './pullrequest'
 import type { PrTemplate } from './prtemplate'
 
 // The git flow (setting gitFlow): how a teammate's work reaches main. The first start in a project asks
@@ -218,15 +218,24 @@ One checkout, shared with the other teammates: no branch, no worktree, no PR.
 ${landLine(bin, '')}`
 }
 
-export function devTeammateRules(bin: string, dev: string, body = prBodyRules()): string {
+export function devTeammateRules(bin: string, dev: string): string {
   return `## Git flow: shared ${dev} branch, a PR per task (this project)
 One checkout, on \`${dev}\`, shared with the other teammates: no worktree. Installs and tests build \`${dev}\`, so the user tries every change together.
 ${landLine(bin, dev)}
 - A commit for two tasks names both ids. Never commit to main.
-${body}
-- Done: write that description to <scratchpad>/pr.md, then \`python3 ${bin}/task_pr.py open T-004 --body-file <scratchpad>/pr.md\`. It puts the task's commits on \`task/T-004\` (origin's main plus them, picked without touching any checkout), pushes it and opens the PR with the video attached (or on the videos branch when gh can't). Leave the two video lines out of pr.md: it puts them right after the request and why. Run again later: it adds only the new commits.
-- It stops on a commit that conflicts on main (it leans on another task's commit): tell the lead which one.
-- Your notes get the line "PR: <the url it printed>". Request changes: land the fix on \`${dev}\`, then run open again. Never fix on the task branch; never merge.`
+${PR_DONE_LINE}`
+}
+
+export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
+  if (flow === 'dev-prs') return devTeammateRules(bin, dev)
+  return flow === 'worktree-prs' ? prRules : directTeammateRules(bin)
+}
+
+/** What the pull-request skill reads under its title: which flow's part applies, and how to write the description. */
+export function prSkillSettings(flow: GitFlow, dev: string, body: string): string {
+  if (flow === 'dev-prs') return `- Git flow: shared dev branch \`${dev}\`: follow "Shared dev branch".\n${body}`
+  if (flow === 'worktree-prs') return `- Git flow: worktree and PR per task: follow "Worktree and PR per task".\n${body}`
+  return '- Git flow: straight to main: this project has no PRs; nothing to do here.'
 }
 
 /** The lead's Finishing line for a PR (the PR link in the question), taken from the PR flow's rules so both say the same. */
@@ -246,7 +255,3 @@ export function leadRules(flow: GitFlow, bin: string, dev: string, prRules: stri
   return flow === 'worktree-prs' ? prRules : ''
 }
 
-export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string, body = prBodyRules()): string {
-  if (flow === 'dev-prs') return devTeammateRules(bin, dev, body)
-  return flow === 'worktree-prs' ? `${prRules}\n${body}` : directTeammateRules(bin)
-}

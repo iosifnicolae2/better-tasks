@@ -4,10 +4,10 @@
 // so a skill always follows the settings in force.
 
 /** Our skills that follow settings, by folder name; the model calls them better-tasks:<name>. */
-export type SkillName = 'video' | 'testing' | 'done' | 'contribute'
+export type SkillName = 'video' | 'testing' | 'done' | 'contribute' | 'pull-request'
 
 const PLUGIN = 'better-tasks'
-const SKILLS: readonly SkillName[] = ['video', 'testing', 'done', 'contribute']
+const SKILLS: readonly SkillName[] = ['video', 'testing', 'done', 'contribute', 'pull-request']
 const PLUGIN_ROOT = /\$\{CLAUDE_PLUGIN_ROOT\}/g
 
 /** The name as the model calls it. */
