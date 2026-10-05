@@ -3,7 +3,8 @@
 // Write the skill: `bun scripts/settings-doc.ts`; check it is current: `bun scripts/settings-doc.ts --check`.
 import { DEFAULTS, FIELDS, PROJECT_KEYS } from '../hooks/settings'
 
-type Group = 'Team' | 'Teammate models' | 'Sprint' | 'Task files and paths'
+/** The settings page's groups (hooks/configpage.tsx GROUPS), then what only config.json sets. */
+type Group = 'General' | 'Git & PRs' | 'Testing & videos' | 'Teammate models' | 'Sprint' | 'Task files and paths'
 
 type Doc = {
   group: Group
@@ -13,27 +14,27 @@ type Doc = {
 
 /** Every key of hooks/settings.ts FIELDS, in the order the skill lists them. */
 export const SETTING_DOCS: Record<string, Doc> = {
-  editor: { group: 'Team', about: 'Opens task files from the board. auto: IntelliJ in a JetBrains terminal, VS Code in VS Code, else the default app.' },
+  editor: { group: 'General', about: 'Opens task files from the board. auto: IntelliJ in a JetBrains terminal, VS Code in VS Code, else the default app.' },
   gitFlow: {
-    group: 'Team',
+    group: 'Git & PRs',
     about: 'How teammates\' work reaches main. direct ("Straight to main"): small commits on main, no branches, no PRs. dev-prs ("Shared dev branch, PR per task"): everyone commits on the dev branch in one checkout, a PR per task. worktree-prs ("Worktree and PR per task"): each teammate its own git worktree, branch and PR. Asked once per project at the first start.',
   },
-  devBranch: { group: 'Team', about: 'The shared branch of the dev-prs git flow.' },
-  instructions: { group: 'Team', about: 'The project\'s own rules for every task: files or folders, comma-separated. The lead\'s and teammates\' prompts get each path and its first line.' },
-  longCache: { group: 'Team', about: '1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself.' },
-  statusEvery: { group: 'Team', about: 'Minutes of quiet before the lead checks the open work and moves it forward. 0: off.' },
-  keepAwake: { group: 'Team', about: 'Holds caffeinate (the Mac stays awake) while any teammate runs.' },
-  openPrInBrowser: { group: 'Team', about: 'Before the lead merges the PR of a task the user accepted, it opens that PR in the default browser (once its video is uploaded) and waits a few seconds for the page to load. The user tries a local build first; the PR opens after they accept.' },
-  demoVideos: { group: 'Team', about: 'Finished work comes with a short narrated before/after video (red boxes, arrows, subtitles read aloud by Kokoro, set up once per machine). Asked once per project.' },
-  videoQuality: { group: 'Team', about: 'The videos\' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file.' },
-  offScreen: { group: 'Team', about: 'Teammates test and record in a hidden browser, simulator or terminal, so the screen, mouse and keyboard stay the user\'s. On by default, not asked.' },
-  testScreen: { group: 'Team', about: 'The screen teammates test and record Mac apps on. virtual: the project\'s own virtual display, kept below the user\'s screens. Else a real screen\'s name as the settings page lists it ("Built-in Retina Display", "DELL U2720Q"); not connected: the virtual display, and the teammate tells the user. Not asked: change it on the settings page\'s "Test screen" row.' },
-  excludeWorktreesFromIde: { group: 'Team', about: 'IntelliJ skips .claude/worktrees/ from the first run, so teammates\' worktrees don\'t set off re-indexing (git ignores them too: .gitignore). On by default, not asked.' },
-  prTemplate: { group: 'Team', about: 'The template every PR description fills in: a path relative to the project root. Empty: the project\'s own (.github/pull_request_template.md and the other places GitHub and GitLab look), else better-tasks\' (the request and why on top, then the video, what changed, how to test, notes, commits). The settings page\'s "PR template" row opens it, or adds better-tasks\' one to the repo as .github/pull_request_template.md.' },
-  useBetterTasks: { group: 'Team', about: 'Use better-tasks in this project at all. false: it stays quiet here (no tools, no task rules, no setup questions; only its commands). Not asked: set it in config.json, then restart.' },
-  shareWithTeam: { group: 'Team', about: 'Who gets better-tasks in this project. true: it is in the project\'s shared .claude/settings.json (committed, not pushed), so teammates who open the project see it turned on, install it once, and get new releases by themselves (autoUpdate). false: only this user has it. Asked once per git project.' },
-  worktree: { group: 'Team', about: 'Old switch, kept for projects that set it: with gitFlow direct, each named teammate works in its own worktree. Use gitFlow instead.' },
-  pullRequests: { group: 'Team', about: 'Old switch, kept for projects that set it: true reads as gitFlow worktree-prs. Use gitFlow instead.' },
+  devBranch: { group: 'Git & PRs', about: 'The shared branch of the dev-prs git flow.' },
+  instructions: { group: 'General', about: 'The project\'s own rules for every task: files or folders, comma-separated. The lead\'s and teammates\' prompts get each path and its first line.' },
+  longCache: { group: 'General', about: '1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself.' },
+  statusEvery: { group: 'General', about: 'Minutes of quiet before the lead checks the open work and moves it forward. 0: off.' },
+  keepAwake: { group: 'General', about: 'Holds caffeinate (the Mac stays awake) while any teammate runs.' },
+  openPrInBrowser: { group: 'Git & PRs', about: 'Before the lead merges the PR of a task the user accepted, it opens that PR in the default browser (once its video is uploaded) and waits a few seconds for the page to load. The user tries a local build first; the PR opens after they accept.' },
+  demoVideos: { group: 'Testing & videos', about: 'Finished work comes with a short narrated before/after video (red boxes, arrows, subtitles read aloud by Kokoro, set up once per machine). Asked once per project.' },
+  videoQuality: { group: 'Testing & videos', about: 'The videos\' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file.' },
+  offScreen: { group: 'Testing & videos', about: 'Teammates test and record in a hidden browser, simulator or terminal, so the screen, mouse and keyboard stay the user\'s. On by default, not asked.' },
+  testScreen: { group: 'Testing & videos', about: 'The screen teammates test and record Mac apps on. virtual: the project\'s own virtual display, kept below the user\'s screens. Else a real screen\'s name as the settings page lists it ("Built-in Retina Display", "DELL U2720Q"); not connected: the virtual display, and the teammate tells the user. Not asked: change it on the settings page\'s "Test screen" row.' },
+  excludeWorktreesFromIde: { group: 'General', about: 'IntelliJ skips .claude/worktrees/ from the first run, so teammates\' worktrees don\'t set off re-indexing (git ignores them too: .gitignore). On by default, not asked.' },
+  prTemplate: { group: 'Git & PRs', about: 'The template every PR description fills in: a path relative to the project root. Empty: the project\'s own (.github/pull_request_template.md and the other places GitHub and GitLab look), else better-tasks\' (the request and why on top, then the video, what changed, how to test, notes, commits). The settings page\'s "PR template" row opens it, or adds better-tasks\' one to the repo as .github/pull_request_template.md.' },
+  useBetterTasks: { group: 'General', about: 'Use better-tasks in this project at all. false: it stays quiet here (no tools, no task rules, no setup questions; only its commands). Not asked: set it in config.json, then restart.' },
+  shareWithTeam: { group: 'General', about: 'Who gets better-tasks in this project. true: it is in the project\'s shared .claude/settings.json (committed, not pushed), so teammates who open the project see it turned on, install it once, and get new releases by themselves (autoUpdate). false: only this user has it. Asked once per git project.' },
+  worktree: { group: 'Git & PRs', about: 'Old switch, kept for projects that set it: with gitFlow direct, each named teammate works in its own worktree. Use gitFlow instead.' },
+  pullRequests: { group: 'Git & PRs', about: 'Old switch, kept for projects that set it: true reads as gitFlow worktree-prs. Use gitFlow instead.' },
   easyModel: { group: 'Teammate models', about: 'Model for easy tasks (a typo, a text, a small fix). inherit: the lead\'s own model.' },
   easyEffort: { group: 'Teammate models', about: 'How hard teammates think on easy tasks.' },
   normalModel: { group: 'Teammate models', about: 'Model for normal tasks (an ordinary feature or bug fix). inherit: the lead\'s own model.' },
@@ -63,7 +64,7 @@ export function docGaps(): { undocumented: string[]; unknown: string[] } {
 /** The plugin.json userConfig fields (shown in /config) that the docs read: a title per key. */
 export type UserConfig = Record<string, { title?: string }>
 
-const GROUPS: Group[] = ['Team', 'Teammate models', 'Sprint', 'Task files and paths']
+const GROUPS: Group[] = ['General', 'Git & PRs', 'Testing & videos', 'Teammate models', 'Sprint', 'Task files and paths']
 
 function whereOf(key: string, userConfig: UserConfig): string {
   if (key in userConfig && !PROJECT_KEYS.includes(key)) return `/config "${userConfig[key]?.title}" or config.json`
@@ -100,7 +101,7 @@ Every setting of the better-tasks plugin, one row each. Generated by \`bun scrip
 Grep a key (\`gitFlow\`) or a word (\`video\`) to find its row.
 
 ## Where a value lives
-- **Per user, every project:** Claude Code's \`/config\` (rows "Better Tasks: …"), or the settings page: \`/better-tasks config\`, or \`c\` on the sprint board.
+- **Per user, every project:** Claude Code's \`/config\` (rows "Better Tasks: …"), or the settings page: \`/better-tasks config\`, or \`c\` on the sprint board. It shows the groups below.
 - **Per project:** \`.claude/tasks/config.json\`, one JSON object; keys starting with \`//\` are comments. Any key below may go there and wins over \`/config\`. Keys whose "Where" is only config.json live there alone (the settings page writes them there).
 - Order: shipped default < \`/config\` < config.json. A bad key or value is skipped and shown on the settings page.
 
