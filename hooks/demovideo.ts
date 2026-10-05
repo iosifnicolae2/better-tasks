@@ -52,6 +52,7 @@ Finished work that shows on screen comes with one short narrated video. Nothing 
 - AFTER: the same steps on your change.
 - Spec: a JSON file (format at the top of ${root}/bin/demo_video.py), its "name" the task id ("T-004.mp4"): a BEFORE clip and an AFTER clip, 1–4 steps each. Per step one short, plain sentence (shown and read aloud), a red box around what matters and an arrow pointing at it, in the pixels of the image or video.
 - Make it: \`${root}/bin/demo-video.sh spec.json\`. Inputs stay in your scratchpad; the video goes to the project's ${VIDEOS_FOLDER}/ (git ignores it), with its poster beside it (<task id>.png: an AFTER frame with a big play button, for a PR); the script prints the poster's file:// link, then the video's. Check a frame or two (\`ffmpeg -ss <second> -i video.mp4 -frames:v 1 frame.png\`): the boxes and arrows land on target.
+- Online copy, when gh can't upload it (the PR rules say when): \`${root}/bin/video-branch.sh <video> <poster>\` commits both to the branch better-tasks-videos (its own history, never merged: videos stay out of main and out of the task's branch), pushes it and prints their web links (video first), then the caption that fits them.
 - Your task file gets, as the first line under "## Notes", the line \`Video: [T-004.mp4](../tasks_videos/T-004.mp4)\` (the path relative to the task file). A newer video replaces the file, not the line.`
 }
 

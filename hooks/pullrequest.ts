@@ -35,10 +35,10 @@ export function ghUpdateVerdict(output: string): { isReady: boolean; text: strin
   const last = output.trim().split('\n').pop() ?? ''
   const [word = '', ...rest] = last.split(' ')
   const version = rest.join(' ')
-  if (word === 'failed:') return { isReady: false, text: `better-tasks: ${last}. PRs still work, without the video.` }
+  if (word === 'failed:') return { isReady: false, text: `better-tasks: ${last}. PRs still work; their video goes on a branch.` }
   const problem = ghProblem(version)
   if (problem || !['ready', 'login'].includes(word)) {
-    return { isReady: false, text: `better-tasks: ${problem ?? 'the gh update said nothing'}. PRs still work, without the video.` }
+    return { isReady: false, text: `better-tasks: ${problem ?? 'the gh update said nothing'}. PRs still work; their video goes on a branch.` }
   }
   const login = word === 'login' ? ' Sign in once: gh auth login.' : ''
   return { isReady: word === 'ready', text: `GitHub CLI updated (${version.split(' ')[2] ?? version}): PRs carry their video.${login}` }
@@ -47,13 +47,14 @@ export function ghUpdateVerdict(output: string): { isReady: boolean; text: strin
 export const PR_TEAMMATE_RULES = `## Pull request per task (on in this project)
 You work in your own git worktree, on its own branch; the project's main checkout stays as it is. This setting is the user's ask for branches and PRs.
 - Commit there as usual, small and often.
-- The project has no GitHub remote (\`git remote -v\`)? No PR: commit as usual and say so in your notes.
+- The project has no GitHub remote (\`git remote -v\`)? No PR: commit as usual and say so in your notes. A video goes on the videos branch (video rules) if the project has a remote; your notes get its link.
 - Done: push to a short branch named for the task, \`git push -u origin HEAD:task/T-004\`, then open the PR against the branch the project's main checkout is on (usually main):
   \`gh pr create --base main --head task/T-004 --title "T-004 <task title>" --body-file <scratchpad>/pr.md\`
   The body, in plain words: what changed, how to test it, the task file path. With a demo video, show its poster (demo-video.sh made it next to the video, same name, .png) as a picture that opens the video, the browser playing it with sound. Put these two lines where it belongs, the text line right under the picture (alone, GitHub turns the link into its muted player; GitHub drops target="_blank", so the line tells how to get a new tab):
   \`[![Before/after video: click to play it with sound](<poster's absolute path>)](<video's absolute path>)\`
   \`Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).\`
-  and add \`--attach <poster's absolute path> --attach <video's absolute path>\`: gh uploads both and points the picture and its link at them. gh older than 2.99 has no --attach: leave the video out and say so in your notes.
+  and add \`--attach <poster's absolute path> --attach <video's absolute path>\`: gh uploads both and points the picture and its link at them.
+- gh can't attach (older than 2.99, or the upload failed)? Put the video on the videos branch (video rules: video-branch.sh) and use what it prints in the two lines, with no --attach: its links in the picture line, its last line as the text line.
 - Your notes get the line "PR: <the url gh printed>".
 - Request changes: commit and push to the same branch; the PR follows. A new video: the same two lines and \`gh pr edit <url> --body-file <scratchpad>/pr.md --attach <poster> --attach <video>\`.
 - Never merge it yourself: the lead merges once the user approves.`
