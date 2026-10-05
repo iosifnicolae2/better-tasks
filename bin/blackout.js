@@ -41,9 +41,11 @@ function run(argv) {
     $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.25))
   }
 
-  restore(statusFile, displayHelper)
-  $.NSCursor.unhide
+  // Quickest first: the windows and the Mac's own brightness go at once, then the DDC screens.
   windows.forEach(window => window.orderOut(null))
+  $.NSCursor.unhide
+  $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.01)) // shows it now
+  restore(statusFile, displayHelper)
 }
 
 function physicalScreens(physicalIds) {
@@ -110,8 +112,8 @@ function dimDisplays(statusFile, displays) {
 }
 
 function restore(statusFile, displayHelper) {
-  runHelper(displayHelper, 'undim', statusFile)
   restoreBrightness(statusFile)
+  runHelper(displayHelper, 'undim', statusFile)
 }
 
 // External screens' backlight over DDC/CI (a black window alone keeps an LCD lit); the helper saves
