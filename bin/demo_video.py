@@ -15,7 +15,6 @@ and the subtitles read aloud by Kokoro. Overlays are drawn with Pillow, so ffmpe
 libass or freetype. The spec (paths relative to the spec file):
 
 {
-  "title": "T-004 Fix login redirect",          optional opening card
   "name": "T-004.mp4",                          the task id: a new video for the task replaces the old
   "voice": "af_heart",                          optional Kokoro voice
   "clips": [
@@ -55,10 +54,9 @@ QUALITIES = {
 }
 quality = QUALITIES['medium']  # main() sets the chosen one
 FPS = 30
-LEAD_IN = 0.6
+LEAD_IN = 0.6  # a pause before the AFTER clip talks, so the cut registers; the video itself starts talking at once
 GAP = 0.5
 TAIL = 0.8
-TITLE_SECONDS = 2.5
 POSTER_DELAY = 1.0  # a video clip's poster frame: this long into its poster step
 POSTER_WIDTH = 1920  # at every quality: GitHub shows it about 880 px wide, so its text stays readable
 POSTER_GAP = 48
@@ -89,9 +87,8 @@ def main(spec_path: str, quality_name: str) -> None:
     voice = Voice(spec.get('voice', 'af_heart'))
     with tempfile.TemporaryDirectory(prefix='demo-video-') as tmp:
         work = Path(tmp)
-        parts = [title_card(work, canvas, spec['title'])] if spec.get('title') else []
-        rendered = [render_clip(work / f'clip{i}', base, clip, canvas, voice) for i, clip in enumerate(clips)]
-        join(work, parts + [path for path, _ in rendered], output)
+        rendered = [render_clip(work / f'clip{i}', base, clip, canvas, voice, i == 0) for i, clip in enumerate(clips)]
+        join(work, [path for path, _ in rendered], output)
         poster = make_poster(work, base, clips, [starts for _, starts in rendered], output)
     print(poster.as_uri())
     print(output.as_uri())
@@ -296,9 +293,9 @@ def fitted(path: Path, canvas: tuple) -> tuple:
 
 # ---- Timeline and rendering ----
 
-def timeline(steps: list, voice: Voice) -> tuple:
+def timeline(steps: list, voice: Voice, lead_in: float) -> tuple:
     """Each step's start and narration, and the narration's end."""
-    clock, timed = LEAD_IN, []
+    clock, timed = lead_in, []
     for step in steps:
         audio = voice.say(step['say'])
         start = max(clock, float(step.get('at', 0)))
@@ -307,11 +304,11 @@ def timeline(steps: list, voice: Voice) -> tuple:
     return timed, clock - GAP
 
 
-def render_clip(work: Path, base: Path, clip: dict, canvas: tuple, voice: Voice) -> tuple:
-    """The clip as an mp4, and the second each of its steps starts at."""
+def render_clip(work: Path, base: Path, clip: dict, canvas: tuple, voice: Voice, is_first: bool) -> tuple:
+    """The clip as an mp4, and the second each of its steps starts at. The first one starts talking at once."""
     work.mkdir()
     steps, label = clip['steps'], clip['label']
-    timed, spoken_until = timeline(steps, voice)
+    timed, spoken_until = timeline(steps, voice, 0.0 if is_first else LEAD_IN)
     video = base / clip['video'] if clip.get('video') else None
     length = max(probe(video)['duration'] if video else 0, spoken_until + TAIL)
     write_narration(work / 'voice.wav', timed, length)
@@ -372,25 +369,6 @@ def write_frame_list(path: Path, frames: list) -> Path:
     lines.append(f"file '{frames[-1][0]}'")
     path.write_text('\n'.join(lines) + '\n')
     return path
-
-
-def title_card(work: Path, canvas: tuple, title: str) -> Path:
-    image = Image.new('RGB', canvas, (18, 18, 22))
-    draw = ImageDraw.Draw(image)
-    unit = max(canvas) / 1000
-    title_font, small_font = font(round(44 * unit)), font(round(26 * unit))
-    block = '\n'.join(wrap(draw, title, title_font, canvas[0] * 0.85))
-    left, top, right, bottom = draw.multiline_textbbox((0, 0), block, font=title_font, align='center')
-    x, y = (canvas[0] - (right - left)) / 2 - left, (canvas[1] - (bottom - top)) / 2 - top - 20 * unit
-    draw.multiline_text((x, y), block, font=title_font, fill=WHITE, align='center')
-    draw.text((canvas[0] / 2, y + bottom + 40 * unit), 'Before  →  After', font=small_font,
-              fill=(200, 200, 200), anchor='mt')
-    still = work / 'title.png'
-    image.save(still)
-    out = work / 'title.mp4'
-    inputs = ['-loop', '1', '-i', str(still), '-f', 'lavfi', '-i', f'anullsrc=r={RATE}:cl=mono']
-    encode(inputs, f'[0:v]fps={FPS},format=yuv420p[v]', '1:a', TITLE_SECONDS, out)
-    return out
 
 
 def encode(inputs: list, graph: str, audio: str, seconds: float, out: Path) -> None:
