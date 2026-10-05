@@ -5,7 +5,7 @@ import type { Engine } from 'claude-code/testing'
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { IDE_NO, IDE_QUESTION, IDE_YES } from '../hooks/intellij'
 import { gitQuestion, GIT_NO } from '../hooks/projectsetup'
-import { TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
+import { AUTO_UPDATE_COMMIT, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES } from '../hooks/teaminstall'
 import { OFFSCREEN_QUESTION } from '../hooks/testenv'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -1057,7 +1057,7 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
   expect(team.asked).toBe(1)
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '')).toEqual({
     permissions: { allow: ['Bash(npm test)'] },
-    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } } },
+    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' }, autoUpdate: true } },
     enabledPlugins: { 'better-tasks@better-tasks': true },
   })
   expect(host.ran).toContain(`git -C ${ROOT} add -- .claude/settings.json`)
@@ -1068,6 +1068,22 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
   expect(team.asked).toBe(1)
+})
+
+test('shared before auto-update existed: auto-update is turned on and that one file committed, without asking', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const team = answerTeam(on, TEAM_YES)
+  const older = {
+    extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } } },
+    enabledPlugins: { 'better-tasks@better-tasks': true },
+  }
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/settings.json`]: JSON.stringify(older) })
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(team.asked).toBe(0)
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '').extraKnownMarketplaces['better-tasks'].autoUpdate).toBe(true)
+  expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${AUTO_UPDATE_COMMIT} --only -- .claude/settings.json`)
 })
 
 test('"Only me": nothing in the project changes, the answer is saved, and it is not asked again', async ($, on) => {

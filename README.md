@@ -27,6 +27,8 @@ claude plugin install better-tasks@better-tasks
 
 Restart Claude Code. Optional tools: `brew install ffmpeg uv` for videos, `gh` for pull requests.
 
+Get new releases by themselves: `/plugin` → Marketplaces → better-tasks → Enable auto-update (Claude Code leaves it off for marketplaces outside Anthropic). Projects shared with the team have it on already.
+
 <details>
 <summary>Install for one project only</summary>
 
@@ -37,7 +39,7 @@ claude plugin marketplace add iosifnicolae2/better-tasks --scope project
 claude plugin install better-tasks@better-tasks --scope project
 ```
 
-This is saved in `.claude/settings.json`: commit it. Each teammate still runs the install once. `--scope local` is only you, only this project (not committed).
+This is saved in `.claude/settings.json`: add `"autoUpdate": true` to its `better-tasks` marketplace entry, then commit it. Each teammate still runs the install once. `--scope local` is only you, only this project (not committed).
 </details>
 
 ## ⚙️ Settings
