@@ -21,5 +21,5 @@ Not loaded `better-tasks:testing` yet? Load it now, before you capture: it says 
 - Online copy, when gh can't upload it (the `better-tasks:pull-request` skill says when): `${CLAUDE_PLUGIN_ROOT}/bin/video-branch.sh <video> <poster>` commits both to the branch better-tasks-videos (its own history, never merged: videos stay out of main and out of the task's branch), pushes it and prints their web links (video first), then the caption that fits them.
 
 ## Report it
-- Your task file gets, as the first line under "## Notes", the line `Video: [T-004.mp4](../tasks_videos/T-004.mp4)` (the path relative to the task file). A newer video replaces the file, not the line.
+- Your task file gets, as the first line under "## Notes", the line `Video: [T-004.mp4](../tasks_videos/T-004.mp4)` (the path relative to the task file). A newer video replaces the file, not the line. Can't edit the task file (it's outside your worktree)? Put the line first in your task_note.
 - Its file:// link (the one the script printed) goes in your "For the user" block: the `better-tasks:done` skill.

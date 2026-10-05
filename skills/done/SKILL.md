@@ -9,6 +9,7 @@ The lead asks the user to test your work in your words: it pastes your "For the 
 
 ## 1. Notes
 In the task file's Notes, dated: what changed, how to test it, the commits, and what you could not verify. (The Video and PR lines: the video and pull-request steps.)
+The task file is outside your worktree, so you can't edit it? Add all of this, the block below too, with the task_note tool.
 
 ## 2. "For the user" block
 Last in the Notes; a newer one replaces the old. Its shape:
