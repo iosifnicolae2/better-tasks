@@ -964,7 +964,7 @@ test('the shared dev branch flow: no worktree, land on dev, the PR from task_pr.
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
   expect(lead).toContain('/bin/task_pr.py sync')
-  expect(lead).toContain('Like every link, it also goes above the question') // the PR flow's Finishing line, shared
+  expect(lead).toContain('that url goes above and in the question like every link') // the PR flow's Finishing line, shared
 })
 
 test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {
