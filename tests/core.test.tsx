@@ -972,7 +972,7 @@ test('with PR per task on, the lead opens each PR in the browser before its ques
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   const leadRules = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
-  expect(await leadRules()).toContain('open the PR in the default browser right before its question')
+  expect(await leadRules()).toContain('/bin/open-pr.sh <url>`: once the PR\'s video is uploaded it opens the PR in the default browser')
   expect(await leadRules()).toContain('one finished task per call, never several at once')
   host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ openPrInBrowser: false }))
   expect(await leadRules()).not.toContain('default browser')

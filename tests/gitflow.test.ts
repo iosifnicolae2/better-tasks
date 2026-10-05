@@ -6,7 +6,7 @@ import {
   recommend, teammateRules, usesWorktree,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
-import { OPEN_PR_LINE, prCoordinatorRules } from '../hooks/pullrequest'
+import { openPrLine, prCoordinatorRules } from '../hooks/pullrequest'
 
 const SOLO_LIGHT: ProjectFacts = { hasGitHub: true, cacheMb: 300, app: '', authors: 1, prChecks: false }
 
@@ -107,8 +107,8 @@ describe('git flow', () => {
   })
 
   test("the dev flow's lead opens the PR in the browser too, when the setting is on", () => {
-    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(true))).toContain(OPEN_PR_LINE)
-    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(false))).not.toContain('default browser')
+    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(true, '/bin'))).toContain(openPrLine('/bin'))
+    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(false, '/bin'))).not.toContain('default browser')
   })
 })
 

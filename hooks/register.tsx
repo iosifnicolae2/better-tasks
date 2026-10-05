@@ -112,7 +112,7 @@ export const register: Register = (on, options) => {
     if (!(await teamsOn($)) || (await isOffHere($))) return composed
     const settings = await settingsNow($)
     const testing = coordinatorTestingRules(settings.offScreen)
-    const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, prCoordinatorRules(settings.openPrInBrowser))
+    const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, prCoordinatorRules(settings.openPrInBrowser, binOf($)))
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
     const instructions = await instructionsNow($, settings)
     const rules = [await projectText(ioOf($), 'coordinator'), models, testing, flow, instructions, CONTRIBUTE_POINTER].filter(Boolean).join('\n\n')
