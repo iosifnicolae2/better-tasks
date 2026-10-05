@@ -40,13 +40,18 @@ export function lacksAutoUpdate(settingsText: string | undefined): boolean {
   return hasTeamInstall(settingsText) && entry?.autoUpdate !== true
 }
 
-/** The shared settings with the marketplace (auto-updating) and the plugin added, the rest kept; undefined when not one JSON object. */
+/**
+ * The shared settings with the marketplace (auto-updating) and the plugin added, the rest kept; a marketplace entry
+ * already there keeps its source (a fork). Undefined when not one JSON object.
+ */
 export function withTeamInstall(settingsText: string | undefined): string | undefined {
   const settings = parse(settingsText)
   if (settings === undefined) return undefined
+  const existing = settings.extraKnownMarketplaces?.[MARKETPLACE] as object | undefined
+  const marketplace = { ...MARKETPLACE_ENTRY, ...existing, autoUpdate: true }
   const shared = {
     ...settings,
-    extraKnownMarketplaces: { ...settings.extraKnownMarketplaces, [MARKETPLACE]: MARKETPLACE_ENTRY },
+    extraKnownMarketplaces: { ...settings.extraKnownMarketplaces, [MARKETPLACE]: marketplace },
     enabledPlugins: { ...settings.enabledPlugins, [PLUGIN]: true },
   }
   return `${JSON.stringify(shared, null, 2)}\n`

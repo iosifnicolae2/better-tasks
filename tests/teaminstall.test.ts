@@ -24,6 +24,13 @@ describe('sharing better-tasks with the team', () => {
     expect(lacksAutoUpdate('{ not json')).toBe(false)
   })
 
+  test('turning on auto-update keeps a marketplace source already there (a fork)', () => {
+    const fork = { source: { source: 'github', repo: 'someone/better-tasks' } }
+    const before = JSON.stringify({ extraKnownMarketplaces: { 'better-tasks': fork }, enabledPlugins: { 'better-tasks@better-tasks': true } })
+    const after = JSON.parse(withTeamInstall(before) ?? '')
+    expect(after.extraKnownMarketplaces['better-tasks']).toEqual({ ...fork, autoUpdate: true })
+  })
+
   test('not there yet, or a file that is not JSON: no team install; a broken file is never rewritten', () => {
     expect(hasTeamInstall(undefined)).toBe(false)
     expect(hasTeamInstall('{"enabledPlugins": {"better-tasks@better-tasks": false}}')).toBe(false)
