@@ -4,8 +4,18 @@
 # The branch has its own history, never merged, so videos stay out of main. No checkout is touched.
 # Prints one link per file, pinned to the new commit, then the caption line that fits those links.
 set -eu
+
+# The remote's web address, without any user or token in it (those would end up in the PR).
+web_url() {
+  url="$(printf '%s' "$1" | sed -E 's#^git@([^:]+):#https://\1/#; s#^ssh://([^@/]+@)?([^/:]+)(:[0-9]+)?/#https://\2/#; s#^(https?://)[^@/]+@#\1#; s#\.git$##')"
+  case "$url" in *@*) echo "video-branch.sh: can't tell the remote's web address safely" >&2; return 1 ;; esac
+  printf '%s\n' "$url"
+}
+if [ "${1:-}" = --web-url ]; then web_url "$2"; exit; fi
+
 branch="${BETTER_TASKS_VIDEO_BRANCH:-better-tasks-videos}"
 remote=origin
+web="$(web_url "$(git remote get-url "$remote")")"
 
 index_dir="$(mktemp -d)"
 trap 'rm -rf "$index_dir"' EXIT
@@ -27,7 +37,6 @@ tree="$(git write-tree)"
 commit="$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "Videos:$names")"
 git push -q "$remote" "$commit:refs/heads/$branch"
 
-web="$(git remote get-url "$remote" | sed -E 's#^git@([^:]+):#https://\1/#; s#^ssh://git@([^/]+)/#https://\1/#; s#\.git$##')"
 is_public() { [ "$(curl -s -o /dev/null -w '%{http_code}' "$web")" = 200 ]; }
 case "$web" in
   https://github.com/*)
