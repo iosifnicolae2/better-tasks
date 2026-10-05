@@ -15,16 +15,21 @@ if printf '%s' "$body" | grep -Eq '\]\((/|file:)'; then
   exit 2
 fi
 
-# The picture that opens the video loads (the video itself answers only to a signed-in browser).
-picture=$(printf '%s' "$body" | sed -n 's/.*\[!\[[^]]*\](\([^)]*\)).*/\1/p' | head -1)
-if [ -n "$picture" ]; then
+# The picture and the video it opens both load, as the user signed in to GitHub (an upload answers others only later).
+token=$(gh auth token 2>/dev/null)
+loads() {
+  code=$(curl -s -o /dev/null -w '%{http_code}' -L -r 0-0 ${token:+-H "Authorization: token $token"} "$1")
+  [ "$code" = 200 ] || [ "$code" = 206 ]
+}
+links=$(printf '%s' "$body" | sed -n 's/.*\[!\[[^]]*\](\([^)]*\))](\([^)]*\)).*/\1 \2/p' | head -1)
+for link in $links; do
   tries=0
-  until [ "$(curl -s -o /dev/null -w '%{http_code}' -L "$picture")" = 200 ]; do
+  until loads "$link"; do
     tries=$((tries + 1))
-    [ "$tries" -ge 6 ] && { echo "not ready: the PR's picture does not load yet ($picture)"; exit 2; }
+    [ "$tries" -ge 6 ] && { echo "not ready: the PR's video does not load yet ($link)"; exit 2; }
     sleep 5
   done
-fi
+done
 
 case "$(uname -s)" in
   Darwin) open "$url" ;;
