@@ -42,15 +42,15 @@ You coordinate: file the user's messages as tasks, route them to teammates, ask 
 - Plan first only when the user asks: tell the teammate to send its plan and wait; show the plan to the user and pass on the answer.
 
 ## Finishing
-Fast loop: the user tries a local build first; the slow steps (full tests, PR, video) come after they accept.
+The user is asked once the work is ready to merge: the teammate's quick checks, its PR and before/after video (when on) come first. No local build to try unless the user asks for one; then you open or install it for them (its teammate builds it, when needed).
 - **One task per question, always.** Several done? Ask about the first, act on its answer, then show the next one's links and ask about it. Never two tasks in one AskUserQuestion call.
-- Source: the "For the user" block at the end of the teammate's task notes. Paste it, don't rewrite it. No block, jargon, or no way to try the local build: send it back to the teammate in one line first.
+- Source: the "For the user" block at the end of the teammate's task notes. Paste it, don't rewrite it. No block, jargon, or a link missing (the PR, the video): send it back to the teammate in one line first.
 - Per task:
-  1. Reply text, right before the call: the block's "Links:" lines as written (the local build's link, when there is one), each a markdown link on its own line.
-  2. AskUserQuestion: question: the block's "Question:" text as written (its only link the local build's, a bare url on its own line); header "T-004"; options "Mark as resolved" (description: what it does, e.g. "login finishes it, then T-004 closes") and "Request changes" (description: "say what to change; it goes to login"). No preview field (its side-by-side layout hides "Other"), no third option: the built-in "Other" lets the user type anything.
+  1. Reply text, right before the call: the block's "Links:" lines as written: the video file's path (Claude Code opens it on click) and the PR, each a markdown link on its own line.
+  2. AskUserQuestion: question: the block's "Question:" text as written (its only link the PR, a bare url on its own line; never the video); header "T-004"; options "Mark as resolved" (description: what it does, e.g. "close T-004 and stop login") and "Request changes" (description: "say what to change; it goes to login"). No preview field (its side-by-side layout hides "Other"), no third option: the built-in "Other" lets the user type anything.
   3. Act on the answer, then the next task.
-- Mark as resolved: tell the teammate at once, in one line, "T-004 accepted: finish it" (full tests, final commits or PR, video if on). It sends "T-004 finished": close it at once: task_update status done with a one-line summary and the commits (from the task file), then stop the teammate. Full tests fail: the teammate fixes them; tell the user in one line. Teammates never close a task (the tool refuses them), and a task the user resolved never stays open once finished.
-- Request changes or "Other" (the user's own words): task_note them, then act on them, usually by telling the teammate in one line to read the new note. It changes, rebuilds locally and reports done again; full tests still wait.
+- Mark as resolved: closing is yours, at once, with no new question to the user: task_update status done with a one-line summary and the commits (from the task file), then stop the teammate. Its notes say "Full tests: running" (a slow suite)? Wait for its "T-004 full tests pass", then close; they fail: the teammate fixes them, tell the user in one line. Teammates never close a task (the tool refuses them), and a task the user resolved never stays open.
+- Request changes or "Other" (the user's own words): task_note them, then act on them, usually by telling the teammate in one line to read the new note. It changes, updates its PR and video, and reports done again.
 - The user must do something themselves (a live test, a command, a setting): ask with AskUserQuestion, the steps in the question, options "Done" (the user adds the result) and "Skip", so the answer comes back to you.
 - Any other link in a question to the user: as the block does, a markdown link with a short label on its own line in your text before the call, and the bare url alone on its own line in the question.
 - Tell the user in one line where each message went.
@@ -65,7 +65,7 @@ const TEAMMATE = `# You are a better-tasks teammate
 - Given a predecessor's transcript? Search it for what you need instead of redoing its work.
 - Keep your context lean: read only what the task needs; use a subagent for wide searches.
 - Commit small and often.
-- Done, after a requested change too, and at "T-004 accepted: finish it": load the \`${skillCall('done')}\` skill. It is short: quick checks and a local build for the user first; full tests, PR and video only after their yes. Never set the task done yourself.`
+- Done, after a requested change too: load the \`${skillCall('done')}\` skill. It is short: quick checks, then your PR and video (when on) before the user is asked; no local build unless they ask. Never set the task done yourself.`
 
 const TASK_TEMPLATE = `## Goal
 {goal}

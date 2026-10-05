@@ -257,7 +257,7 @@ export function devLeadRules(bin: string, dev: string, prLeadRules: string): str
   return `## Git flow: shared ${dev} branch, a PR per task (on)
 - The project's checkout stays on \`${dev}\`; teammates land there. An install or test for the user builds \`${dev}\`.
 ${finishingOf(prLeadRules)}
-- Finished: \`gh pr merge <url> --squash --delete-branch\`, then \`python3 ${bin}/task_pr.py sync\` (main follows origin's main; \`${dev}\` takes it in without a file changing), then close the task with the merge commit. sync refuses: a fix was made on the task branch, not on \`${dev}\`: the owner lands it on \`${dev}\`, then sync again.
+- Mark as resolved: \`gh pr merge <url> --squash --delete-branch\` (full tests still running: once they pass), then \`python3 ${bin}/task_pr.py sync\` (main follows origin's main; \`${dev}\` takes it in without a file changing), then close the task with the merge commit. sync refuses: a fix was made on the task branch, not on \`${dev}\`: the owner lands it on \`${dev}\`, then sync again.
 - The merge fails (a conflict): the owner lands what the PR needs on \`${dev}\` and runs open again.`
 }
 
