@@ -34,8 +34,8 @@ describe('PR per task', () => {
     expect(hasGitHub('')).toBe(false)
   })
 
-  test('with a PR the approval question shows only the PR link: its picture opens the video', () => {
-    expect(prCoordinatorRules(true, '/bin')).toContain("links the PR, not the video (the PR's picture opens it)")
+  test('with a PR the approval question links only the PR; the video path and the PR sit above it', () => {
+    expect(prCoordinatorRules(true, '/bin')).toContain("its question links only the PR; the video's path and the PR sit above it, in Links.")
     expect(prCoordinatorRules(true, '/bin')).toContain('gh pr merge <url> --squash --delete-branch')
   })
 

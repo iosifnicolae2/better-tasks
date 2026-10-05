@@ -12,12 +12,13 @@ In the task file's Notes, dated: what changed, how to test it, the commits, and 
 The task file is outside your worktree, so you can't edit it? Add all of this, the block below too, with the task_note tool.
 
 ## 2. "For the user" block
-Last in the Notes; a newer one replaces the old. Its shape:
+Last in the Notes; a newer one replaces the old. The lead shows "Links:" as text right above its question, and "Question:" as the question. Its shape:
 
 ```
 ### For the user
 Links:
-[PR #12](https://github.com/o/r/pull/12)
+Video: [/Users/me/app/.claude/tasks_videos/T-004.mp4](file:///Users/me/app/.claude/tasks_videos/T-004.mp4)
+PR: [#12](https://github.com/o/r/pull/12)
 Question:
 T-004 Fix login redirect
 What changed: after login you land on the page you asked for.
@@ -26,10 +27,9 @@ https://github.com/o/r/pull/12
 Is everything OK?
 ```
 
-- Question: plain words, short lines: the task id and title, what changed, how to test it, the links, then "Is everything OK?". No jargon (commits, branches, test counts): the details stay in the notes.
-- The user must do something to test (a live test, a command, a setting)? The steps go in "To test".
-- Links (a PR, a video, a page to test) go twice. Under "Links:", each a markdown link with a short label on a line of its own: `[PR #12](url)`, `[T-004 video](file:///Users/me/app/.claude/tasks_videos/T-004.mp4)` (spaces in a path as %20): Claude Code and the mobile app make these clickable. In the question: the bare url, each on a line of its own with nothing else on it (no markdown, quotes, backticks or punctuation): the question is plain text, so only a terminal that spots urls itself opens it. A file:// link opens only on this Mac; give it anyway.
-- With a PR: its link, no video link (the PR's picture opens the video). Without a PR: the video's link, when there is a video.
+- Links: the video's file path (when there is one) and the PR, each a markdown link on its own line, clickable in Claude Code and the mobile app. The video's label is its absolute path, the link its file:// url (spaces as %20): Claude Code opens it on click. No PR (no remote)? Just the video.
+- Question: plain words, short lines: task id and title, what changed, how to test it (steps the user must do: a live test, a command, a setting), the PR url, "Is everything OK?". No jargon (commits, branches, test counts): details stay in the notes.
+- The question's only link is the PR: the bare url on a line of its own, nothing else on it (no markdown, quotes, backticks, punctuation). Never the video: it's in Links.
 - Videos on and your work shows on screen: no block without the video.
 
 ## 3. Tell the lead

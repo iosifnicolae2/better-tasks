@@ -54,6 +54,6 @@ export const openPrLine = (bin: string) =>
   `- A finished task with a PR: right before its question, run \`${bin}/open-pr.sh <url>\`: once the PR's video is uploaded it opens the PR in the default browser and waits a few seconds for the page to load; then ask. It says "not ready" (the video not uploaded yet): tell the teammate to finish its PR, and ask once it has.`
 
 export const prCoordinatorRules = (openPrInBrowser: boolean, bin: string) => `## Pull request per task (on)
-- A finished task's notes hold "PR: <url>"; its "For the user" block links the PR, not the video (the PR's picture opens it). "Mark as resolved" merges: its description says "merge the PR and close T-004".${openPrInBrowser ? `\n${openPrLine(bin)}` : ''}
+- A finished task's notes hold "PR: <url>"; its question links only the PR; the video's path and the PR sit above it, in Links. "Mark as resolved" merges: its description says "merge the PR and close T-004".${openPrInBrowser ? `\n${openPrLine(bin)}` : ''}
 - Mark as resolved: \`gh pr merge <url> --squash --delete-branch\`, then \`git pull --ff-only\` in the project, then close the task with the merge commit. The merge fails (a conflict)? Tell the teammate to update its PR; then merge.
 - Request changes: the teammate pushes to the same PR.`

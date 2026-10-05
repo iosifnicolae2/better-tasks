@@ -209,15 +209,15 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
-test("the lead pastes the teammate's block: its markdown links above the question, its question (bare urls) inside", async ($, on) => {
+test("the lead pastes the teammate's block: the video path and the PR above the question, only the PR inside", async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
-  expect(lead).toContain('in your reply text right before the call: the block\'s "Links:" lines as written')
-  expect(lead).toContain('question: the block\'s "Question:" text as written (its bare urls each on a line of their own)')
+  expect(lead).toContain('Reply text, right before the call: the block\'s "Links:" lines as written: the video file\'s path (Claude Code opens it on click) and the PR')
+  expect(lead).toContain('question: the block\'s "Question:" text as written (its only link the PR, a bare url on its own line; never the video)')
   expect(lead).toContain('the bare url alone on its own line in the question')
   expect(lead).toContain('load the `better-tasks:contribute` skill')
   expect(lead).not.toContain('gh repo fork')
@@ -964,7 +964,7 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   expect(host.spawned[0]).toContain('first load the `better-tasks:pull-request` skill')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
-  expect(composed.sections.at(-1)?.text).toContain('links the PR, not the video')
+  expect(composed.sections.at(-1)?.text).toContain('its question links only the PR')
 })
 
 test('with PR per task on, the lead opens each PR in the browser before its question, unless openPrInBrowser is off', { options: { pullRequests: true } }, async ($, on) => {
@@ -974,10 +974,10 @@ test('with PR per task on, the lead opens each PR in the browser before its ques
   await $.session.start(SESSION)
   const leadRules = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(await leadRules()).toContain('/bin/open-pr.sh <url>`: once the PR\'s video is uploaded it opens the PR in the default browser')
-  expect(await leadRules()).toContain('one finished task per call, never several at once')
+  expect(await leadRules()).toContain('**One task per question, always.**')
   host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ openPrInBrowser: false }))
   expect(await leadRules()).not.toContain('default browser')
-  expect(await leadRules()).toContain('one finished task per call, never several at once')
+  expect(await leadRules()).toContain('**One task per question, always.**')
 })
 
 test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {
@@ -1237,7 +1237,7 @@ test('the shared dev branch flow: no worktree, land on dev, the PR from the pull
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
   expect(lead).toContain('/bin/task_pr.py sync')
-  expect(lead).toContain('links the PR, not the video') // the PR flow's Finishing line, shared
+  expect(lead).toContain('its question links only the PR') // the PR flow's Finishing line, shared
 })
 
 test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {

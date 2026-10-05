@@ -23,4 +23,4 @@ Not loaded `better-tasks:testing` yet? Load it now, before you capture: it says 
 
 ## Report it
 - Your task file gets, as the first line under "## Notes", the line `Video: [T-004.mp4](../tasks_videos/T-004.mp4)` (the path relative to the task file). A newer video replaces the file, not the line. Can't edit the task file (it's outside your worktree)? Put the line first in your task_note.
-- Its file:// link (the one the script printed) goes in your "For the user" block: the `better-tasks:done` skill.
+- Its path and file:// link (the one the script printed) go under "Links:" in your "For the user" block, never in its question: the `better-tasks:done` skill.
