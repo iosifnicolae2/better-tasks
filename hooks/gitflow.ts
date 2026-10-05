@@ -226,6 +226,17 @@ ${landLine(bin, dev)}
 ${PR_DONE_LINE}`
 }
 
+/**
+ * A worktree-isolated teammate's gh/git commands: Claude Code refuses (in Bash and Monitor alike) one it can't
+ * prove stays in the worktree. Shapes tested for real in T-040; a script run by its path is never read, so passes.
+ */
+export const WORKTREE_COMMAND_RULES = `## gh and git in your worktree
+Claude Code refuses a Bash or Monitor command running gh or git that it can't check stays in your worktree ("too complex to verify").
+- Refused: \`( … )\` subshell, \`{ …; }\` group, a function, \`bash -c\`, heredoc, \`[[ … ]]\`, \`cd\` or \`git -C\` to another checkout.
+- Fine: plain commands, \`;\`, \`&&\`, pipes, jq \`\\(.x)\`, \`$( … )\`, for/while, if, case, \`[ … ]\`.
+- Watch a PR's checks: Bash with run_in_background, one notice when they end: \`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>\`. A run: \`gh run watch <id> --exit-status --compact\`.
+- Need more logic? Write a script to your scratchpad and run it by its path; it still targets only your worktree.`
+
 export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
   if (flow === 'dev-prs') return devTeammateRules(bin, dev)
   return flow === 'worktree-prs' ? prRules : directTeammateRules(bin)

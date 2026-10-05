@@ -248,6 +248,24 @@ test('with worktree on, a named teammate is spawned in a worktree', { options: {
   expect(scout.result).toEqual({ isolation: 'none' })
 })
 
+test('a teammate in the shared checkout gets no worktree command rules', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(host.spawned[0]).not.toContain('## gh and git in your worktree')
+})
+
+test('a teammate the lead spawns in a worktree itself gets the worktree command rules', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
+  expect(host.spawned[0]).toContain('## gh and git in your worktree')
+})
+
 const EXCLUDED = '<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />'
 const IDE_NOTICE = 'better-tasks: IntelliJ now skips .claude/worktrees/ (teammate worktrees), so they are not indexed'
 
@@ -962,6 +980,7 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'worktree' })
   expect(host.spawned[0]).toContain('first load the `better-tasks:pull-request` skill')
+  expect(host.spawned[0]).toContain('## gh and git in your worktree')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
   expect(composed.sections.at(-1)?.text).toContain('its question links only the PR')

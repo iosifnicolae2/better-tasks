@@ -22,6 +22,7 @@ You work in your own git worktree, on its own branch; the project's main checkou
   `gh pr create --base main --head task/T-004 --title "T-004 <task title>" --body-file <scratchpad>/pr.md`
   With a video: the two lines in pr.md, and `--attach <poster's absolute path> --attach <video's absolute path>`: gh uploads both and points the picture and its link at them.
 - gh can't attach (older than 2.99, or the upload failed)? Put the video on the videos branch: `${CLAUDE_PLUGIN_ROOT}/bin/video-branch.sh <video> <poster>` prints their web links (video first), then the caption. Use them in the two lines, with no --attach: its links in the picture line, its last line as the text line.
+- Watch its checks: Bash with run_in_background, `gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>`: one notice when they end. Plain commands only: no `( … )`, `{ …; }`, function, `bash -c` or heredoc around gh or git, or Claude Code refuses it ("too complex to verify"; your prompt's "gh and git in your worktree").
 - Request changes: commit and push to the same branch; the PR follows. A new video: the same two lines and `gh pr edit <url> --body-file <scratchpad>/pr.md --attach <poster> --attach <video>`.
 - The lead says the merge conflicts: merge main into your branch (`git fetch origin && git merge origin/main`), fix, test, push; tell the lead.
 
