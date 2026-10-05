@@ -48,13 +48,6 @@ You watch a short video instead of reading the code first. Here is the one for T
 
 <sub>Click to play, with sound: the subtitles are read aloud.</sub>
 
-Then you answer one question:
-
-| You pick | What happens |
-|---|---|
-| **Mark as resolved** | The task closes. |
-| **Request changes** | Type what to change. The same teammate fixes it and sends it back to you. |
-
 Claude asks about one task at a time. With a PR per task, it opens the PR in your browser first (setting `openPrInBrowser`).
 
 ## ⚙️ Settings
