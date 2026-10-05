@@ -978,7 +978,7 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
   const team = answerTeam(on, TEAM_YES)
   const host = fakeHost(on, [], { [`${ROOT}/.claude/settings.json`]: JSON.stringify({ permissions: { allow: ['Bash(npm test)'] } }) })
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(team.asked).toBe(1)
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/settings.json`) ?? '')).toEqual({
     permissions: { allow: ['Bash(npm test)'] },
@@ -991,7 +991,7 @@ test('"Everyone on this project": better-tasks goes in the shared .claude/settin
 
   host.files.delete(`${TASKS}/config.json`) // a teammate's checkout: better-tasks is in the shared settings already
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(team.asked).toBe(1)
 })
 
@@ -1001,9 +1001,9 @@ test('"Only me": nothing in the project changes, the answer is saved, and it is 
   const team = answerTeam(on, TEAM_NO)
   const host = fakeHost(on)
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   await $.session.start(SESSION)
-  await clock.advance(0)
+  await clock.advance(QUIET_PROMPT_BOX)
   expect(team.asked).toBe(1)
   expect(host.files.has(`${ROOT}/.claude/settings.json`)).toBe(false)
   expect(JSON.parse(host.files.get(`${TASKS}/config.json`) ?? '')).toEqual({ shareWithTeam: false })
