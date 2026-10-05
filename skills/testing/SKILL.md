@@ -1,18 +1,16 @@
 ---
 name: testing
 user-invocable: false
-description: How a better-tasks teammate tests its change like a user, in its own environment, off the user's screen when the project says so (web, iOS, Android, terminal, Linux and Mac apps). Load it before you run, test or capture the app.
+description: How a better-tasks teammate runs, tests and captures its change like a user, in its own environment, off the user's screen when the project says so, and leaves a local build for the user (web, iOS, Android, terminal, Linux and Mac apps, plugins). Load it before you run, test or capture the app.
 ---
 
 # Testing like a user
-- Test your change as a user would: run it, go through the steps, look at the result. Passing tests alone don't count.
-- Before done, quick checks only: the tests near your change. The full suite runs at the finish, after the user accepts (the `better-tasks:done` skill).
-- Your own test environment: your own app instance on its own port, its own data (a fresh database, browser profile or simulator, kept in your scratchpad), never the user's running apps, data or accounts, nor another teammate's. When done, stop what you started (servers, simulators).
+- Run it, go through the steps, look at the result: passing tests alone don't count.
+- Your own environment: your own instance on its own port, its own data (a fresh database, browser profile or simulator, in your scratchpad); not another teammate's. Stop what you started when done, except the local build you leave for the user.
 - iPhone/iOS apps: build, run and test through Xcode's own tools (its MCP server; Apple: https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode). Not set up (no xcode tools among yours)? Tell the lead it takes: Xcode > Settings > Intelligence > "Allow external agents to use Xcode tools", then `claude mcp add --transport stdio xcode -- xcrun mcpbridge`, with the project open in Xcode. Until then: `xcodebuild` and `xcrun simctl`.
-- A new bug you notice, even outside your task: don't fix it unasked. Send the lead one line, "New bug: <what you saw>, <how to see it again>", plus a screenshot path if you have one.
 
 ## Local build for the user
-At done, leave a build the user can try right away, on their machine or device: the one thing you start for them, not in your own test environment. Say in your notes how to stop or remove it.
+At done, leave a build the user can try right away, on their machine or device. Say in your notes how to stop or remove it.
 - Web: your dev server left running on its own port; its URL is the link.
 - iOS / Android: installed on the user's device (`xcrun devicectl device install app --device <id> <app>`, `adb install -r <apk>`), else on a simulator or emulator they can see.
 - Mac app: the built .app's path; the user opens it.
@@ -34,3 +32,4 @@ The user's screen, mouse and keyboard stay theirs.
 
 ## On the screen: when off-screen is off
 - Off-screen first when the tool allows it (a headless browser, a simulator without its window: the recipes above). Need the user's screen, mouse or keyboard? Tell the lead first: the user may be working.
+- Capture on screen: `screencapture -x shot.png`, or `-v -V <seconds> clip.mov`.

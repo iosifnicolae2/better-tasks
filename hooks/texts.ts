@@ -65,7 +65,7 @@ const TEAMMATE = `# You are a better-tasks teammate
 - Given a predecessor's transcript? Search it for what you need instead of redoing its work.
 - Keep your context lean: read only what the task needs; use a subagent for wide searches.
 - Commit small and often.
-- Done (and when a requested change is done): load the \`${skillCall('done')}\` skill: quick checks, a local build the user tries, your notes, the user's question for the lead to paste, then one line to the lead, "T-004 done: <commits>, see <task file>". Full tests, PR and video wait for the user's yes: the lead says "T-004 accepted: finish it", and that skill's "Finish" says how. Never set the task done yourself.`
+- Done, after a requested change too, and at "T-004 accepted: finish it": load the \`${skillCall('done')}\` skill. It is short: quick checks and a local build for the user first; full tests, PR and video only after their yes. Never set the task done yourself.`
 
 const TASK_TEMPLATE = `## Goal
 {goal}

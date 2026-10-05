@@ -12,7 +12,7 @@ import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
-import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, TEAMMATE_POINTER, videoSkillSettings, voiceDir } from './demovideo'
+import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, videoPointer, videoSkillSettings, voiceDir } from './demovideo'
 import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, prSkillSettings, recommend, teammateRules as flowRules, usesWorktree, WORKTREE_COMMAND_RULES } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
@@ -182,7 +182,7 @@ export const register: Register = (on, options) => {
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const testing = testingPointer(settings.offScreen)
-    const videos = settings.demoVideos ? TEAMMATE_POINTER : ''
+    const videos = settings.demoVideos ? videoPointer(settings.videoQuality) : ''
     const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
     const commands = isWorktree || e.isolation === 'worktree' ? WORKTREE_COMMAND_RULES : ''

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { setupVerdict, TEAMMATE_POINTER, videoSkillSettings, voiceDir } from '../hooks/demovideo'
+import { setupVerdict, videoPointer, videoSkillSettings, voiceDir } from '../hooks/demovideo'
 import { settingsOf } from '../hooks/settings'
 
 describe('before/after videos', () => {
@@ -9,17 +9,18 @@ describe('before/after videos', () => {
     expect(settingsOf({ demoVideos: true }).demoVideos).toBe(true)
   })
 
-  test('video quality: 1080p medium unless chosen; the video skill reads it and its capture size', () => {
+  test('video quality: 1080p medium unless chosen; the video skill reads it, the prompt its capture size', () => {
     expect(settingsOf({}).videoQuality).toBe('medium')
     expect(settingsOf({ videoQuality: 'low' }).videoQuality).toBe('low')
     expect(settingsOf({ videoQuality: '4k' }).videoQuality).toBe('medium')
-    expect(videoSkillSettings('medium')).toBe('- Video quality: medium. Capture at 1920x1080 or more; make it with `--quality medium`.')
-    expect(videoSkillSettings('low')).toContain('Capture at 1280x720 or more')
+    expect(videoSkillSettings('medium')).toBe('- Video quality: medium: make it with `--quality medium`.')
+    expect(videoPointer('low')).toContain('at 1280x720 or more')
   })
 
-  test("the teammate's prompt keeps a pointer: the how-to is the video skill, loaded before the first change", () => {
-    expect(TEAMMATE_POINTER).toContain('load the `better-tasks:video` skill before your first change')
-    expect(TEAMMATE_POINTER).not.toContain('demo-video.sh')
+  test("the teammate's prompt says how to capture; the video skill loads only at the finish", () => {
+    expect(videoPointer('medium')).toContain('BEFORE first: before you change anything')
+    expect(videoPointer('medium')).toContain('made at the finish, after the user accepts: the `better-tasks:video` skill')
+    expect(videoPointer('medium')).not.toContain('demo-video.sh')
   })
 
   test('the voice lives outside any project: its own folder, else XDG data, else ~/.local/share', () => {

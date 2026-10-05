@@ -84,7 +84,7 @@ describe('git flow', () => {
     expect(teammateRules('direct', '/bin', 'dev', 'PR')).not.toContain('pull-request')
     const dev = devTeammateRules('/bin', 'develop')
     expect(dev).toContain('`/bin/land.sh -b develop -m')
-    expect(dev).toContain('"Accepted: finish it": load the `better-tasks:pull-request` skill: it opens the PR')
+    expect(dev).toContain('The PR opens at the finish (the done skill\'s "Finish"), with the `better-tasks:pull-request` skill')
     expect(dev).not.toContain('task_pr.py open')
     expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toBe('PR RULES')
   })
