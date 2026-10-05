@@ -32,15 +32,26 @@ export const videoPagePath = (video: string) => video.replace(/\.mp4$/, '.html')
 const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-/** A dark page that plays the video at once, with its controls, filling the window. */
+/**
+ * A dark page that plays the video, with its controls, filling the window. A browser that blocks
+ * sound until a click gets a big "Play with sound" button instead of a still, silent frame.
+ */
 export function videoPage(video: string): string {
   const name = video.split('/').pop() ?? video
   const title = escapeHtml(name.replace(/\.mp4$/, ''))
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${title} · before/after video</title>
-<style>html,body{margin:0;height:100%;background:#111}video{width:100%;height:100%;object-fit:contain}</style></head>
+<style>html,body{margin:0;height:100%;background:#111}video{width:100%;height:100%;object-fit:contain}
+button{position:fixed;inset:0;margin:auto;width:340px;height:96px;border:0;border-radius:48px;background:#d77757;color:#fff;font:600 28px system-ui,sans-serif;cursor:pointer}</style></head>
 <body><video src="${escapeHtml(encodeURIComponent(name))}" controls autoplay playsinline></video>
-<script>document.querySelector('video').play().catch(() => undefined)</script></body></html>
+<button hidden>▶ Play with sound</button>
+<script>
+const video = document.querySelector('video')
+const button = document.querySelector('button')
+button.onclick = () => video.play()
+video.onplay = () => { button.hidden = true }
+video.play().catch(() => { button.hidden = false })
+</script></body></html>
 `
 }
 
