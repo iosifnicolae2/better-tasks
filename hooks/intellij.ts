@@ -1,9 +1,23 @@
 // Keeps JetBrains IDEs (IntelliJ, WebStorm, PyCharm...) from indexing teammate worktrees.
 // Claude Code puts each worktree, a full copy of the repo, in <project>/.claude/worktrees/, so the IDE
 // sees it as project content and re-indexes a whole copy each time one is made, merged or removed.
-// At session start this marks that folder as excluded in the project's .idea module file.
+// Asked once per project at setup (worktrees on and a .idea folder): the answer is the project setting
+// excludeWorktreesFromIde. When yes, each session start marks that folder as excluded in the .idea module file.
 
 export const WORKTREES_DIR = '.claude/worktrees'
+
+export const IDE_SETTING = 'excludeWorktreesFromIde'
+export const IDE_YES = 'Exclude it (recommended)'
+export const IDE_NO = 'Leave IntelliJ as it is'
+export const IDE_QUESTION =
+  'This project is open in IntelliJ (it has a .idea folder). Each teammate works in a full copy of the project under ' +
+  `${WORKTREES_DIR}/, and IntelliJ re-indexes every copy, which makes it slow. May better-tasks mark that folder as ` +
+  `Excluded in IntelliJ, so it skips it? Change it later in .claude/tasks/config.json ("${IDE_SETTING}").`
+
+/** Ask only in an IntelliJ project (a .idea folder) whose teammates use worktrees, and only until the user answers. */
+export function shouldAskIde(usesWorktree: boolean, ideaFiles: string[] | undefined, answer: boolean | undefined): boolean {
+  return usesWorktree && ideaFiles !== undefined && answer === undefined
+}
 
 const EXCLUDE_LINE = `<excludeFolder url="file://$MODULE_DIR$/${WORKTREES_DIR}" />`
 
