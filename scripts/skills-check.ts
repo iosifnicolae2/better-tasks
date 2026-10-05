@@ -34,9 +34,10 @@ const MUST_SAY: Record<string, string[]> = {
   ],
   done: [
     '### For the user',
-    'Under "Links:", each a markdown link with a short label on a line of its own',
-    'In the question: the bare url, each on a line of its own with nothing else on it',
-    'With a PR: its link, no video link',
+    'Video: [/Users/me/app/.claude/tasks_videos/T-004.mp4](file:///Users/me/app/.claude/tasks_videos/T-004.mp4)',
+    'Links: the video\'s file path (when there is one) and the PR, each a markdown link on its own line',
+    'The question\'s only link is the PR: the bare url on a line of its own, nothing else on it',
+    'Never the video: it\'s in Links.',
     '"T-004 done: <commits>, see <task file>"',
     'never set it done yourself',
   ],
