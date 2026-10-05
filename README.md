@@ -12,7 +12,7 @@ A Claude Code plugin. Your tasks are Markdown files in your project; a team of C
 
 - 📝 **Tasks as Markdown**: plain files in `.claude/tasks/`, committed with your code.
 - 🤖 **A team of agents**: a lead routes each task to a teammate; teammates work in parallel.
-- 🎥 **Before/after videos**: short, narrated, with boxes and arrows on what changed.
+- 🎥 **Before/after video**: after each task you get a short narrated video, [like the one below](#-review-a-finished-task), to review it. Turn it on with the `demoVideos` setting.
 - ✅ **You approve**: no task closes without your yes.
 - 🔀 **Your git flow**: straight to main, a shared `dev` branch, or a worktree and PR per task. Asked once per project.
 - 🗂️ **Sprint board**: `/better-tasks` shows sprints, goals, the backlog and search.
@@ -39,14 +39,6 @@ claude plugin install better-tasks@better-tasks --scope project
 
 This is saved in `.claude/settings.json`: commit it. Each teammate still runs the install once. `--scope local` is only you, only this project (not committed).
 </details>
-
-## 🚀 First use
-
-1. **Add a task**: tell Claude what you want, e.g. *"Add a task: the Add to cart button loses clicks."*
-2. **Start it**: *"Start T-001."* Claude asks your git flow once, then a teammate takes it.
-3. **Review it**: when it is done, Claude shows the video and the PR and asks: **Mark as resolved** or **Request changes** (or type your own answer).
-
-Open the board any time with `/better-tasks`.
 
 ## 👀 Review a finished task
 
