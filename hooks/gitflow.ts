@@ -202,7 +202,7 @@ function landLine(bin: string, branch: string): string {
 }
 
 /** What a PR's description holds, in every PR flow (the user reads it on GitHub, often on a phone). */
-export const PR_BODY_RULES = `- The PR's description, in plain words, in this order: the video (two lines, below) when there is one; "Asked for": the user's request, in their words from the task file; "Why": the problem it solves; "What changed": what was implemented, a few lines; "To test": the steps; the task file's path.`
+export const PR_BODY_RULES = `- The PR's description, in plain words, in this order: "## Asked for": the user's request, in their words from the task file; "## Why": why it was needed, the problem it solves; the video (the solution: its two lines) when there is one; "## What changed": what was implemented, a few lines; "## To test": the steps; "## Commits": one line each; the task file's path.`
 
 export function directTeammateRules(bin: string): string {
   return `## Git flow: straight to main (this project)
@@ -216,7 +216,7 @@ One checkout, on \`${dev}\`, shared with the other teammates: no worktree. Insta
 ${landLine(bin, dev)}
 - A commit for two tasks names both ids. Never commit to main.
 ${PR_BODY_RULES}
-- Done: write that description to <scratchpad>/pr.md, then \`python3 ${bin}/task_pr.py open T-004 --body-file <scratchpad>/pr.md\`. It puts the task's commits on \`task/T-004\` (origin's main plus them, picked without touching any checkout), pushes it and opens the PR with the video attached (or on the videos branch when gh can't). Leave the two video lines out of pr.md: it adds them. Run again later: it adds only the new commits.
+- Done: write that description to <scratchpad>/pr.md, then \`python3 ${bin}/task_pr.py open T-004 --body-file <scratchpad>/pr.md\`. It puts the task's commits on \`task/T-004\` (origin's main plus them, picked without touching any checkout), pushes it and opens the PR with the video attached (or on the videos branch when gh can't). Leave the two video lines out of pr.md: it puts them right before "## What changed". Run again later: it adds only the new commits.
 - It stops on a commit that conflicts on main (it leans on another task's commit): tell the lead which one.
 - Your notes get the line "PR: <the url it printed>". Request changes: land the fix on \`${dev}\`, then run open again. Never fix on the task branch; never merge.`
 }

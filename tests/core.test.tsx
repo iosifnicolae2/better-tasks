@@ -960,7 +960,7 @@ test('the shared dev branch flow: no worktree, land on dev, the PR from task_pr.
   expect(named.result).toEqual({ isolation: 'none' })
   expect(host.spawned[0]).toContain('/bin/land.sh -b develop -m')
   expect(host.spawned[0]).toContain('/bin/task_pr.py open T-004 --body-file <scratchpad>/pr.md')
-  expect(host.spawned[0]).toContain('"Asked for": the user\'s request')
+  expect(host.spawned[0]).toContain('"## Asked for": the user\'s request')
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
   expect(lead).toContain('/bin/task_pr.py sync')
