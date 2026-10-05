@@ -1,6 +1,7 @@
 import type { FsEntry } from 'claude-code'
 
 import { hasGitHub } from './pullrequest'
+import type { PrTemplate } from './prtemplate'
 
 // The git flow (setting gitFlow): how a teammate's work reaches main. The first start in a project asks
 // which one (recommended from a cheap look at the project, done once) and saves the answer in its
@@ -201,8 +202,15 @@ function landLine(bin: string, branch: string): string {
 - Never \`git add -A\`, \`git commit -a\`, \`git stash\`, \`git checkout -- <file>\`, \`git reset --hard\` or a branch switch: the other teammates work in the same files.`
 }
 
-/** What a PR's description holds, in every PR flow (the user reads it on GitHub, often on a phone). */
-export const PR_BODY_RULES = `- The PR's description, in plain words, in this order: "## Asked for": the user's request, in their words from the task file; "## Why": why it was needed, the problem it solves; the video (the solution: its two lines) when there is one; "## What changed": what was implemented, a few lines; "## To test": the steps; "## Commits": one line each; the task file's path.`
+/** What a PR's description holds, in every PR flow (the user reads it on GitHub, often on a phone): the template it fills in (prtemplate.ts). */
+export function prBodyRules(template?: Pick<PrTemplate, 'path' | 'source'>): string {
+  const ending = 'Drop its <!-- --> comments; keep its checklists, ticking what is true. Never add a template to the repo yourself: the user does it from the settings page.'
+  if (!template || template.source === 'shipped') {
+    const path = template ? ` (\`${template.path}\`; this project has none of its own)` : ''
+    return `- The PR's description fills in better-tasks' template${path}, in plain words, kept short, in this order: "## Asked for": the user's request, in their words from the task file; "## Why": why it was needed, the problem it solves or the feature it adds; the video (the solution: its two lines) when there is one; "## What changed": what was implemented, a few lines; "## To test": the steps; "## Notes": risk, follow-ups, a linked issue, or "None"; "## Commits": one line each, then the task file's path. ${ending}`
+  }
+  return `- The PR's description fills in this project's template, \`${template.path}\` (read it first): each of its sections, in plain words, kept short. At the top, the user's request (their words from the task file) and why it was needed (the problem it solves or the feature it adds): in the template's matching sections, else as "## Asked for" and "## Why" above them; the video (the solution: its two lines) right after those, when there is one. Not in the template? Add at the end: "## Commits", one line each, then the task file's path. ${ending}`
+}
 
 export function directTeammateRules(bin: string): string {
   return `## Git flow: straight to main (this project)
@@ -210,13 +218,13 @@ One checkout, shared with the other teammates: no branch, no worktree, no PR.
 ${landLine(bin, '')}`
 }
 
-export function devTeammateRules(bin: string, dev: string): string {
+export function devTeammateRules(bin: string, dev: string, body = prBodyRules()): string {
   return `## Git flow: shared ${dev} branch, a PR per task (this project)
 One checkout, on \`${dev}\`, shared with the other teammates: no worktree. Installs and tests build \`${dev}\`, so the user tries every change together.
 ${landLine(bin, dev)}
 - A commit for two tasks names both ids. Never commit to main.
-${PR_BODY_RULES}
-- Done: write that description to <scratchpad>/pr.md, then \`python3 ${bin}/task_pr.py open T-004 --body-file <scratchpad>/pr.md\`. It puts the task's commits on \`task/T-004\` (origin's main plus them, picked without touching any checkout), pushes it and opens the PR with the video attached (or on the videos branch when gh can't). Leave the two video lines out of pr.md: it puts them right before "## What changed". Run again later: it adds only the new commits.
+${body}
+- Done: write that description to <scratchpad>/pr.md, then \`python3 ${bin}/task_pr.py open T-004 --body-file <scratchpad>/pr.md\`. It puts the task's commits on \`task/T-004\` (origin's main plus them, picked without touching any checkout), pushes it and opens the PR with the video attached (or on the videos branch when gh can't). Leave the two video lines out of pr.md: it puts them right after the request and why. Run again later: it adds only the new commits.
 - It stops on a commit that conflicts on main (it leans on another task's commit): tell the lead which one.
 - Your notes get the line "PR: <the url it printed>". Request changes: land the fix on \`${dev}\`, then run open again. Never fix on the task branch; never merge.`
 }
@@ -238,7 +246,7 @@ export function leadRules(flow: GitFlow, bin: string, dev: string, prRules: stri
   return flow === 'worktree-prs' ? prRules : ''
 }
 
-export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
-  if (flow === 'dev-prs') return devTeammateRules(bin, dev)
-  return flow === 'worktree-prs' ? `${prRules}\n${PR_BODY_RULES}` : directTeammateRules(bin)
+export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string, body = prBodyRules()): string {
+  if (flow === 'dev-prs') return devTeammateRules(bin, dev, body)
+  return flow === 'worktree-prs' ? `${prRules}\n${body}` : directTeammateRules(bin)
 }

@@ -14,6 +14,7 @@ import type { HostApp } from './editor'
 import type { Files } from './io'
 import { CONFIG_FILE, PROJECT_KEYS, projectSettings, readOverrides, saveProjectValue, settingsFrom } from './settings'
 import { pathsOf } from './instructions'
+import { findPrTemplate, NEW_TEMPLATE, shownPath } from './prtemplate'
 import type { Editor } from './settings'
 import { goalOf, readSprints } from './sprintlog'
 import { daysLeft, daysLeftLabel, nextSprint, sprintEnd, sprintLabel, sprintStart, weekLabel } from './sprints'
@@ -194,6 +195,15 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
   const present = await Promise.all(starters.map(exists))
   const redraw = () => $.ui.invalidate('ui.render')
   const instructions = pathsOf(String(overrides.values.instructions ?? ''))[0]
+  const prTemplate = await findPrTemplate(files, root, String(overrides.values.prTemplate ?? ''), $.plugin.root)
+  /** Opens the PR template; better-tasks' own is first added to the repo, said plainly. */
+  const openPrTemplate = async () => {
+    if (prTemplate.source !== 'shipped') return openFile($, editor, prTemplate.path)
+    await files.write(`${root}/${NEW_TEMPLATE}`, await files.read(prTemplate.path))
+    $.ui.log(`better-tasks: added ${NEW_TEMPLATE}, the PR template every PR now fills in. Commit it to keep it.`)
+    redraw()
+    return openFile($, editor, `${root}/${NEW_TEMPLATE}`)
+  }
   const fileAt = (label: string) => (label === 'instructions' ? (instructions ?? CONFIG_FILE) : (PROJECT_FILES[label] ?? CONFIG_FILE))
   /** Opens one of the project's files, writing its starter text first when it is missing. */
   const openOrCreate = async (label: string) => {
@@ -208,7 +218,8 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
     project: {
       problems: overrides.problems,
       files: Object.keys(PROJECT_FILES).map(label => ({ label, exists: present[starters.indexOf(fileAt(label))] ?? false })),
-      onOpen: label => void openOrCreate(label),
+      prTemplate: { shown: shownPath(prTemplate, root), source: prTemplate.source },
+      onOpen: label => void (label === 'pr-template' ? openPrTemplate() : openOrCreate(label)),
     },
   }
 }

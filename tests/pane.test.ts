@@ -709,6 +709,33 @@ for (const surface of SURFACES) {
   })
 }
 
+test("the PR template row: better-tasks' own until Enter adds it to the repo, said plainly; then the project's opens", async ($, on) => {
+  on('fs.read', { path: /\/templates\/pull_request_template\.md$/ }, () => ({ value: '## Asked for\n' })) // wherever the plugin root is
+  const { files, commands } = fakeProject(on)
+  const logged: string[] = []
+  on('ui.log', ($, e) => {
+    logged.push(String(e.text))
+    return { value: undefined }
+  })
+  await $.command.run(sprintCommand('config'))
+  const ui = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', ...PANE })
+  expect(await ui.find({ type: 'Text', text: 'better-tasks’ · add to repo' })).toBeDefined()
+  await arrowTo($, 'cfg-pr-template')
+  expect(await ui.find({ type: 'Text', text: /^PR template: .*⏎ adds it as \.github\/pull_request_template\.md/ })).toBeDefined()
+
+  await ui.press({ key: 'cfg-pr-template' })
+  expect(files.get(`${ROOT}/.github/pull_request_template.md`)).toBe('## Asked for\n')
+  expect(logged.some(line => line.includes('added .github/pull_request_template.md'))).toBe(true)
+  expect(commands.at(-1)).toEqual(['open', `${ROOT}/.github/pull_request_template.md`])
+  expect(await ui.find({ type: 'Text', text: '.github/pull_request_template.md · open' })).toBeDefined()
+
+  files.set(`${ROOT}/team/pr.md`, '# Ours\n')
+  files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ prTemplate: 'team/pr.md' }))
+  await ui.press({ key: 'board' })
+  await ui.press({ key: 'config' })
+  expect(await ui.find({ type: 'Text', text: 'team/pr.md · open' })).toBeDefined()
+})
+
 for (const surface of SURFACES) {
   test(`each sprint's heading carries its week, dates and days left; the goal sits under This sprint (${surface})`, async ($, on) => {
     const { files } = fakeProject(on)

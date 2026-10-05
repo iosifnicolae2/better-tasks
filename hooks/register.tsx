@@ -11,9 +11,10 @@ import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from 
 import { contributeRules, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { COORDINATOR_RULES, ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, teammateRules, voiceDir } from './demovideo'
-import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
+import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, recommend, teammateRules as flowRules, usesWorktree } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
+import { findPrTemplate } from './prtemplate'
 import { coordinatorTestingRules, OFFSCREEN_FIELD, OFFSCREEN_QUESTION, testingRules } from './testenv'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, PR_COORDINATOR_RULES, PR_TEAMMATE_RULES } from './pullrequest'
 import type { Io } from './io'
@@ -41,6 +42,7 @@ const FILING_TOOLS = ['task_create', 'task_update', 'task_note']
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
 let loggedMissing = ''
+let loggedMissingTemplate = ''
 let voiceSetup: Promise<void> | undefined
 let ghUpdate: Promise<void> | undefined
 
@@ -166,7 +168,7 @@ export const register: Register = (on, options) => {
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const testing = testingRules(settings.offScreen)
     const videos = settings.demoVideos ? teammateRules($.plugin.root, settings.videoQuality) : ''
-    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
+    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES, await prBodyNow($, settings))
     const instructions = await instructionsNow($, settings)
     const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, instructions].filter(Boolean).join('\n\n')
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
@@ -404,6 +406,16 @@ async function instructionsNow($: EngineInterface, settings: Settings): Promise<
   if (text && text !== loggedMissing) $.ui.log(`better-tasks: project instructions not found: ${text}`)
   loggedMissing = text
   return instructionsBlock(lines)
+}
+
+/** The PR description's rules, from the template it fills in (prtemplate.ts); a custom path that isn't there is one log line, once. */
+async function prBodyNow($: EngineInterface, settings: Settings): Promise<string> {
+  if (!hasPrs(settings.gitFlow)) return ''
+  const template = await findPrTemplate(ioOf($), await $.session.root(), settings.prTemplate, $.plugin.root)
+  const missing = template.missing ?? ''
+  if (missing && missing !== loggedMissingTemplate) $.ui.log(`better-tasks: PR template not found: ${missing}; using ${template.path}`)
+  loggedMissingTemplate = missing
+  return prBodyRules(template)
 }
 
 /** The plugin's scripts folder (land.sh, task_pr.py, …). */
