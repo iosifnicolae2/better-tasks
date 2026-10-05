@@ -32,4 +32,4 @@ One checkout, on the dev branch "Settings" names, shared with the other teammate
 - Request changes, or the merge conflicts: land the fix on the dev branch, then run open again. Never fix on the task branch.
 
 ## Then
-Your notes get the line "PR: <the url it printed>", and the PR link goes in your "For the user" block (the `better-tasks:done` skill).
+Your notes get the line "PR: <the url it printed>", and the PR link goes in your "For the user" block, under "Links:" and in the question (the `better-tasks:done` skill).

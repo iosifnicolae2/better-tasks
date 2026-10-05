@@ -166,7 +166,8 @@ describe('filing messages', () => {
 
 describe('finishing', () => {
   test('the lead asks about one finished task at a time, then the next', () => {
-    expect(SHIPPED.coordinator).toContain('one finished task per call, never several at once')
+    expect(SHIPPED.coordinator).toContain('**One task per question, always.**')
+    expect(SHIPPED.coordinator).toContain('act on its answer, then show the next one\'s links and ask about it')
     expect(SHIPPED.coordinator).not.toContain('up to 4 in one call')
   })
 })
