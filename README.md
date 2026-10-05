@@ -35,6 +35,7 @@ Restart Claude Code.
 - ✅ **You approve** finished work before a task closes.
 - 🎥 **Before/after videos** of each change, narrated.
 - 🔀 **A pull request per task**, merged when you approve.
+- 🧘 **A quiet IDE:** IntelliJ skips the teammates' worktrees (`.claude/worktrees/`), so they don't set off re-indexing.
 - 🌙 **`/away`:** screens off, the Mac keeps working.
 
 ### 🎬 Demo: a before/after video

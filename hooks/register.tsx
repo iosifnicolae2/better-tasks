@@ -5,6 +5,7 @@ import type { Activity, CacheStep, StatusCheck, Task, Teammate, TurnFacts } from
 import { activityOf } from './activity'
 import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
+import { excludeWorktrees } from './intellij'
 import { migrateFolder } from './migrate'
 import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
@@ -61,6 +62,7 @@ export const register: Register = (on, options) => {
     await useLongCache($).catch(error => logFailure($, 'the 1-hour cache', error))
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
+    await keepWorktreesFromIde($).catch(error => logFailure($, 'excluding the worktrees in IntelliJ', error))
     if (!(await setUpTeams($))) return started
     await update($, typesState, () => '')
     await syncTeammateTypes($, await settingsNow($)).catch(error => logFailure($, 'the teammate agent types', error))
@@ -227,6 +229,13 @@ async function declareAll($: EngineInterface): Promise<void> {
   for (const command of [...PANE_COMMANDS, ...SCREEN_COMMANDS]) {
     await $.command.register(command).catch(error => logFailure($, `/${command.name}`, error))
   }
+}
+
+/** IntelliJ skips .claude/worktrees/ (intellij.ts); a project without .idea/ is left as it is. */
+async function keepWorktreesFromIde($: EngineInterface): Promise<void> {
+  const ideaFiles = await $.fs.list(`${await $.session.root()}/.idea`).then(entries => entries.map(entry => entry.name), () => undefined)
+  const line = await excludeWorktrees(ioOf($), ideaFiles)
+  if (line) $.ui.log(line)
 }
 
 function logFailure($: EngineInterface, what: string, error: unknown): void {
