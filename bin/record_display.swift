@@ -8,6 +8,7 @@
 //   info <display id>      prints "x=.. y=.. w=.. h=.. capture=.." (capture: screencapture -D's number)
 //   arrange                moves every virtual display into the row below the lowest physical screen
 //   screens                prints each real screen as "<display id><tab><name>", e.g. "2<tab>DELL U2720Q"
+//   virtuals               prints each virtual display's id, one per line (ours and other apps')
 // Each prints "ready ..." once it holds what it asked for, or "failed: why".
 import AppKit
 import CoreGraphics
@@ -184,6 +185,11 @@ func listScreens() {
   }
 }
 
+func listVirtuals() {
+  let screens = hardwareScreens()
+  for id in activeDisplays() where !isPhysical(id, screens) { say("\(id)") }
+}
+
 func makeDisplay(_ options: Options) -> CGVirtualDisplay {
   let descriptor = CGVirtualDisplayDescriptor()
   descriptor.queue = DispatchQueue.main
@@ -264,5 +270,6 @@ case "turn": holdTurn(parseOptions(arguments.dropFirst()))
 case "info": info(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0)
 case "arrange": arrangeAll()
 case "screens": listScreens()
-default: fail("usage: record_display display|turn|info|arrange|screens ...")
+case "virtuals": listVirtuals()
+default: fail("usage: record_display display|turn|info|arrange|screens|virtuals ...")
 }

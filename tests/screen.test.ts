@@ -55,6 +55,13 @@ test('when the blackout fails, the displays sleep instead', async ($, on) => {
   expect(spawned).toContainEqual(['pmset', 'displaysleepnow'])
 })
 
+test('when the blackout fails while virtual displays run, nothing sleeps', async ($, on) => {
+  const spawned = fakeHost(on, 'failed: no answer in 5 s\nvirtual displays on')
+  const { text } = await $.command.run(AWAY)
+  expect(text).toContain('virtual displays')
+  expect(spawned).not.toContainEqual(['pmset', 'displaysleepnow'])
+})
+
 test('keepAwake: a hold is due while someone runs, at most every 30 s', () => {
   const due = (keepAwake: boolean, mates: Teammate[], now: number, heldAt = -Infinity) =>
     holdIsDue({ keepAwake, team: mates, now, heldAt })

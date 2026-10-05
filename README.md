@@ -16,7 +16,7 @@ A Claude Code plugin. Your tasks are Markdown files in your project; a team of C
 - ✅ **You approve**: no task closes without your yes.
 - 🔀 **Your git flow**: straight to main, a shared `dev` branch, or a worktree and PR per task. Asked once per project.
 - 🗂️ **Sprint board**: `/better-tasks` shows sprints, goals, the backlog and search.
-- 🌙 **`/away`**: screens off, the Mac keeps working.
+- 🌙 **`/away`**: screens off, the Mac keeps working; the virtual test displays stay on.
 
 ## 📦 Install
 
