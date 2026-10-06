@@ -103,6 +103,24 @@ describe('the shipped templates', () => {
     expect(await rule('teammate.md', { batchDeviceTests: false })).not.toContain('feature flag')
   })
 
+  test('batched testing: owners capture "before", one tester records each "after" and notes bugs, owners combine and finish; off, no tester', async () => {
+    const lead = await rule('lead.md', { demoVideos: true })
+    expect(lead).toContain('then one tester (named "batch-testing", told to load `better-tasks:tester`, given the task files) runs the build once, tests every task in it, records each "after" and writes the bugs it finds into the task files.')
+    expect(lead).toContain('Each owner then fixes its bugs, combines its "before" with the tester\'s "after" and finishes as usual.')
+    const teammate = await rule('teammate.md', { demoVideos: true })
+    expect(teammate).toContain('Your task in a batch with a tester? Capture your "before", make your change, and write in your task file what to check; the tester records your "after" and notes any bugs there.')
+    expect(teammate).toContain('make your video from your "before" and its "after", and go on with your PR.')
+    expect(await rule('video.md')).toContain('In a batch, the tester records your AFTER')
+    expect(await rule('teammate.md', { demoVideos: false })).not.toContain('records your "after"')
+    const tester = await rule('tester.md', { demoVideos: true })
+    expect(tester).toContain('You test; the owners fix.')
+    expect(tester).toContain('One full go: run the shared build once and test every task in it as a user would')
+    expect(tester).toContain('A bug goes in that task\'s file: what, how to see it again, a capture.')
+    expect(tester).toContain("Don't change code")
+    expect(tester).toContain('Once the whole batch is tested, tell each owner')
+    for (const name of ['lead.md', 'teammate.md', 'video.md'] as const) expect(await rule(name, { batchDeviceTests: false, demoVideos: true })).not.toContain('tester')
+  })
+
   test('team size: 5 by default; the lead groups similar tasks onto one teammate and spawns only under the limit; 0: no limit', async () => {
     expect(settingsOf({}).maxTeammates).toBe(5)
     const lead = await rule('lead.md')

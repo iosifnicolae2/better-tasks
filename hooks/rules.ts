@@ -12,7 +12,7 @@ import { VIRTUAL_SCREEN } from './testenv'
 /** The plugin's folder of instruction templates, under its root. */
 export const TEMPLATES_DIR = '.claude/better-tasks'
 
-export const RULE_FILES = ['lead.md', 'teammate.md', 'status-check.md', 'done.md', 'testing.md', 'video.md', 'pull-request.md', 'contribute.md'] as const
+export const RULE_FILES = ['lead.md', 'teammate.md', 'status-check.md', 'done.md', 'testing.md', 'video.md', 'pull-request.md', 'contribute.md', 'tester.md'] as const
 export type RuleFile = (typeof RULE_FILES)[number]
 
 /** Facts that aren't settings: the teammate being spawned, the plugin's paths, the PR template. */
