@@ -33,3 +33,4 @@ Video: [T-094.mp4](../tasks_videos/T-094.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/54
 T-094 (#54) Batched testing: owners record "before", one tester records "after" for all, finds bugs, owners combine and finish
 When tasks share one build, each owner records its "before"; one tester then tests them all in one go, first sets up its own fast test environment, then records each "after" and writes bugs into each task, and the owners fix them and finish. Shown only with Batch device tests on.
+- 2026-10-07: accepted. Full tests 352 pass, skills-check and settings-doc current. Video plays signed out from jsDelivr (it 503'd for a few minutes after the push, then 200 video/mp4). Review PR closed.
