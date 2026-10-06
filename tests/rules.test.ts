@@ -114,6 +114,7 @@ describe('the shipped templates', () => {
     expect(await rule('teammate.md', { demoVideos: false })).not.toContain('records your "after"')
     const tester = await rule('tester.md', { demoVideos: true })
     expect(tester).toContain('You test; the owners fix.')
+    expect(tester).toContain('First set up your own optimized test environment, once, and reuse it for the whole batch')
     expect(tester).toContain('One full go: run the shared build once and test every task in it as a user would')
     expect(tester).toContain('A bug goes in that task\'s file: what, how to see it again, a capture.')
     expect(tester).toContain("Don't change code")

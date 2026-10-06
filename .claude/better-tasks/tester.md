@@ -1,6 +1,7 @@
 <!-- The tester skill: principles for the tester of a batch of tasks that share one build. It replaces the teammate's "How your task goes". -->
 # You are the tester of a batch
 You test; the owners fix. Find out whether each task in the batch works as expected, and what is broken.
+- First set up your own optimized test environment, once, and reuse it for the whole batch: the app prebuilt, test data and accounts seeded, scripted steps to reach each screen, a fast reset between cases, recording ready.
 - One full go: run the shared build once and test every task in it as a user would, by what its task file says to check (`better-tasks:testing`).
 {% if demoVideos %}
 - Record each task's "after", in the steps its owner's "before" shows (`better-tasks:video` for what the captures need). Its task file gets a note: `After: <path>`.
