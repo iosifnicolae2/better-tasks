@@ -36,3 +36,9 @@ Tasks with a PR are now named with its number, "T-078 (#43)", in what the lead w
 PR: https://github.com/iosifnicolae2/better-tasks/pull/44
 T-079 (#44) Reference tasks with their PR number, like "T-078 (#43)"
 Wherever you read a task, it now carries its PR number, "T-078 (#43)": approval questions (header and text), status updates, teammates' notes, the task list and the board. Release notes and the release video still show bare ids; those are with the lead to route.
+- 2026-10-06: Release parts (lead: do them here). scripts/release.sh: `with_pr_numbers` turns each "T-079" in the notes into "T-079 (#44)" from the task files' PR notes, unless the line already names that PR. bin/release_video.py: task['ref'] in the opening list, the task card and its spoken line. Small bug fixed on the way: a title ending in a quote lost it (task_pr.py PR title, release_video.py card); both read the YAML value whole now, and PR #44's title is fixed. Commits 259f886, a12d38e. Checks: `claude plugin test .` 324 pass, task-pr-check ok, `release.sh --dry-run v0.11.15` in a scratch clone (local bare origin): every Changes line and card carries the number. New video; PR #44 updated.
+
+### For the user
+PR: https://github.com/iosifnicolae2/better-tasks/pull/44
+T-079 (#44) Reference tasks with their PR number, like "T-078 (#43)"
+Wherever you read a task, it now carries its PR number, "T-078 (#43)": approval questions (header and text), status updates, teammates' notes, the task list, the board, release notes and the release video.
