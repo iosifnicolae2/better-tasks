@@ -1,0 +1,7 @@
+BEFORE: install of v0.11.14 (claude plugin install, fresh CLAUDE_CONFIG_DIR)
+files:      220
+.claude/tasks files:       84  size: 616K
+.claude/tasks/T-070/validation-blocked.jpg
+better-tasks
+settings.json
+tasks
