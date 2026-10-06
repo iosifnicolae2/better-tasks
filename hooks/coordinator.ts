@@ -3,7 +3,7 @@ import type { PromptComposeSection, PromptComposeTrait, PromptOrigin } from 'cla
 import type { Task, TurnFacts } from '../types'
 import type { Io } from './io'
 import type { Settings } from './settings'
-import { taskIdIn } from './spawn'
+import { questionTasks } from './spawn'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintNumber, sprintStart, sprintTitle } from './sprints'
 import type { SprintConfig } from './sprints'
@@ -84,13 +84,12 @@ export function unfiledLine(last: TurnFacts): string | undefined {
 /** The Finishing question's option that closes a task (texts.ts). */
 export const RESOLVE_OPTION = 'Mark as resolved'
 
-/** The task ids an AskUserQuestion answer resolved: each question naming a task, answered "Mark as resolved". */
+/** The task ids an AskUserQuestion answer resolved: each question naming a task (or a bundle's tasks), answered "Mark as resolved". */
 export function resolvedIn(answers: unknown, prefix: string): string[] {
   if (!answers || typeof answers !== 'object') return []
   return Object.entries(answers)
     .filter(([, answer]) => answer === RESOLVE_OPTION)
-    .map(([question]) => taskIdIn(question, prefix))
-    .filter((id): id is string => id !== undefined)
+    .flatMap(([question]) => questionTasks(question, prefix))
 }
 
 /** One line while a task the user resolved is still open: the lead closes it now. */

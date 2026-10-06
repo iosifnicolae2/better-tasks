@@ -6,7 +6,8 @@ The tasks are those the commits in since..until name: a subject that starts with
 a PR merge) or ends with it in parentheses ("... (T-058)", straight to main); the prefix is the project's
 taskPrefix. The video: an opening card (the version, what it ships, the tasks without
 a video), then per task a card with its id, its PR number ("T-058 (#33)") and its title and its own before/after video, as the video skill
-made it. The video and its poster (the opening card with a play button) go next to the task videos,
+made it. Similar tasks that share one video (one PR for them, its "Video:" note in each task file) get one card
+naming them all, and the video once. The video and its poster (the opening card with a play button) go next to the task videos,
 release-<version>.mp4 and .png; prints the poster's path, then the video's.
 Exits 3 when no shipped task has a video: there is nothing to show.
 
@@ -53,14 +54,15 @@ def main() -> None:
         work = Path(tmp)
         for task in tasks:
             task['video'] = task_video(task['id'], work)
-        shown = [task for task in tasks if task['video']]
+        shown = bundled([task for task in tasks if task['video']])
         if not shown:
             print(f'release-video: no task since {args.since or "the start"} has a video ({len(tasks)} shipped)', file=sys.stderr)
             sys.exit(NO_VIDEO)
 
         voice = demo.Voice('af_heart')
         opening = draw_opening(work / 'opening.png', canvas, args.version, args.since, tasks)
-        parts = [card_clip(work, 'opening', opening, args.version, opening_words(args.version, args.since, tasks, shown), canvas, voice, True)]
+        with_video = [task for task in tasks if task['video']]
+        parts = [card_clip(work, 'opening', opening, args.version, opening_words(args.version, args.since, tasks, with_video), canvas, voice, True)]
         for number, task in enumerate(shown, 1):
             card = draw_task_card(work / f'{task["id"]}.png', canvas, task, number, len(shown))
             parts.append(card_clip(work, task['id'], card, args.version, f'{task["ref"]}: {task["title"]}', canvas, voice, False))
@@ -91,13 +93,18 @@ def shipped_tasks(since: str, until: str, prefix: str) -> list:
     """
     span = f'{since}..{until}' if since else until
     subjects = demo.run(['git', 'log', '--reverse', '--format=%s', span]).splitlines()
+    return tasks_named(subjects, prefix)
+
+
+def tasks_named(subjects: list, prefix: str) -> list:
+    """The tasks these commit subjects name, in order; a bundle's PR names several at its start ("T-4 T-5 Title (#7)")."""
     task_id = rf'{re.escape(prefix)}\d+'
-    at_start = re.compile(rf'^({task_id})\b[\s:]*(.*?)(\s*\(#\d+\))?$')
+    at_start = re.compile(rf'^((?:{task_id})(?:[\s,+]+{task_id})*)\b[\s:]*(.*?)(\s*\(#\d+\))?$')
     at_end = re.compile(rf'^(.*?)\s*\(((?:{task_id})(?:,\s*{task_id})*)\)$')
     tasks, seen = [], set()
     for subject in subjects:
         if match := at_start.match(subject):
-            named, title = [match.group(1)], match.group(2)
+            named, title = re.findall(task_id, match.group(1)), match.group(2)
         elif match := at_end.match(subject):
             named, title = re.split(r',\s*', match.group(2)), match.group(1)
         else:
@@ -108,8 +115,30 @@ def shipped_tasks(since: str, until: str, prefix: str) -> list:
                 seen.add(found)
                 number = pr_number(found) or (merged and merged.strip(' (#)'))
                 ref = f'{found} (#{number})' if number else found
-                tasks.append({'id': found, 'ref': ref, 'title': task_title(found) or title or found})
+                tasks.append({'id': found, 'ref': ref, 'pr': number or '', 'title': task_title(found) or title or found})
     return tasks
+
+
+def bundled(tasks: list) -> list:
+    """One card per video: tasks that share one (a bundle's PR) become one, naming them all, in their order."""
+    cards = {}
+    for task in tasks:
+        key = str(task['video'])
+        if key not in cards:
+            cards[key] = {**task, 'ids': [task['id']], 'titles': [task['title']], 'prs': [task['pr']]}
+            continue
+        card = cards[key]
+        card['ids'].append(task['id'])
+        card['titles'].append(task['title'])
+        card['prs'].append(task['pr'])
+    for card in cards.values():
+        if len(card['ids']) > 1:
+            numbers = set(card['prs'])
+            one = numbers.pop() if len(numbers) == 1 else ''
+            card['ref'] = f"{', '.join(card['ids'])} (#{one})" if one else ', '.join(
+                f'{task} (#{pr})' if pr else task for task, pr in zip(card['ids'], card['prs']))
+            card['title'] = '; '.join(card['titles'])
+    return list(cards.values())
 
 
 def task_text(task_id: str) -> str:
@@ -148,17 +177,25 @@ def pr_number(task_id: str) -> str:
     return numbers[-1] if numbers else ''
 
 
+def video_name(task_id: str) -> str:
+    """The task's video file: the one its "Video:" note names (shared with the tasks of its PR), else <id>.mp4."""
+    named = re.search(r'^Video:.*?([\w.-]+\.mp4)', task_text(task_id), re.M)
+    return named.group(1) if named else f'{task_id}.mp4'
+
+
 def task_video(task_id: str, work: Path) -> Path | None:
     """The task's video: the project's own copy (bin/demo-video.sh's folder), else the one on the videos branch."""
+    video = video_name(task_id)
     for folder in (demo.videos_dir(), demo.project_root() / '.claude' / 'tasks_videos'):
-        if (folder / f'{task_id}.mp4').exists():
-            return folder / f'{task_id}.mp4'
-    name = f'{VIDEOS_BRANCH}:{task_id}.mp4'
+        if (folder / video).exists():
+            return folder / video
+    name = f'{VIDEOS_BRANCH}:{video}'
     if subprocess.run(['git', 'cat-file', '-e', name], capture_output=True).returncode != 0:
         return None
-    path = work / f'{task_id}-branch.mp4'
-    with path.open('wb') as out:
-        subprocess.run(['git', 'cat-file', 'blob', name], stdout=out, check=True)
+    path = work / f'{Path(video).stem}-branch.mp4'
+    if not path.exists():
+        with path.open('wb') as out:
+            subprocess.run(['git', 'cat-file', 'blob', name], stdout=out, check=True)
     return path
 
 
@@ -207,7 +244,8 @@ def draw_task_card(path: Path, canvas: tuple, task: dict, number: int, total: in
     image, draw, unit = blank(canvas)
     left = 90 * unit
     draw.text((left, 260 * unit), f'{number} of {total}', font=demo.font(round(30 * unit)), fill=MUTED)
-    draw.text((left, 300 * unit), task['ref'], font=demo.font(round(110 * unit)), fill=ACCENT)
+    ref_font = demo.font(round((110 if len(task.get('ids', [task['id']])) == 1 else 64) * unit))
+    draw.text((left, 300 * unit), clipped(draw, task['ref'], ref_font, line_width(canvas, left)), font=ref_font, fill=ACCENT)
     title_font = demo.font(round(54 * unit))
     for row, line in enumerate(wrapped(draw, task['title'], title_font, line_width(canvas, left), TITLE_LINES)):
         draw.text((left, (460 + row * 72) * unit), line, font=title_font, fill=demo.WHITE)

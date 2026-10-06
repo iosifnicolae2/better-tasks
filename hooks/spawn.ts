@@ -12,6 +12,14 @@ export function taskIdIn(text: string, prefix: string): string | undefined {
   return text.match(new RegExp(`(?<![\\w-])${escape(prefix)}\\d+\\b`))?.[0]
 }
 
+/** The tasks a question is about: every id on its first line before a colon ("T-4, T-5 (#7): ..." for a bundle's PR), else the first it names. */
+export function questionTasks(text: string, prefix: string): string[] {
+  const opening = text.split('\n')[0]!.split(':')[0]!
+  const ids = opening.match(new RegExp(`(?<![\\w-])${escape(prefix)}\\d+\\b`, 'g'))
+  const first = taskIdIn(text, prefix)
+  return ids ? [...new Set(ids)] : first ? [first] : []
+}
+
 /** The task a spawn is for: the id its prompt names, else the one open task its name owns. */
 export function spawnTask(tasks: readonly Task[], prompt: string, name: string, prefix: string): Task | undefined {
   const id = taskIdIn(prompt, prefix)
