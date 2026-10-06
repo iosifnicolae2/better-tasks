@@ -1,9 +1,0 @@
-AFTER: install of the v0.11.15 package (release.sh in a test clone, claude plugin install, fresh CLAUDE_CONFIG_DIR)
-files:      136
-.claude/tasks: absent
-better-tasks
-settings.json
-  ❯ better-tasks@better-tasks
-    Version: 0.11.15
-    Scope: user
-    Status: ✔ enabled
