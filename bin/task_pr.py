@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """A pull request per task, with its before/after video in it, opened before the user is asked to approve.
 
-    python3 task_pr.py open T-004 [--body-file pr.md] [--ready] [--dry-run]           picks the task's commits
-    python3 task_pr.py open T-004 --here [--body-file pr.md] [--ready] [--dry-run]    this checkout's branch (a worktree)
-    python3 task_pr.py close T-004
+    python3 task_pr.py open T-004 [T-005 ...] [--body-file pr.md] [--ready] [--dry-run]    picks the tasks' commits
+    python3 task_pr.py open T-004 --here [--body-file pr.md] [--ready] [--dry-run]          this checkout's branch (a worktree)
+    python3 task_pr.py close T-004 [T-005 ...]
     python3 task_pr.py sync
 
-The last line `open` prints is the PR's URL: the link the lead puts in the approval question.
+The last line `open` prints is the PR's URL: the link the lead puts in the approval question. `open` notes it in
+each task file ("PR: <url>"), with the video (a "Video:" line) when the task file has none.
+
+Several similar tasks can share one PR and one video: `open T-004 T-005` opens one PR, task/T-004, for the
+commits that name any of them, with the first one's video (T-004.mp4); its title and description name each.
+`close` with the same ids closes it.
 
 `open` opens a draft PR; run it again with --ready after the user's yes and the full tests (a draft can't merge).
 Run again, it pushes what's new, and a new video (another .mp4 than the PR shows) takes the old one's place.
@@ -40,6 +45,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -101,9 +107,14 @@ def default_main(remote: str) -> str:
     return head.split("/", 1)[1] if "/" in head else "main"
 
 
-def task_commits(task: str, upstream: str, dev: str) -> list[str]:
-    """Oldest first: the non-merge commits on dev, not in origin's main, whose subject names the task."""
-    pattern = re.compile(rf"(?<![\w-]){re.escape(task)}\b")
+def naming(tasks: list[str]) -> re.Pattern:
+    """A commit subject that names any of the tasks."""
+    return re.compile(rf"(?<![\w-])(?:{'|'.join(map(re.escape, tasks))})\b")
+
+
+def task_commits(tasks: list[str], upstream: str, dev: str) -> list[str]:
+    """Oldest first: the non-merge commits on dev, not in origin's main, whose subject names one of the tasks."""
+    pattern = naming(tasks)
     lines = git("log", "--reverse", "--no-merges", "--format=%H %s", f"{upstream}..{dev}").splitlines()
     return [line.split(" ", 1)[0] for line in lines if pattern.search(line.split(" ", 1)[1])]
 
@@ -258,7 +269,8 @@ VIDEO_BLOCK = re.compile(r"^(<!-- video \w+ -->\n)?\[!\[Before/after video[^\n]*
                          r"(<details><summary>Or play it here</summary>\n\n[^\n]*\n\n</details>\n\n?)?", re.M)
 
 
-def open_pr(task: str, options: argparse.Namespace) -> int:
+def open_pr(tasks: list[str], options: argparse.Namespace) -> int:
+    task = tasks[0]
     dev, main = branches(options)
     remote = options.remote
     upstream = f"{remote}/{main}"
@@ -266,15 +278,15 @@ def open_pr(task: str, options: argparse.Namespace) -> int:
     branch = f"task/{task}"
     if options.here or ROOT != MAIN_CHECKOUT:
         options.here = True
-        return open_here(task, branch, upstream, main, options)
+        return open_here(tasks, branch, upstream, main, options)
     if options.ready and is_direct():
         sys.exit("task_pr: straight to main: the PR is for review only and stays a draft; close it with the task")
     if is_direct():
-        commits, base, base_tip = commits_on_main(task, dev)
+        commits, base, base_tip = commits_on_main(tasks, dev)
     else:
-        commits, base, base_tip = task_commits(task, upstream, dev), main, git("rev-parse", upstream)
+        commits, base, base_tip = task_commits(tasks, upstream, dev), main, git("rev-parse", upstream)
     if not commits:
-        sys.exit(f"task_pr: no commit on {dev} names {task} in its subject")
+        sys.exit(f"task_pr: no commit on {dev} names {' or '.join(tasks)} in its subject")
     remote_tip = git("rev-parse", "--verify", "--quiet", f"refs/remotes/{remote}/{branch}", ok=True)
     start = remote_tip or base_tip
     done = already_picked(base_tip, remote_tip) if remote_tip else set()
@@ -294,12 +306,12 @@ def open_pr(task: str, options: argparse.Namespace) -> int:
     if tip != start or not remote_tip:
         lease = f"--force-with-lease=refs/heads/{branch}:{remote_tip}" if remote_tip else "--force-with-lease"
         git("push", "--quiet", lease, remote, f"{tip}:refs/heads/{branch}")
-    return update_pr(task, branch, options) if open_url(branch) else create_pr(task, branch, base, commits, options)
+    return update_pr(tasks, branch, options) if open_url(branch) else create_pr(tasks, branch, base, commits, options)
 
 
-def commits_on_main(task: str, main: str) -> tuple[list[str], str, str]:
-    """Straight to main, pushed or not: the task's commits on main, and the commit before the first (task/<id>-base)."""
-    pattern = re.compile(rf"(?<![\w-]){re.escape(task)}\b")
+def commits_on_main(tasks: list[str], main: str) -> tuple[list[str], str, str]:
+    """Straight to main, pushed or not: the tasks' commits on main, and the commit before the first (task/<id>-base)."""
+    task, pattern = tasks[0], naming(tasks)
     lines = git("log", "--reverse", "--no-merges", "--max-count=500", "--format=%H %s", main).splitlines()
     commits = [line.split(" ", 1)[0] for line in lines if pattern.search(line.split(" ", 1)[1])]
     if not commits:
@@ -307,7 +319,7 @@ def commits_on_main(task: str, main: str) -> tuple[list[str], str, str]:
     return commits, f"task/{task}-base", git("rev-parse", f"{commits[0]}^")
 
 
-def open_here(task: str, branch: str, upstream: str, main: str, options: argparse.Namespace) -> int:
+def open_here(tasks: list[str], branch: str, upstream: str, main: str, options: argparse.Namespace) -> int:
     """This checkout's HEAD (a worktree's own branch) pushed as task/<id>, and its PR."""
     commits = git("log", "--reverse", "--no-merges", "--format=%H", f"{upstream}..HEAD").splitlines()
     if not commits:
@@ -316,37 +328,71 @@ def open_here(task: str, branch: str, upstream: str, main: str, options: argpars
         say(f"dry run: {branch} would be HEAD ({len(commits)} commits)")
         return 0
     git("push", "--quiet", "--force-with-lease", options.remote, f"HEAD:refs/heads/{branch}")
-    return update_pr(task, branch, options) if open_url(branch) else create_pr(task, branch, main, commits, options)
+    return update_pr(tasks, branch, options) if open_url(branch) else create_pr(tasks, branch, main, commits, options)
 
 
 def open_url(branch: str) -> str:
     return run("gh", "pr", "view", branch, "--json", "url,state", "-q", 'select(.state=="OPEN") | .url').stdout.strip()
 
 
-def create_pr(task: str, branch: str, base: str, commits: list[str], options: argparse.Namespace) -> int:
+def create_pr(tasks: list[str], branch: str, base: str, commits: list[str], options: argparse.Namespace) -> int:
+    task = tasks[0]
     path = task_file(task)
     shown, attach = video_lines(task)
     body = Path(options.body_file).read_text() if options.body_file else default_body(task, path, commits)
-    if is_direct() and not options.here:
-        body = REVIEW_NOTE + body
+    body = intro(tasks, options) + body
     draft = [] if options.ready else ["--draft"]
     created = run("gh", "pr", "create", "--base", base, "--head", branch, *draft,
-                  "--title", f"{task} {task_title(path, task)}", "--body", with_video(body, shown), *attach)
+                  "--title", f"{' '.join(tasks)} {options.title or task_title(path, task)}", "--body", with_video(body, shown), *attach)
     if created.returncode != 0:
         print(created.stderr.strip(), file=sys.stderr)
         return created.returncode
     if attach:
         show_player(task, branch)
-    print(created.stdout.strip().splitlines()[-1])
+    url = created.stdout.strip().splitlines()[-1]
+    note_in_tasks(tasks, url)
+    print(url)
     return 0
 
 
-def update_pr(task: str, branch: str, options: argparse.Namespace) -> int:
+def intro(tasks: list[str], options: argparse.Namespace) -> str:
+    """Above the description: straight to main's review note; for several tasks, each one by its id and title."""
+    note = REVIEW_NOTE if is_direct() and not options.here else ""
+    if len(tasks) == 1:
+        return note
+    listed = "\n".join(f"- {task} {task_title(task_file(task), task)}" for task in tasks)
+    return f"{note}{BUNDLE_HEADING}\n{listed}\n\n"
+
+
+BUNDLE_HEADING = "Tasks in this PR, one video for them all:"
+
+
+def note_in_tasks(tasks: list[str], url: str) -> None:
+    """Each task file notes the PR, and the shared video (the first task's) when it names none."""
+    video = video_file(tasks[0])
+    for task in tasks:
+        path = task_file(task)
+        if path is None:
+            continue
+        text = path.read_text()
+        others = [other for other in tasks if other != task]
+        shared = f" (with {', '.join(others)})" if others else ""
+        if url not in text:
+            text = text.rstrip("\n") + f"\n- {date.today().isoformat()}: PR: {url}{shared}\n"
+        if video.exists() and not re.search(r"^Video:", text, re.M):
+            line = f"Video: [{video.name}](../tasks_videos/{video.name})"
+            text = re.sub(r"^## Notes\n", f"## Notes\n{line}\n", text, count=1, flags=re.M) if "\n## Notes\n" in text else text.rstrip("\n") + f"\n\n## Notes\n{line}\n"
+        if text != path.read_text():
+            path.write_text(text)
+
+
+def update_pr(tasks: list[str], branch: str, options: argparse.Namespace) -> int:
     """The open PR: a new video in place of the old one, a new description if given, ready if asked. Prints its URL."""
+    task = tasks[0]
     view = json.loads(run("gh", "pr", "view", branch, "--json", "url,body,isDraft").stdout)
     body = Path(options.body_file).read_text() if options.body_file else view["body"]
-    if options.body_file and is_direct() and not options.here:
-        body = REVIEW_NOTE + body
+    if options.body_file:
+        body = intro(tasks, options) + body
     old = VIDEO_BLOCK.search(view["body"])
     is_new_video = video_file(task).exists() and not (old and f"<!-- video {video_id(task)} -->" in old.group(0))
     shown, attach = video_lines(task) if is_new_video else (old.group(0).rstrip("\n").splitlines() + [""] if old else [], [])
@@ -361,14 +407,17 @@ def update_pr(task: str, branch: str, options: argparse.Namespace) -> int:
     if options.ready and view["isDraft"]:
         run("gh", "pr", "ready", branch)
         say("marked ready for review")
+    note_in_tasks(tasks, view["url"])
     print(view["url"])
     return 0
 
 
-def close(task: str, options: argparse.Namespace) -> int:
-    """The task closed without a merge: its PR closed, its branches deleted."""
+def close(tasks: list[str], options: argparse.Namespace) -> int:
+    """The tasks closed without a merge: their PR closed (the first one's branch), its branches deleted."""
+    task, named = tasks[0], ", ".join(tasks)
     branch = f"task/{task}"
-    note = f"{task} is closed; its commits are on main." if is_direct() else f"{task} is closed without this PR."
+    are = "is" if len(tasks) == 1 else "are"
+    note = f"{named} {are} closed; the commits are on main." if is_direct() else f"{named} {are} closed without this PR."
     if open_url(branch):
         closed = run("gh", "pr", "close", branch, "--comment", note, "--delete-branch")
         if closed.returncode != 0:
@@ -418,18 +467,19 @@ def main() -> int:
     parser.add_argument("--remote", default="origin")
     sub = parser.add_subparsers(dest="what", required=True)
     opened = sub.add_parser("open", help="make or extend task/<id> and its draft PR; prints the PR's URL last")
-    opened.add_argument("task", help="the task id, e.g. T-004")
+    opened.add_argument("tasks", nargs="+", help="the task id, e.g. T-004; several similar tasks share one PR and the first one's video")
+    opened.add_argument("--title", default="", help="the words after the ids (default: the first task's title)")
     opened.add_argument("--body-file", help="the PR description (default: from the task file and the commits)")
     opened.add_argument("--ready", action="store_true", help="after the user's yes and the full tests: ready to merge, no longer a draft")
     opened.add_argument("--dry-run", action="store_true", help="build the branch, push nothing")
     opened.add_argument("--here", action="store_true", help="push this checkout's HEAD instead of picking commits from dev (the default in a worktree)")
     closed = sub.add_parser("close", help="the task closed without a merge: close its PR, delete its branches")
-    closed.add_argument("task", help="the task id, e.g. T-004")
+    closed.add_argument("tasks", nargs="+", help="the task ids the PR was opened with")
     sub.add_parser("sync", help="after a merge: main follows origin's main, dev takes it in")
     options = parser.parse_args()
     if options.what == "open":
-        return open_pr(options.task, options)
-    return close(options.task, options) if options.what == "close" else sync(options)
+        return open_pr(options.tasks, options)
+    return close(options.tasks, options) if options.what == "close" else sync(options)
 
 
 if __name__ == "__main__":
