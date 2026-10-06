@@ -31,3 +31,4 @@ Video: [T-078.mp4](../tasks_videos/T-078.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/43
 T-078 Keep the task board (.claude/tasks) out of the published plugin
 From the next release, installs and the directory get the plugin without our task board: the release tag points at a copy of the release without .claude/tasks (220 files down to 136). Main keeps the board. The directory submission has to follow the release tag, not main.
+- 2026-10-06: Accepted. Full tests: claude plugin test . 322 pass; scripts/*-check.sh, skills-check, settings-doc --check ok. Review PR closed.
