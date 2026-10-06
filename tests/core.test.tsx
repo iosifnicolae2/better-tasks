@@ -232,7 +232,8 @@ test("the lead's rules: the task scenario, one question per task, the video befo
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
   expect(lead).toMatch(/^# better-tasks: you lead a team of Claude Code teammates\n/)
   expect(lead).toContain('## How a task goes')
-  expect(lead).toContain('One task per question, plain words.')
+  expect(lead).toContain('Ask the user about one task at a time: one question, never two tasks in it or two questions at once')
+  expect(lead).toContain('goes in your text just above the question and again inside it')
   expect(lead).toContain('tell the teammate "<id> accepted: finish it"')
   expect(lead).toContain('load the `better-tasks:contribute` skill')
   expect(lead).not.toContain('{%')
