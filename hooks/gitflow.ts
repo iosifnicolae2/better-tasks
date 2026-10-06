@@ -2,30 +2,38 @@ import type { FsEntry } from 'claude-code'
 
 import { hasGitHub } from './pullrequest'
 
-// The git flow (setting gitFlow): how a teammate's work reaches main. The first start in a project asks
-// which one (recommended from a cheap look at the project, done once) and saves the answer in its
-// config.json. The rules of the chosen flow only go into the prompts. The parts that need `$` are in register.tsx.
+// The git flow (setting gitFlow): how a teammate's work reaches main. Unless a project chose one, a worktree
+// and a PR per task (straight to main without a GitHub remote: no PRs there). The first start in a project with
+// a GitHub remote asks which one (recommended from a cheap look at the project, done once) and saves the answer
+// in its config.json. The rules of the chosen flow only go into the prompts. The parts that need `$` are in register.tsx.
 
-export const GIT_FLOWS = ['direct', 'dev-prs', 'worktree-prs'] as const
+export const GIT_FLOWS = ['worktree-prs', 'dev-prs', 'direct'] as const
 export type GitFlow = (typeof GIT_FLOWS)[number]
 
 export const FLOW_LABELS: Record<GitFlow, string> = {
-  direct: 'Straight to main',
-  'dev-prs': 'Shared dev branch, PR per task',
   'worktree-prs': 'Worktree and PR per task',
+  'dev-prs': 'Shared dev branch, PR per task',
+  direct: 'Straight to main',
 }
 
 const FLOW_ABOUT: Record<GitFlow, string> = {
-  direct: 'small commits land on main in this checkout. No branches, no PRs, except a bug fix\'s. Fastest.',
+  'worktree-prs': 'each teammate gets its own copy and branch and opens its PR, merged once you approve it; each copy costs an install or a build. The default.',
   'dev-prs': 'everyone commits on dev in this checkout, so one build and one install test it all; each task becomes its own PR, with its video.',
-  'worktree-prs': 'each teammate gets its own copy and branch and opens its PR; each copy costs an install or a build.',
+  direct: 'small commits land on main in this checkout. No branches, no PRs, except a bug fix\'s. Fastest.',
 }
 
-/** The flow a project's values name: gitFlow, else the old "PR per task" switch, else straight to main. */
+/** The flow when a project chose none. */
+export const DEFAULT_FLOW: GitFlow = 'worktree-prs'
+
+/**
+ * The flow a project's values name: gitFlow, else the old switches ("PR per task" on; "Worktree per teammate" on:
+ * straight to main), else the default; hasGitHub false (no GitHub remote) makes that straight to main.
+ */
 export function flowOf(values: Record<string, unknown>): GitFlow {
   const named = GIT_FLOWS.find(flow => flow === values.gitFlow)
   if (named) return named
-  return values.pullRequests === true ? 'worktree-prs' : 'direct'
+  if (values.pullRequests === true) return 'worktree-prs'
+  return values.worktree === true || values.hasGitHub === false ? 'direct' : DEFAULT_FLOW
 }
 
 /** Teammates get a worktree only in the worktree flow, or under "straight to main" with the old worktree switch on. */
@@ -84,7 +92,7 @@ async function foldersOf(probe: Probe): Promise<Folder[]> {
 
 /**
  * One cheap look: directory listings two levels down, `git remote`, `git shortlog`, the workflow files,
- * and only when it decides the flow (a team or CI on PRs, no app) one `du` of the caches, 3 s at most.
+ * and only when it decides the flow (GitHub, no app) one `du` of the caches, 3 s at most.
  */
 export async function lookAt(probe: Probe): Promise<ProjectFacts> {
   const folders = await foldersOf(probe)
@@ -100,7 +108,7 @@ export async function lookAt(probe: Probe): Promise<ProjectFacts> {
     authors: authorsOf(shortlog ?? ''),
     prChecks,
   }
-  const needsSize = facts.hasGitHub && !facts.app && (facts.authors >= 2 || facts.prChecks)
+  const needsSize = facts.hasGitHub && !facts.app
   return needsSize ? { ...facts, cacheMb: await cacheSize(probe, folders) } : facts
 }
 
@@ -151,20 +159,20 @@ export function appOf(names: readonly string[]): string {
 const gigabytes = (mb: number) => `${Math.round(mb / 102.4) / 10} GB`
 
 /**
- * The flow that fits, and why, in a few plain words. An app to install: everyone on one dev branch, so one
- * build and one install test it all. A team or CI on PRs: a PR per task, from dev when a copy is heavy to
- * build. Else straight to main: nobody reviews a PR.
+ * The flow that fits, and why, in a few plain words: a worktree and a PR per task, unless a copy is costly.
+ * An app to install: everyone on one dev branch, so one build and one install test it all; a heavy build
+ * cache: a PR per task, from dev. No GitHub remote: straight to main, no PRs.
  */
 export function recommend(facts: ProjectFacts): { flow: GitFlow; reason: string } {
   if (!facts.hasGitHub) return { flow: 'direct', reason: 'no GitHub remote, so no PRs' }
   if (facts.app) return { flow: 'dev-prs', reason: `${facts.app} to build and install once for every change` }
-  if (facts.authors < 2 && !facts.prChecks) return { flow: 'direct', reason: 'one person, no app to install and no CI on PRs' }
-  const why = [facts.authors >= 2 && `${facts.authors} people commit`, facts.prChecks && 'CI runs on PRs'].filter(Boolean).join(', ')
+  const team = [facts.authors >= 2 && `${facts.authors} people commit`, facts.prChecks && 'CI runs on PRs'].filter(Boolean).join(', ')
+  const because = (copy: string) => (team ? `${team}, and ${copy}` : copy)
   if (facts.cacheMb === undefined || facts.cacheMb >= HEAVY_MB) {
     const cache = facts.cacheMb === undefined ? 'a build cache too big to measure quickly' : `a ${gigabytes(facts.cacheMb)} build cache`
-    return { flow: 'dev-prs', reason: `${why}, and ${cache} for every copy` }
+    return { flow: 'dev-prs', reason: because(`${cache} for every copy`) }
   }
-  return { flow: 'worktree-prs', reason: `${why}, and a copy is cheap to set up` }
+  return { flow: 'worktree-prs', reason: because('a copy is cheap to set up') }
 }
 
 // ---- The first-start question ----

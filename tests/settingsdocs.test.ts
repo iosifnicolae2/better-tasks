@@ -13,7 +13,7 @@ describe('settings skill', () => {
     for (const key of Object.keys(FIELDS)) expect(text).toContain(`| \`${key}\` |`)
     expect(text).toContain('| `editor` | Opens task files')
     expect(text).toContain('| "auto" | /config "Editor" or config.json |')
-    expect(text).toContain('| "direct" | config.json |')
+    expect(text).toContain('| "worktree-prs" | config.json |')
     expect(text).toContain('`upstreamPr`')
   })
 

@@ -103,6 +103,8 @@ declare module 'claude-code' {
       page: 'board' | 'config'
       /** The last setting the settings page turned on, counted, so register.tsx can set it up. */
       turnedOn: { field: string; count: number }
+      /** This project has no GitHub remote (seen at session start), so the default git flow reads as straight to main. */
+      noGitHub: boolean
     }
   }
 }
