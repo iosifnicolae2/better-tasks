@@ -144,8 +144,31 @@ async function setConfig($: EngineInterface, options: PluginOptions, field: stri
     $.ui.invalidate('ui.render')
     return
   }
-  const { deny } = await $.config.set({ key: `better-tasks.${field}`, value })
-  if (!deny && value === true) await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
+  const written = await writeOption($, field, value)
+  if (written && !written.deny && value === true) await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
+}
+
+/** One of our /config rows, each key spelled out: the settings page writes better-tasks' own settings and nothing else. */
+function writeOption($: EngineInterface, field: string, value: ConfigValue): ReturnType<EngineInterface['config']['set']> | undefined {
+  switch (field) {
+    case 'editor': return $.config.set({ key: 'better-tasks.editor', value })
+    case 'longCache': return $.config.set({ key: 'better-tasks.longCache', value })
+    case 'statusEvery': return $.config.set({ key: 'better-tasks.statusEvery', value })
+    case 'keepAwake': return $.config.set({ key: 'better-tasks.keepAwake', value })
+    case 'openPrInBrowser': return $.config.set({ key: 'better-tasks.openPrInBrowser', value })
+    case 'demoVideos': return $.config.set({ key: 'better-tasks.demoVideos', value })
+    case 'videoQuality': return $.config.set({ key: 'better-tasks.videoQuality', value })
+    case 'easyModel': return $.config.set({ key: 'better-tasks.easyModel', value })
+    case 'easyEffort': return $.config.set({ key: 'better-tasks.easyEffort', value })
+    case 'normalModel': return $.config.set({ key: 'better-tasks.normalModel', value })
+    case 'normalEffort': return $.config.set({ key: 'better-tasks.normalEffort', value })
+    case 'hardModel': return $.config.set({ key: 'better-tasks.hardModel', value })
+    case 'hardEffort': return $.config.set({ key: 'better-tasks.hardEffort', value })
+    case 'escalate': return $.config.set({ key: 'better-tasks.escalate', value })
+    case 'sprintWeeks': return $.config.set({ key: 'better-tasks.sprintWeeks', value })
+    case 'sprintStart': return $.config.set({ key: 'better-tasks.sprintStart', value })
+    default: return undefined
+  }
 }
 
 

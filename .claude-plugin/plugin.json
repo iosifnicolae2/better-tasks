@@ -21,15 +21,7 @@
     "editor": {
       "type": "string",
       "title": "Editor",
-      "description": "Opens task files from the sprint board. auto: IntelliJ inside a JetBrains terminal, VS Code inside VS Code, else the default app.",
-      "options": [
-        "auto",
-        "default",
-        "code",
-        "idea",
-        "cursor",
-        "zed"
-      ],
+      "description": "Opens task files from the sprint board. auto: IntelliJ inside a JetBrains terminal, VS Code inside VS Code, else the default app. One of: auto, default, code, idea, cursor, zed.",
       "default": "auto"
     },
     "worktree": {
@@ -71,12 +63,7 @@
     "videoQuality": {
       "type": "string",
       "title": "Video quality",
-      "description": "The before/after videos' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file.",
-      "options": [
-        "low",
-        "medium",
-        "high"
-      ],
+      "description": "The before/after videos' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file. One of: low, medium, high.",
       "default": "medium"
     },
     "pullRequests": {
@@ -88,79 +75,37 @@
     "easyModel": {
       "type": "string",
       "title": "Easy-task model",
-      "description": "The model teammates run on for quick, clear work: a typo, a text, a small fix. inherit: the manager's own model.",
-      "options": [
-        "sonnet",
-        "opus",
-        "fable",
-        "haiku",
-        "inherit"
-      ],
+      "description": "The model teammates run on for quick, clear work: a typo, a text, a small fix. inherit: the manager's own model. One of: sonnet, opus, fable, haiku, inherit.",
       "default": "opus"
     },
     "easyEffort": {
       "type": "string",
       "title": "Easy-task effort",
-      "description": "How hard teammates think on those tasks.",
-      "options": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
+      "description": "How hard teammates think on those tasks. One of: low, medium, high, xhigh, max.",
       "default": "low"
     },
     "normalModel": {
       "type": "string",
       "title": "Normal-task model",
-      "description": "The model teammates run on for an ordinary feature or bug fix. inherit: the manager's own model.",
-      "options": [
-        "sonnet",
-        "opus",
-        "fable",
-        "haiku",
-        "inherit"
-      ],
+      "description": "The model teammates run on for an ordinary feature or bug fix. inherit: the manager's own model. One of: sonnet, opus, fable, haiku, inherit.",
       "default": "opus"
     },
     "normalEffort": {
       "type": "string",
       "title": "Normal-task effort",
-      "description": "How hard teammates think on those tasks.",
-      "options": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
+      "description": "How hard teammates think on those tasks. One of: low, medium, high, xhigh, max.",
       "default": "medium"
     },
     "hardModel": {
       "type": "string",
       "title": "Hard-task model",
-      "description": "The model teammates run on for deep debugging, security work, changes across several areas. inherit: the manager's own model.",
-      "options": [
-        "sonnet",
-        "opus",
-        "fable",
-        "haiku",
-        "inherit"
-      ],
+      "description": "The model teammates run on for deep debugging, security work, changes across several areas. inherit: the manager's own model. One of: sonnet, opus, fable, haiku, inherit.",
       "default": "opus"
     },
     "hardEffort": {
       "type": "string",
       "title": "Hard-task effort",
-      "description": "How hard teammates think on those tasks.",
-      "options": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
+      "description": "How hard teammates think on those tasks. One of: low, medium, high, xhigh, max.",
       "default": "high"
     },
     "escalate": {
@@ -172,28 +117,13 @@
     "sprintWeeks": {
       "type": "string",
       "title": "Sprint length (weeks)",
-      "description": "How many weeks one sprint lasts (1 to 4).",
-      "options": [
-        "1",
-        "2",
-        "3",
-        "4"
-      ],
+      "description": "How many weeks one sprint lasts. One of: 1, 2, 3, 4.",
       "default": "1"
     },
     "sprintStart": {
       "type": "string",
       "title": "Sprint starts on",
-      "description": "The weekday a sprint starts.",
-      "options": [
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday"
-      ],
+      "description": "The weekday a sprint starts. One of: monday, tuesday, wednesday, thursday, friday, saturday, sunday.",
       "default": "monday"
     }
   }

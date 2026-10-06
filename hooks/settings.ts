@@ -85,6 +85,7 @@ const EDITORS = ['auto', 'default', 'code', 'idea', 'cursor', 'zed']
 export const MODELS = ['sonnet', 'opus', 'fable', 'haiku', 'inherit']
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+const SPRINT_WEEKS = ['1', '2', '3', '4']
 
 type Field = { kind: 'string' | 'number' | 'boolean'; values?: readonly string[] }
 
@@ -115,7 +116,7 @@ export const FIELDS: Record<string, Field> = {
   hardModel: { kind: 'string', values: MODELS },
   hardEffort: { kind: 'string', values: EFFORTS },
   escalate: { kind: 'boolean' },
-  sprintWeeks: { kind: 'string', values: ['1', '2', '3', '4'] },
+  sprintWeeks: { kind: 'string', values: SPRINT_WEEKS },
   sprintStart: { kind: 'string', values: WEEKDAYS },
   taskPrefix: { kind: 'string' },
   taskPadding: { kind: 'number' },
@@ -168,7 +169,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
   const oneOf = (key: string, list: readonly string[]) => (list.includes(String(value(key))) ? String(value(key)) : String(DEFAULTS[key]))
   const choiceOf = (level: Level): ModelChoice => ({ model: oneOf(`${level}Model`, MODELS), effort: oneOf(`${level}Effort`, EFFORTS) })
   return {
-    editor: value('editor') as Editor,
+    editor: oneOf('editor', EDITORS) as Editor,
     worktree: value('worktree') === true,
     longCache: value('longCache') !== false,
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
@@ -191,8 +192,8 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
       escalate: value('escalate') !== false,
     },
     sprint: {
-      weeks: Math.min(4, Math.max(1, Number(value('sprintWeeks')) || 1)),
-      startDay: Math.max(0, WEEKDAYS.indexOf(String(value('sprintStart')))),
+      weeks: Number(oneOf('sprintWeeks', SPRINT_WEEKS)),
+      startDay: WEEKDAYS.indexOf(oneOf('sprintStart', WEEKDAYS)),
     },
     tasks: {
       prefix: String(value('taskPrefix')),
