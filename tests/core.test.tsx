@@ -1327,7 +1327,9 @@ test('straight to main, the default: one checkout, and teammates commit only the
   expect(host.spawned[0]).toContain('## Git flow: straight to main (this project)')
   expect(host.spawned[0]).toMatch(/`\S+\/bin\/land\.sh -m "<what changed> \(T-004\)" -- <your paths>`/)
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).not.toContain('Git flow')
+  expect(composed.sections.at(-1)?.text).toContain("no PR, except a bug fix's")
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'bug', isolation: 'worktree' })
+  expect(host.spawned[1]).toContain('## Pull request per task (on in this project)')
 })
 
 test('the shared dev branch flow: no worktree, land on dev, the PR from the pull-request skill; the lead merges and syncs dev', async ($, on) => {

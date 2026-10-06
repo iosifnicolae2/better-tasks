@@ -1,7 +1,7 @@
 ---
 name: pull-request
 user-invocable: false
-description: How a better-tasks teammate opens and updates the pull request of its task (push, gh pr create or task_pr.py, the description from the template, the video in it, conflicts). Load it at done, before the user is asked, when your prompt says the project has a PR per task, and when the lead asks you to update your PR.
+description: How a better-tasks teammate opens and updates the pull request of its task (push, gh pr create or task_pr.py, the description from the template, the video in it, conflicts). Load it at done, before the user is asked, when your prompt says the project has a PR per task or your task is a bug fix in its own worktree, and when the lead asks you to update your PR.
 ---
 
 # Pull request per task

@@ -92,7 +92,7 @@ export const FIELDS: readonly Field[] = [
     group: 'git',
     field: 'gitFlow',
     label: 'Git flow',
-    describe: 'How teammates’ work reaches main. Straight to main: one checkout, no PRs. Shared dev branch: one checkout on dev, a PR per task. Worktree: a copy and a PR each. Saved in this project’s config.json.',
+    describe: 'How teammates’ work reaches main. Straight to main: one checkout, a PR only for a bug fix. Shared dev branch: one checkout on dev, a PR per task. Worktree: a copy and a PR each. Saved in this project’s config.json.',
     options: GIT_FLOWS.map(flow => FLOW_LABELS[flow]),
     value: settings => FLOW_LABELS[settings.gitFlow],
     initial: FLOW_LABELS.direct,

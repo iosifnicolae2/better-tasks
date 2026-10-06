@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { fieldsWith, nextOption } from '../hooks/configpage'
+import { GIT_FLOWS } from '../hooks/gitflow'
 import { PROJECT_KEYS, settingsOf } from '../hooks/settings'
 import { coordinatorTestingRules, screenNames, testingPointer, testingSkillSettings } from '../hooks/testenv'
 
@@ -10,7 +11,9 @@ describe('testing like a user', () => {
       const rules = testingPointer(isOffScreen)
       expect(rules).toContain('in your own environment')
       expect(rules).toContain("never the user's running apps, data or accounts")
-      expect(rules).toContain('"New bug: <what you saw>, <how to see it again>"')
+      expect(rules).toContain('"New bug: <what you saw>, <how to see it again>, BEFORE: <path>"')
+      expect(rules).toContain('Capture it first (a screenshot per step: its BEFORE)')
+      expect(rules).toContain('A bug your own change made is part of your task: fix it there.')
       expect(rules).toContain('load the `better-tasks:testing` skill')
       expect(rules).not.toContain('headless: true')
     }
@@ -23,10 +26,17 @@ describe('testing like a user', () => {
     expect(testingSkillSettings(false)).toContain('Off-screen: off. Follow "On the screen"')
   })
 
-  test('the lead tells the user about new bugs and files them only when asked', () => {
-    expect(coordinatorTestingRules(false)).toContain('File it (task_create) only when they say so.')
-    expect(coordinatorTestingRules(false)).not.toContain('Off-screen is on')
-    expect(coordinatorTestingRules(true)).toContain('Off-screen is on')
+  test('the lead files every new bug; its fix gets a video and a PR, merged into main or the open task it came from', () => {
+    for (const flow of GIT_FLOWS) {
+      const rules = coordinatorTestingRules(false, flow)
+      expect(rules).toContain('every bug gets fixed with a before/after video and a PR the user sees before it merges')
+      expect(rules).toContain('File it (task_create')
+      expect(rules).not.toContain('Off-screen is on')
+    }
+    expect(coordinatorTestingRules(false, 'worktree-prs')).toContain("so the fix merges into that task's branch")
+    expect(coordinatorTestingRules(false, 'dev-prs')).toContain('lands it on the dev branch and runs task_pr.py open again')
+    expect(coordinatorTestingRules(false, 'direct')).toContain('Spawn its teammate with isolation "worktree"')
+    expect(coordinatorTestingRules(true, 'direct')).toContain('Off-screen is on')
   })
 })
 

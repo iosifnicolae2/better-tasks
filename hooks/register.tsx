@@ -114,7 +114,7 @@ export const register: Register = (on, options) => {
     const composed = await next(e)
     if (!(await teamsOn($)) || (await isOffHere($))) return composed
     const settings = await settingsNow($)
-    const testing = coordinatorTestingRules(settings.offScreen)
+    const testing = coordinatorTestingRules(settings.offScreen, settings.gitFlow)
     const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, prCoordinatorRules(settings.openPrInBrowser, binOf($)))
     const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
     const instructions = await instructionsNow($, settings)
@@ -185,7 +185,7 @@ export const register: Register = (on, options) => {
     const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
     const testing = testingPointer(settings.offScreen)
     const videos = settings.demoVideos ? videoPointer(settings.videoQuality) : ''
-    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES)
+    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES, e.isolation === 'worktree')
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
     const commands = isWorktree || e.isolation === 'worktree' ? WORKTREE_COMMAND_RULES : ''
     const instructions = await instructionsNow($, settings)
@@ -592,7 +592,6 @@ async function instructionsNow($: EngineInterface, settings: Settings): Promise<
 
 /** The PR description's rules, from the template it fills in (prtemplate.ts); a custom path that isn't there is one log line, once. */
 async function prBodyNow($: EngineInterface, settings: Settings): Promise<string> {
-  if (!hasPrs(settings.gitFlow)) return ''
   const template = await findPrTemplate(ioOf($), await $.session.root(), settings.prTemplate, $.plugin.root)
   const missing = template.missing ?? ''
   if (missing && missing !== loggedMissingTemplate) $.ui.log(`better-tasks: PR template not found: ${missing}; using ${template.path}`)

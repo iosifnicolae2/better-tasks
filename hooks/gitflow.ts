@@ -17,7 +17,7 @@ export const FLOW_LABELS: Record<GitFlow, string> = {
 }
 
 const FLOW_ABOUT: Record<GitFlow, string> = {
-  direct: 'small commits land on main in this checkout. No branches, no PRs. Fastest.',
+  direct: 'small commits land on main in this checkout. No branches, no PRs, except a bug fix\'s. Fastest.',
   'dev-prs': 'everyone commits on dev in this checkout, so one build and one install test it all; each task becomes its own PR, with its video.',
   'worktree-prs': 'each teammate gets its own copy and branch and opens its PR; each copy costs an install or a build.',
 }
@@ -238,16 +238,17 @@ Claude Code refuses a Bash or Monitor command running gh or git that it can't ch
 - Watch a PR's checks: Bash with run_in_background, one notice when they end: \`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>\`. A run: \`gh run watch <id> --exit-status --compact\`.
 - Need more logic? Write a script to your scratchpad and run it by its path; it still targets only your worktree.`
 
-export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
+/** Straight to main, a teammate spawned in a worktree is a bug fix (the lead's "New bugs" rules): it gets a PR. */
+export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string, isInWorktree = false): string {
   if (flow === 'dev-prs') return devTeammateRules(bin, dev)
-  return flow === 'worktree-prs' ? prRules : directTeammateRules(bin)
+  return flow === 'worktree-prs' || isInWorktree ? prRules : directTeammateRules(bin)
 }
 
 /** What the pull-request skill reads under its title: which flow's part applies, and how to write the description. */
 export function prSkillSettings(flow: GitFlow, dev: string, body: string): string {
   if (flow === 'dev-prs') return `- Git flow: shared dev branch \`${dev}\`: follow "Shared dev branch".\n${body}`
   if (flow === 'worktree-prs') return `- Git flow: worktree and PR per task: follow "Worktree and PR per task".\n${body}`
-  return '- Git flow: straight to main: this project has no PRs; nothing to do here.'
+  return `- Git flow: straight to main: only a bug fix, in its own worktree, has a PR: follow "Worktree and PR per task".\n${body}`
 }
 
 /** The lead's Finishing line for a PR (the PR link in the question), taken from the PR flow's rules so both say the same. */
@@ -261,9 +262,15 @@ ${finishingOf(prLeadRules)}
 - The merge fails (a conflict): the owner lands what the PR needs on \`${dev}\` and runs open again.`
 }
 
-/** "Straight to main" adds nothing for the lead: no PR, no merge. */
+/** "Straight to main" has PRs only for bug fixes: the PR flow's lines, under their own heading. */
+export function directLeadRules(prLeadRules: string): string {
+  return `## Git flow: straight to main (on)
+- Teammates land on main; no PR, except a bug fix's (its teammate in a worktree, "New bugs from testing"). Its PR:
+${prLeadRules.split('\n').slice(1).join('\n')}`
+}
+
 export function leadRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
   if (flow === 'dev-prs') return devLeadRules(bin, dev, prRules)
-  return flow === 'worktree-prs' ? prRules : ''
+  return flow === 'worktree-prs' ? prRules : directLeadRules(prRules)
 }
 

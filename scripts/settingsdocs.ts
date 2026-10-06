@@ -17,7 +17,7 @@ export const SETTING_DOCS: Record<string, Doc> = {
   editor: { group: 'General', about: 'Opens task files from the board. auto: IntelliJ in a JetBrains terminal, VS Code in VS Code, else the default app.' },
   gitFlow: {
     group: 'Git & PRs',
-    about: 'How teammates\' work reaches main. direct ("Straight to main"): small commits on main, no branches, no PRs. dev-prs ("Shared dev branch, PR per task"): everyone commits on the dev branch in one checkout, a PR per task. worktree-prs ("Worktree and PR per task"): each teammate its own git worktree, branch and PR. Asked once per project at the first start.',
+    about: 'How teammates\' work reaches main. direct ("Straight to main"): small commits on main, no branches, no PRs except a bug fix\'s (its own worktree and PR). dev-prs ("Shared dev branch, PR per task"): everyone commits on the dev branch in one checkout, a PR per task. worktree-prs ("Worktree and PR per task"): each teammate its own git worktree, branch and PR. Asked once per project at the first start.',
   },
   devBranch: { group: 'Git & PRs', about: 'The shared branch of the dev-prs git flow.' },
   instructions: { group: 'General', about: 'The project\'s own rules for every task: files or folders, comma-separated. The lead\'s and teammates\' prompts get each path and its first line.' },

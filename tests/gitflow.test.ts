@@ -2,7 +2,7 @@ import type { FsEntry } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
 import {
-  appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf, prBodyRules, prSkillSettings,
+  appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, leadRules, lookAt, megabytesOf, prBodyRules, prSkillSettings,
   recommend, teammateRules, usesWorktree, WORKTREE_COMMAND_RULES,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
@@ -87,13 +87,21 @@ describe('git flow', () => {
     expect(dev).toContain('The PR opens at done, before the user is asked, with its video: the `better-tasks:pull-request` skill')
     expect(dev).not.toContain('task_pr.py open')
     expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toBe('PR RULES')
+    expect(teammateRules('direct', '/bin', 'dev', 'PR RULES', true)).toBe('PR RULES') // a bug fix, in its own worktree
+  })
+
+  test('straight to main, the lead merges only bug-fix PRs, with the PR flow\'s lines', () => {
+    const rules = leadRules('direct', '/bin', 'dev', '## Pull request per task (on)\n- Mark as resolved: merge')
+    expect(rules).toContain("no PR, except a bug fix's")
+    expect(rules).toContain('- Mark as resolved: merge')
+    expect(rules).not.toContain('## Pull request per task')
   })
 
   test("the pull-request skill reads its flow's part and the description rule, in the request-why-solution order", () => {
     const dev = prSkillSettings('dev-prs', 'develop', prBodyRules())
     expect(dev).toMatch(/^- Git flow: shared dev branch `develop`: follow "Shared dev branch"\.\n- The PR's description/)
     expect(prSkillSettings('worktree-prs', 'dev', 'BODY')).toBe('- Git flow: worktree and PR per task: follow "Worktree and PR per task".\nBODY')
-    expect(prSkillSettings('direct', 'dev', '')).toContain('this project has no PRs')
+    expect(prSkillSettings('direct', 'dev', 'BODY')).toBe('- Git flow: straight to main: only a bug fix, in its own worktree, has a PR: follow "Worktree and PR per task".\nBODY')
     const order = ['## Asked for', '## Why', 'the video', '## What changed', '## To test', '## Commits'].map(part => dev.indexOf(part))
     expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true) // the request, why, the solution, then the rest
   })

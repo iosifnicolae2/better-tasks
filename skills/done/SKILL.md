@@ -14,7 +14,7 @@ The user is asked once your work is ready to merge: the PR and the video come be
 ## 2. Local build, video and PR
 - A local build, ready but not installed or opened: the `better-tasks:testing` skill's "A local build, ready at done".
 - Videos on: the `better-tasks:video` skill makes it, for every task (nothing on screen: the old and new text, labeled BEFORE and AFTER).
-- A PR per task: the `better-tasks:pull-request` skill opens it, the video in it. Else your commits are final.
+- A PR per task, or your task is a bug fix: the `better-tasks:pull-request` skill opens it, the video in it. Else your commits are final.
 
 ## 3. Notes and the "For the user" block
 In the task file's Notes (task_note when it's outside your worktree), dated: what changed, the local build, the commits, the full tests (pass, or running), what you could not verify. Then, last, the block the lead pastes as written (a newer one replaces the old):
