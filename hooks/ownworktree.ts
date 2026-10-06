@@ -26,7 +26,7 @@ export function worktreePaths(porcelain: string): string[] {
 
 /**
  * Where a new worktree branches from, as Claude Code's: worktree.baseRef "head" → HEAD; else the remote's
- * default branch (`git rev-parse --abbrev-ref origin/HEAD`, "origin/main") when it is known, else HEAD.
+ * default branch (`git symbolic-ref --short refs/remotes/origin/HEAD`, "origin/main") when it is known, else HEAD.
  */
 export function baseOf(baseRef: unknown, originHead: string): string {
   const remote = originHead.trim()
