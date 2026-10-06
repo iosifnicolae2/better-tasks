@@ -11,7 +11,7 @@ The user approves from links: the PR{% if demoVideos %}, with the video in it{% 
 ### For the user
 PR: <url>
 Release: <url, only when your task changes a release>
-<id> <title>
+<id> (#<PR number>) <title>
 <what changed, in a line or two>
 ```
 - Tell the lead: "<id> done: <PR url>, see <task file>". Then wait.
