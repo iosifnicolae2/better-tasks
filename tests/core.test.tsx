@@ -52,7 +52,7 @@ type Host = {
 }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
 
-/** The plugin's own instruction templates (tests/templates.gen.ts), at any root but the project's. */
+/** The plugin's own instruction templates (tests/templates.gen.ts, written by scripts/test.sh), at any root but the project's. */
 function pluginTemplate(path: string): string | undefined {
   const name = path.match(/\/\.claude\/better-tasks\/([^/]+)$/)?.[1]
   return name && !path.startsWith(`${ROOT}/`) ? TEMPLATES[name] : undefined
