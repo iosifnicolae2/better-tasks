@@ -35,6 +35,7 @@ CARD_BACKGROUND = demo.POSTER_BACKGROUND
 MUTED = (170, 175, 185, 255)
 ACCENT = (215, 119, 87, 255)
 MAX_LISTED = 9  # the opening card lists this many tasks, then "and N more"
+TITLE_LINES = 3  # a task card's title wraps to this many lines at most
 
 
 def main() -> None:
@@ -62,7 +63,7 @@ def main() -> None:
         parts = [card_clip(work, 'opening', opening, args.version, opening_words(args.version, args.since, tasks, shown), canvas, voice, True)]
         for number, task in enumerate(shown, 1):
             card = draw_task_card(work / f'{task["id"]}.png', canvas, task, number, len(shown))
-            parts.append(card_clip(work, task['id'], card, task['id'], f'{task["id"]}: {task["title"]}', canvas, voice, False))
+            parts.append(card_clip(work, task['id'], card, args.version, f'{task["id"]}: {task["title"]}', canvas, voice, False))
             parts.append(fitted_video(task['video'], canvas, work / f'{task["id"]}-fitted.mp4'))
         output = demo.videos_dir() / f'release-{args.version}.mp4'
         demo.join(work, parts, output)
@@ -160,12 +161,11 @@ def draw_opening(path: Path, canvas: tuple, version: str, since: str, tasks: lis
     compared = f'Before: {since}   After: {version}' if since else f'Everything up to {version}'
     draw.text((left, top + 180 * unit), compared, font=demo.font(round(30 * unit)), fill=ACCENT)
     line_font = demo.font(round(26 * unit))
-    line_width = canvas[0] * 0.7 - left  # stops short of the poster's play button, at 3/4 of the width
     y = top + 250 * unit
     for task in tasks[:MAX_LISTED]:
         mark = '' if task['video'] else '   (no video)'
         line = f'{task["id"]}  {task["title"]}{mark}'
-        draw.text((left, y), clipped(draw, line, line_font, line_width), font=line_font,
+        draw.text((left, y), clipped(draw, line, line_font, line_width(canvas, left)), font=line_font,
                   fill=demo.WHITE if task['video'] else MUTED)
         y += 38 * unit
     if len(tasks) > MAX_LISTED:
@@ -175,12 +175,35 @@ def draw_opening(path: Path, canvas: tuple, version: str, since: str, tasks: lis
 
 
 def draw_task_card(path: Path, canvas: tuple, task: dict, number: int, total: int) -> Path:
+    """Which task of how many, its id, and its title below, wrapped to at most TITLE_LINES lines."""
     image, draw, unit = blank(canvas)
     left = 90 * unit
-    draw.text((left, 340 * unit), f'{number} of {total}', font=demo.font(round(30 * unit)), fill=MUTED)
-    draw.text((left, 390 * unit), task['id'], font=demo.font(round(110 * unit)), fill=ACCENT)
+    draw.text((left, 260 * unit), f'{number} of {total}', font=demo.font(round(30 * unit)), fill=MUTED)
+    draw.text((left, 300 * unit), task['id'], font=demo.font(round(110 * unit)), fill=ACCENT)
+    title_font = demo.font(round(54 * unit))
+    for row, line in enumerate(wrapped(draw, task['title'], title_font, line_width(canvas, left), TITLE_LINES)):
+        draw.text((left, (460 + row * 72) * unit), line, font=title_font, fill=demo.WHITE)
     image.convert('RGB').save(path)
     return path
+
+
+def line_width(canvas: tuple, left: float) -> float:
+    """How wide a card's text may run: it stops short of the poster's play button, at 3/4 of the width."""
+    return canvas[0] * 0.7 - left
+
+
+def wrapped(draw: ImageDraw.ImageDraw, text: str, text_font, width: float, most: int) -> list:
+    """The text in lines that fit the width, word by word; past the last allowed line, it ends with an ellipsis."""
+    lines = []
+    for word in text.split():
+        if lines and draw.textlength(f'{lines[-1]} {word}', font=text_font) <= width:
+            lines[-1] += f' {word}'
+        else:
+            lines.append(word)
+    if len(lines) > most:
+        lines = lines[:most]
+        lines[-1] += '…'
+    return [clipped(draw, line, text_font, width) for line in lines]
 
 
 def blank(canvas: tuple) -> tuple:
