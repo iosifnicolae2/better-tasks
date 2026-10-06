@@ -31,7 +31,9 @@ Keep the rule short and lean: principles only.
 - 2026-10-07: Video made (41 s, spec scratchpad/t091/spec.json): settings row before/after, the lead quoting its rule on and off. The private path in the lead captures is covered.
 - 2026-10-07: PR: https://github.com/iosifnicolae2/better-tasks/pull/51 (draft, review only). Commits b73eac2 (setting, rule lines, tests, settings skill), 28edef4 (notes). Not checked: a real batched run with two teammates on one device build (the rule is guidance; nothing enforces it). No release changes. Not toggled through the settings page live, since that writes the user's real /config; the press is covered by tests/pane.test.ts.
 
+- 2026-10-07: User's refinement done (commit 2d57840): instance per task first; else a shared build, flags only for a change that must be tested on its own or may clash (short-lived, off by default, launch argument or env var), removed once confirmed. Setting texts updated. 348 pass. Live: a fresh lead quotes the new line (cap/after2-lead-on). New video.
+
 ### For the user
 PR: https://github.com/iosifnicolae2/better-tasks/pull/51
 T-091 (#51) Batch device builds and tests: unrelated tasks share a branch behind feature flags
-New setting "Batch device tests", on by default. When it's on, the lead puts tasks that don't touch each other into one shared build, each behind its own feature flag, so one build and one device run tests them all; each flag comes out once its task works. Off: the rule is gone.
+New setting "Batch device tests", on by default. When builds or device tests are slow, each task first gets its own instance (simulator, emulator, app copy) tested in parallel; if that's not possible, unrelated tasks share one build, and only a change that needs testing on its own gets a short-lived feature flag, removed once it works. Off: the rule is gone.
