@@ -2,10 +2,10 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { backlogToggle, filledCells, neighbour, partsOf, prIn, projectTitle, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
+import { backlogToggle, filledCells, neighbour, partsOf, projectTitle, rowRoles, sectionsOf, shifted, shortDates, wheeled, windowFrom, windowOf } from '../hooks/board'
 import { openCommand } from '../hooks/editor'
 import type { HostApp } from '../hooks/editor'
-import { parseTask } from '../hooks/tasks'
+import { parseTask, prIn, taskRef } from '../hooks/tasks'
 
 const ROOT = '/project'
 const DIR = `${ROOT}/.claude/tasks`
@@ -110,6 +110,12 @@ test("a task's PR: the link on its last PR: line, bare or in a markdown link", (
   expect(prIn('- PR: https://github.com/a/b/pull/7')).toBe('https://github.com/a/b/pull/7')
   expect(prIn('- PR: https://x/pull/7\n- finished. PR: [#9](https://x/pull/9), commits abc')).toBe('https://x/pull/9')
   expect(prIn('- see https://example.com\n- PR: not opened yet')).toBeUndefined()
+})
+
+test('a task with a PR is named with its number: "T-078 (#43)"; one without stays "T-078"', () => {
+  const task = (notes: string) => parseTask(`---\nid: T-078\ntitle: x\nstatus: doing\n---\n## Notes\n${notes}`, 'T-078-x.md')
+  expect(taskRef(task('- PR: https://github.com/a/b/pull/43\n'))).toBe('T-078 (#43)')
+  expect(taskRef(task('- fixed\n'))).toBe('T-078')
 })
 
 test('the editor setting picks the command', () => {

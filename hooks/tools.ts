@@ -6,7 +6,7 @@ import type { Settings } from './settings'
 import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
-import { createTask, findTask, isOpen, listTasks, taskLine, today, WHEN_LABELS, whenOf } from './tasks'
+import { createTask, findTask, isOpen, listTasks, taskLine, taskRef, today, WHEN_LABELS, whenOf } from './tasks'
 import { cacheText, findMate, mateLine, refreshTeam } from './team'
 import { searchTasks } from './search'
 import { initProject } from './texts'
@@ -184,7 +184,7 @@ async function teamStatus(io: Io): Promise<string> {
   const team = await refreshTeam(io)
   const tasks = (await listTasks(io)).filter(isOpen)
   const lines = team.map(mate => {
-    const owned = tasks.filter(task => task.owner === mate.name).map(task => `${task.id} ${task.title}`)
+    const owned = tasks.filter(task => task.owner === mate.name).map(task => `${taskRef(task)} ${task.title}`)
     return `${mateLine(mate)}${owned.length ? ` · ${owned.join(', ')}` : ''}`
   })
   return lines.length ? lines.join('\n') : 'No teammates.'
