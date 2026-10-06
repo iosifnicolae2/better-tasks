@@ -18,14 +18,15 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 {% else %}
 3. Leave a build the user can try.
 {% endif %}
-4. Report done (`better-tasks:done`). Full tests{% if hasPr %} and the PR{% endif %} come after the user's yes.
+4. Open your draft PR{% if demoVideos %} with the video{% endif %} (`better-tasks:pull-request`), and a draft release if your task changes one: the user approves from them.
+5. Report done (`better-tasks:done`). Full tests come after the user's yes.
 
 ## Bugs you find
 A bug your change made is part of your task. Any other: don't fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>".
 
 ## Git
 {% if isWorktree %}
-Your own worktree and branch; your PR opens after the user's yes (`better-tasks:pull-request`). gh and git commands must plainly stay in your worktree: no subshells, `cd` or `git -C` elsewhere; long text goes in files.
+Your own worktree and branch, and a PR that merges into main. gh and git commands must plainly stay in your worktree: no subshells, `cd` or `git -C` elsewhere; long text goes in files.
 {% else %}
-A checkout shared with other teammates{% if gitFlow == "dev-prs" %}, on `{{ devBranch }}`{% else %}, on main{% endif %}. Commit only your own files with `{{ bin }}/land.sh` (--help); never stage, stash, reset or switch branches others share.{% if gitFlow == "dev-prs" %} Your PR opens after the user's yes (`better-tasks:pull-request`).{% endif %}
+A checkout shared with other teammates{% if gitFlow == "dev-prs" %}, on `{{ devBranch }}`{% else %}, on main{% endif %}. Commit only your own files with `{{ bin }}/land.sh` (--help), the task id in the subject: your PR gathers them. Never stage, stash, reset or switch branches others share.
 {% endif %}

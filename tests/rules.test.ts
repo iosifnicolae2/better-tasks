@@ -102,7 +102,7 @@ describe('the shipped templates', () => {
   test("the teammate's git part follows the flow and its worktree", async () => {
     const direct = await rule('teammate.md', { gitFlow: 'direct' })
     expect(direct).toContain('on main. Commit only your own files with `/p/bin/land.sh` (--help)')
-    expect(direct).not.toContain('pull-request')
+    expect(direct).toContain('Open your draft PR (`better-tasks:pull-request`)')
     expect(await rule('teammate.md', { gitFlow: 'dev-prs', devBranch: 'develop' })).toContain('on `develop`.')
     const worktree = await rule('teammate.md', { gitFlow: 'direct' }, { isWorktree: true })
     expect(worktree).toContain('`better-tasks:pull-request`')
@@ -123,9 +123,27 @@ describe('the shipped templates', () => {
     expect(await rule('testing.md', { offScreen: false, testScreen: 'DELL' })).toContain('"DELL"')
     expect(await rule('testing.md', { offScreen: false })).not.toContain("off the user's screen")
     expect(await rule('pull-request.md', { gitFlow: 'dev-prs' })).toContain('task_pr.py open <id> --body-file')
-    expect(await rule('pull-request.md', { gitFlow: 'worktree-prs' })).toContain('task_pr.py open <id> --here')
+    expect(await rule('pull-request.md', { gitFlow: 'worktree-prs' })).toContain('open again with --ready')
     expect(await rule('contribute.md', {}, { upstreamPr: 'never' })).toContain("don't ask")
-    expect(await rule('done.md', { gitFlow: 'worktree-prs' })).toContain('then your PR (`better-tasks:pull-request`)')
+    expect(await rule('done.md', { gitFlow: 'worktree-prs' })).toContain('then your PR marked ready (`better-tasks:pull-request`)')
+  })
+
+  test('every approval links the PR, its video inside, and the release when the task changes one; under every flow', async () => {
+    for (const gitFlow of GIT_FLOWS) {
+      const lead = await rule('lead.md', { gitFlow, demoVideos: true })
+      expect(lead).toContain('It opens its PR as a draft, the video in it')
+      expect(lead).toContain('its PR linked just before (and its release, if any)')
+      expect(lead).toContain('a draft release, the release video in its notes')
+      const done = await rule('done.md', { gitFlow })
+      expect(done).toContain('PR: <url>\nRelease: <url, only when your task changes a release>')
+      expect(done).toContain('"<id> done: <PR url>, see <task file>"')
+    }
+    const direct = await rule('lead.md', { gitFlow: 'direct' })
+    expect(direct).toContain('for review only')
+    expect(direct).toContain("its review PR closed. Then close the task")
+    expect(await rule('pull-request.md', { gitFlow: 'direct' })).toContain('`task_pr.py close <id>`')
+    expect(await rule('pull-request.md', { gitFlow: 'direct' }, { isWorktree: true })).not.toContain('review only')
+    expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain('its PR marked ready. Merge once its checks pass')
   })
 
   test('the status check says how long it was quiet', async () => {

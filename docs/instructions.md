@@ -44,9 +44,10 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 ## How a task goes
 1. The teammate captures how things are now, makes the change, and checks it as a user would.
 2. It records a before/after video of the fix or feature: the video is the functional test, and what the user sees.
-3. It reports done. Ask the user about it in one short question, its video linked just before: what changed, "Is everything OK?", options "Mark as resolved" and "Request changes". One task per question, plain words.
-4. Every 10 quiet minutes a status check comes: unblock, ask, start the next task.
-5. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests. Then close the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
+3. It opens its PR as a draft, the video in it, for review only. A task that changes a release also gets a draft release, the release video in its notes.
+4. It reports done. Ask the user about it in one short question, its PR linked just before (and its release, if any), the PR opened with `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` once its video is up: what changed, "Is everything OK?", options "Mark as resolved" and "Request changes". One task per question, plain words.
+5. Every 10 quiet minutes a status check comes: unblock, ask, start the next task.
+6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then its review PR closed. Then close the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
 - Only you close tasks; a task the user resolved never stays open.
 
 ## New bugs
@@ -55,8 +56,7 @@ Straight to main has no task branches: spawn its teammate with isolation "worktr
 Teammates test off the user's screen; one that needs it waits until the user says it may.
 
 ## Git flow
-Straight to main: teammates commit to main; only bug fixes have PRs.
-Before merging, show the user the PR: `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` opens it once its video is up.
+Straight to main: teammates commit to main; a task's PR is a draft for review that never merges. A bug fix's PR merges.
 Merge with `gh pr merge --squash`; a conflict goes back to the teammate.
 
 ## Changes to better-tasks itself
@@ -84,13 +84,14 @@ Task file: .claude/tasks/T-004-fix-login-redirect.md
 1. Capture how it is now, before you change anything (`better-tasks:testing`).
 2. Make the change, and check it as a user would.
 3. Record the before/after video (`better-tasks:video`): your functional test, and what the user sees.
-4. Report done (`better-tasks:done`). Full tests come after the user's yes.
+4. Open your draft PR with the video (`better-tasks:pull-request`), and a draft release if your task changes one: the user approves from them.
+5. Report done (`better-tasks:done`). Full tests come after the user's yes.
 
 ## Bugs you find
 A bug your change made is part of your task. Any other: don't fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>".
 
 ## Git
-A checkout shared with other teammates, on main. Commit only your own files with `${CLAUDE_PLUGIN_ROOT}/bin/land.sh` (--help); never stage, stash, reset or switch branches others share.
+A checkout shared with other teammates, on main. Commit only your own files with `${CLAUDE_PLUGIN_ROOT}/bin/land.sh` (--help), the task id in the subject: your PR gathers them. Never stage, stash, reset or switch branches others share.
 ```
 
 ## Part: The status check
@@ -166,36 +167,41 @@ A task like any other, done in the user's fork:
 
 ## Part: Skill done
 - Source: .claude/better-tasks/done.md, rendered by register.tsx `skill.prompt` (skills/done/SKILL.md holds its name and description)
-- Loads: on skill load (its description is always in the skill list): How a better-tasks teammate reports finished work: quick checks, the before/after video, its notes and the short block the user sees, the done line; then, after the user's yes, the full tests and the PR. Load it when your task is done, when a requested change is done, and at "accepted: finish it".
+- Loads: on skill load (its description is always in the skill list): How a better-tasks teammate reports finished work: quick checks, the before/after video, the draft PR (and draft release) the user approves from, its notes and the short block the user sees, the done line; then, after the user's yes, the full tests and the PR made ready or closed. Load it when your task is done, when a requested change is done, and at "accepted: finish it".
 
 ````markdown
 # Reporting done
+The user approves from links: the PR, with the video in it, and the release when your task changes one.
 - Quick checks: the tests near your change, and your own try as a user.
 - The before/after video (`better-tasks:video`).
+- The draft PR (`better-tasks:pull-request`). Your task changes a release (its notes, its video, how it's cut)? Also a draft release with your change, the release video in its notes.
 - Notes in the task file: what changed, the commits, what you couldn't check. End with a short block the lead shows the user, plain words, no jargon:
 ```
 ### For the user
-Video: [<absolute path>](file://<absolute path>)
+PR: <url>
+Release: <url, only when your task changes a release>
 <id> <title>
 <what changed, in a line or two>
 ```
-- Tell the lead: "<id> done: <commits>, see <task file>". Then wait.
+- Tell the lead: "<id> done: <PR url>, see <task file>". Then wait.
 
 ## After the user's answer
-- Changes asked: make them, a new video if it changed, report again.
-- "<id> accepted: finish it": the full tests. Then "<id> finished: <commits>".
+- Changes asked: make them, a new video if it changed, run the PR's open again, report again.
+- "<id> accepted: finish it": the full tests, then your review PR closed (`better-tasks:pull-request`). Then "<id> finished: <PR url>".
 ````
 
 ## Part: Skill pull-request
 - Source: .claude/better-tasks/pull-request.md, rendered by register.tsx `skill.prompt` (skills/pull-request/SKILL.md holds its name and description)
-- Loads: on skill load (its description is always in the skill list): How a better-tasks teammate opens and updates the pull request of its task, with its video, after the user's yes (push, gh pr create or task_pr.py, the description, checks, conflicts). Load it at the finish when your task has a PR, and when the lead asks you to update it.
+- Loads: on skill load (its description is always in the skill list): How a better-tasks teammate opens and updates the pull request of its task, a draft with its video opened before the user is asked to approve (task_pr.py, the description, a new video, ready or closed after the yes). Load it before you report done, at the finish, and when the lead asks you to update your PR.
 
 ```markdown
 # Pull request
-Opened after the user's yes, with the video. Never merge it yourself.
+Every task has one, opened as a draft with the video before you report done: the user checks the task from it. Never merge it yourself.
+- Straight to main: it is for review only, a draft into the commit before your task's, that never merges.
 - The description is short and plain, read on a phone: the user's request and why, then what changed and how to test it. Write it to a file.
-- `python3 ${CLAUDE_PLUGIN_ROOT}/bin/task_pr.py open <id> --here --body-file <file>` pushes the branch and opens the PR with the video in it (--help).
-- Watch its checks; fix what fails. A change later: push it and run open again.
+- `python3 ${CLAUDE_PLUGIN_ROOT}/bin/task_pr.py open <id> --body-file <file>` pushes your commits and opens the PR with the video in it; its last line is the PR's URL (--help).
+- A change later: land it, then open again: it pushes it, and a new video takes the old one's place.
+- After the user's yes and the full tests: `task_pr.py close <id>`.
 - Notes: "PR: <url>".
 ```
 
@@ -318,7 +324,7 @@ The video shows the fix or feature working: your functional test, and what the u
 - Narrate as a colleague explaining the fix or feature: short, plain sentences.
 - Screenshots are fine; record the screen when movement or something advanced needs showing. Nothing on screen? Show the old and the new text.
 - `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh spec.json --quality medium` makes it, with its poster, from a small spec: `--help` shows the format; marks, arrows and sizes have defaults.
-- Look at the result before you share it. First line under "## Notes": `Video: [<id>.mp4](../tasks_videos/<id>.mp4)`.
+- Look at the result before you share it. First line under "## Notes": `Video: [<id>.mp4](../tasks_videos/<id>.mp4)`. It goes in your PR (`better-tasks:pull-request`).
 ```
 
 ## Part: PR template

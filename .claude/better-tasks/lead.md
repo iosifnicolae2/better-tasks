@@ -27,9 +27,10 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 {% else %}
 2. It leaves a build the user can try.
 {% endif %}
-3. It reports done. Ask the user about it in one short question{% if demoVideos %}, its video linked just before{% endif %}: what changed, "Is everything OK?", options "Mark as resolved" and "Request changes". One task per question, plain words.
-4. Every {{ statusEvery }} quiet minutes a status check comes: unblock, ask, start the next task.
-5. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests{% if gitFlow != "direct" %}, then its PR{% endif %}. {% if gitFlow != "direct" %}Merge once its checks pass, then close{% else %}Then close{% endif %} the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
+3. It opens its PR as a draft{% if demoVideos %}, the video in it{% endif %}{% if gitFlow == "direct" %}, for review only{% endif %}. A task that changes a release also gets a draft release{% if demoVideos %}, the release video in its notes{% endif %}.
+4. It reports done. Ask the user about it in one short question, its PR linked just before (and its release, if any){% if openPrInBrowser %}, the PR opened with `{{ bin }}/open-pr.sh <url>` once its video is up{% endif %}: what changed, "Is everything OK?", options "Mark as resolved" and "Request changes". One task per question, plain words.
+5. Every {{ statusEvery }} quiet minutes a status check comes: unblock, ask, start the next task.
+6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then {% if gitFlow == "direct" %}its review PR closed{% else %}its PR marked ready{% endif %}. {% if gitFlow != "direct" %}Merge once its checks pass, then close{% else %}Then close{% endif %} the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
 - Only you close tasks; a task the user resolved never stays open.
 
 ## New bugs
@@ -45,14 +46,11 @@ Teammates test off the user's screen; one that needs it waits until the user say
 
 ## Git flow
 {% if gitFlow == "direct" %}
-Straight to main: teammates commit to main; only bug fixes have PRs.
+Straight to main: teammates commit to main; a task's PR is a draft for review that never merges. A bug fix's PR merges.
 {% elif gitFlow == "dev-prs" %}
 Shared `{{ devBranch }}` branch: teammates commit there; each task's PR is built from it. After a merge, `{{ bin }}/task_pr.py sync` brings `{{ devBranch }}` up to date.
 {% else %}
 A worktree and a PR per task.
-{% endif %}
-{% if openPrInBrowser %}
-Before merging, show the user the PR: `{{ bin }}/open-pr.sh <url>` opens it once its video is up.
 {% endif %}
 Merge with `gh pr merge --squash`; a conflict goes back to the teammate.
 

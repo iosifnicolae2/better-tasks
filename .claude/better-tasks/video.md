@@ -5,4 +5,4 @@ The video shows the fix or feature working: your functional test, and what the u
 - Narrate as a colleague explaining the fix or feature: short, plain sentences.
 - Screenshots are fine; record the screen when movement or something advanced needs showing. Nothing on screen? Show the old and the new text.
 - `{{ bin }}/demo-video.sh spec.json --quality {{ videoQuality }}` makes it, with its poster, from a small spec: `--help` shows the format; marks, arrows and sizes have defaults.
-- Look at the result before you share it. First line under "## Notes": `Video: [<id>.mp4](../tasks_videos/<id>.mp4)`.
+- Look at the result before you share it. First line under "## Notes": `Video: [<id>.mp4](../tasks_videos/<id>.mp4)`. It goes in your PR (`better-tasks:pull-request`).

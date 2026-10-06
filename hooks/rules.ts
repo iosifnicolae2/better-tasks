@@ -1,5 +1,5 @@
 import { VIDEO_SIZE } from './demovideo'
-import { hasPrs, usesWorktree } from './gitflow'
+import { usesWorktree } from './gitflow'
 import { describeChoice, typeOf } from './models'
 import type { Settings } from './settings'
 import type { Sources, Vars } from './template'
@@ -38,7 +38,7 @@ export function varsOf(settings: Settings, facts: Facts): Vars {
   return {
     gitFlow: settings.gitFlow,
     devBranch: settings.devBranch,
-    hasPr: hasPrs(settings.gitFlow) || isWorktree,
+    isReviewPr: settings.gitFlow === 'direct' && !isWorktree,
     isWorktree,
     demoVideos: settings.demoVideos,
     videoQuality: settings.videoQuality,
