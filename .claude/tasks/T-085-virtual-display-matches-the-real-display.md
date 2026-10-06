@@ -2,8 +2,8 @@
 id: T-085
 title: Virtual display matches the real displays' resolution and scaling
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: virtual-display
 rolled: 0
 order: -4
@@ -36,3 +36,4 @@ T-085 (#49) Virtual display matches the real displays' resolution and scaling
 The test screen now copies your main screen's size and Retina scaling (1920x1080 at 2x, before 1x), so text and recordings look as sharp as on your own screen. It follows your main screen if you change it.
 - 2026-10-07: User: "wrap up the task and finish for today" / "finish". Taken as acceptance of PR #49: finish it, including scripts/record-display-check.sh (it adds virtual displays; the user is wrapping up for the day). Then close the review PR.
 - 2026-10-07: finished. Full tests: claude plugin test . 345 pass; scripts/record-display-check.sh ok. Afterwards only other apps' virtual displays (54, 60, there before) are left; real screens unchanged. Review PR closed.
+- 2026-10-07: The test screen copies the main real display's looks-like size, Retina scaling and physical size: the main LG is 1920x1080 at 2x (3840x2160 px), where it used to be 1x. If the main screen is itself virtual, it copies the first real screen; if none can be read, it falls back to 1920x1080 at 1x. A mismatched test screen is replaced, and the `fit` step switches a new display to 2x. 345 tests pass, record-display-check ok, and no better-tasks display is left. Review PR #49 closed. Pushed with the T-086 release.

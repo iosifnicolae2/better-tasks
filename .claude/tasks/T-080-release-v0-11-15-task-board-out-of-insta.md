@@ -2,7 +2,7 @@
 id: T-080
 title: Release v0.11.15 (task board out of installs + task numbers with PR)
 sprint: 2026-10-05
-urgent: true
+urgent: false
 status: done
 owner: release-5
 rolled: 0
@@ -22,3 +22,4 @@ The user approved one release with T-078 (#43) and T-079 (#44) once T-079 was ap
 ## Notes
 
 - 2026-10-06: released v0.11.15 (https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.15); tag has 0 .claude/tasks files, 136 total; marketplace.json on main at v0.11.15.
+- 2026-10-06: v0.11.15 published with the release video: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.15 (T-078 (#43), T-079 (#44)). The tag has 136 files and 0 under .claude/tasks.

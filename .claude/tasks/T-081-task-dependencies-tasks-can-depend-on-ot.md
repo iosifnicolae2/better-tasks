@@ -2,8 +2,8 @@
 id: T-081
 title: "Task dependencies: tasks can depend on others, and the lead plans and starts work by them"
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: dependencies
 rolled: 0
 order: -2
@@ -50,3 +50,4 @@ A task can wait on one task, on several, or on every task with a label. The boar
 The lead sets labels and what a task waits on when it files it, and starts a task only when those are done.
 - 2026-10-06: Accepted. Full tests: `claude plugin test .` 345 pass; tsc clean; yaml-check, settings-doc, skills-check, templates, instructions-doc, open-pr-check, record-display-check, task-pr-check, video-branch-check all ok. Review PR #46 closed.
 - 2026-10-06: Tasks get labels and dependsOn (task ids, several, or labels: every other open task with it). Unknown ones, self and cycles (also through labels) are refused. Blocked tasks show "waits on …" in task_list, team_status, the lead's context and the board; closing a task names what it unblocked. task_list group: label and the board's g key group by label. Lead rules and status check start work by dependencies. Commits 1b6700f, 913a59e (plus notes). 345 tests pass; review PR #46 closed. Not released yet.
+- 2026-10-06: Tasks get labels and dependsOn: task ids, several of them, or labels (meaning every other open task with that label). Unknown ones, self-dependencies and cycles (also through labels) are refused. Blocked tasks show "waits on …"; closing a task names what it unblocked. task_list group: label and the board's g key group by label. The lead rules and status check start work by dependencies. 345 tests pass; review PR #46 closed. Not released yet.
