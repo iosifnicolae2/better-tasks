@@ -2,8 +2,8 @@
 id: T-067
 title: Submit better-tasks to the Anthropic plugin directory
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: directory
 rolled: 0
 order: -2
@@ -34,3 +34,4 @@ Video: [T-067.mp4](../tasks_videos/T-067.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/37
 T-067 Submit better-tasks to the Anthropic plugin directory
 The submission is ready to read, not sent: every field of the claude.ai/directory/manage form, filled in (T-067/submission.md). plugin.json gained a display name, homepage and keywords; the README now says what better-tasks runs, reads and sends, and where to get support. Seven points for you to decide before it goes out are listed there; the main one is that plugin.json has no version.
+- 2026-10-06: Directory submission prepared (T-067/submission.md), not sent: the user submits at claude.ai/directory/manage after v0.11.11. plugin.json gained displayName, homepage, repository, keywords; README gained "What it runs, reads and sends" and a support line. Tests 320 pass; review PR #37 closed.

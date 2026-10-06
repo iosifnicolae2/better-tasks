@@ -2,8 +2,8 @@
 id: T-068
 title: "Default git flow: a worktree and a PR per task"
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: git-flow
 rolled: 0
 order: -3
@@ -41,3 +41,4 @@ T-068 Default git flow: a worktree and a PR per task
 A project that never picked a git flow now gives each task its own worktree and PR, merged after you approve it (straight to main only when there's no GitHub remote). The setup question recommends it too; projects that already picked a flow keep theirs.
 
 2026-10-06: Accepted. Full tests pass (320 tests, tsc, task-pr/open-pr/video-branch/skills/yaml checks, docs current). Review PR #38 closed.
+- 2026-10-06: Default git flow is now worktree + PR per task (gitFlow "worktree-prs") when a project saved none; straight to main only with no GitHub remote. Setup question recommends it (shared dev branch still for apps / >=2 GB build caches). Saved flows kept; a project with only pullRequests:false now gets the new default. 320 tests pass; review PR #38 closed. Not pushed yet.
