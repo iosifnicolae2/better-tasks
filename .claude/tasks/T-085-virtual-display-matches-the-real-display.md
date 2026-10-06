@@ -34,3 +34,5 @@ Video: [T-085.mp4](../tasks_videos/T-085.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/49
 T-085 (#49) Virtual display matches the real displays' resolution and scaling
 The test screen now copies your main screen's size and Retina scaling (1920x1080 at 2x, before 1x), so text and recordings look as sharp as on your own screen. It follows your main screen if you change it.
+- 2026-10-07: User: "wrap up the task and finish for today" / "finish". Taken as acceptance of PR #49: finish it, including scripts/record-display-check.sh (it adds virtual displays; the user is wrapping up for the day). Then close the review PR.
+- 2026-10-07: finished. Full tests: claude plugin test . 345 pass; scripts/record-display-check.sh ok. Afterwards only other apps' virtual displays (54, 60, there before) are left; real screens unchanged. Review PR closed.
