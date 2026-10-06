@@ -547,7 +547,8 @@ async function ownWorktree($: EngineInterface, name: string): Promise<OwnWorktre
   const worktree = ownWorktreeOf(root, name)
   if (worktreePaths((await git('worktree', 'list', '--porcelain')).stdout).includes(worktree.path)) return worktree
   const hasBranch = (await git('rev-parse', '--verify', '--quiet', `refs/heads/${worktree.branch}`)).exitCode === 0
-  const base = baseOf(((await $.settings.read()).worktree as { baseRef?: unknown } | undefined)?.baseRef, (await git('rev-parse', '--abbrev-ref', 'origin/HEAD')).stdout)
+  const remote = await git('symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD')
+  const base = baseOf(((await $.settings.read()).worktree as { baseRef?: unknown } | undefined)?.baseRef, remote.exitCode === 0 ? remote.stdout : '')
   const added = await git(...addArgs(worktree, base, hasBranch))
   if (added.exitCode !== 0) {
     $.ui.log(`better-tasks: making ${name}'s worktree failed (${added.stderr.trim()}); it runs in Claude Code's isolated worktree instead.`)

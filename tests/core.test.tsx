@@ -389,7 +389,8 @@ test('worktrees without the sandbox, the default: better-tasks makes the worktre
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
-  host.failRun = argv => (argv.includes('--verify') || argv.join(' ').endsWith('origin/HEAD') ? 'no such ref' : undefined)
+  host.answerRun = argv => (argv.includes('symbolic-ref') ? 'origin/HEAD\n' : undefined) // printed, but git failed
+  host.failRun = argv => (argv.includes('--verify') || argv.includes('symbolic-ref') ? 'no such ref' : undefined)
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'Auth', isolation: 'worktree' })
   expect(named.result).toEqual({ isolation: 'none' })
@@ -404,7 +405,7 @@ test('without the sandbox, a respawn reuses its worktree, or its branch; the rem
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
-  host.answerRun = argv => (argv.includes('--porcelain') ? `worktree ${ROOT}\nHEAD abc\n\nworktree ${AUTH_WORKTREE}\nbranch refs/heads/worktree-auth\n` : argv.at(-1) === 'origin/HEAD' ? 'origin/main\n' : undefined)
+  host.answerRun = argv => (argv.includes('--porcelain') ? `worktree ${ROOT}\nHEAD abc\n\nworktree ${AUTH_WORKTREE}\nbranch refs/heads/worktree-auth\n` : argv.at(-1) === 'refs/remotes/origin/HEAD' ? 'origin/main\n' : undefined)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
   expect(host.ran.some(line => line.includes('worktree add'))).toBe(false)
