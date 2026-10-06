@@ -16,8 +16,9 @@ those commits, each picked with `git merge-tree`, so no file in any checkout cha
 shared dev branch (git flow "dev-prs"), or from local main under "straight to main" (the project's
 .claude/tasks/config.json says which). A commit already on the branch (its "(cherry picked from commit ...)" line)
 or already in main is skipped. The task's before/after video (.claude/tasks_videos/T-004.mp4 and its .png poster)
-goes right after the request and why: attached by gh 2.99+, else on the videos branch (video-branch.sh, next to
-this script).
+goes right after the request and why: on the videos branch (video-branch.sh, next to this script), which plays
+for everyone through jsDelivr when the repo is public. A private repo's video is attached by gh 2.99+ instead: GitHub
+serves an attached video only to someone signed in, which a private repo's viewers are.
 
 Straight to main: the PR is for review only, a draft that never merges (the commits reach main with the lead's push).
 It goes into `task/T-004-base`, the commit before the task's first, so it shows the task's changes alone.
@@ -153,6 +154,11 @@ def gh_attaches() -> bool:
     return bool(match) and tuple(map(int, match.groups())) >= ATTACH_SINCE
 
 
+def repo_is_private() -> bool:
+    """Only GitHub says "PRIVATE"; a public repo, or one gh can't see, gets the videos branch."""
+    return run("gh", "repo", "view", "--json", "visibility", "-q", ".visibility").stdout.strip() in ("PRIVATE", "INTERNAL")
+
+
 def video_file(task: str) -> Path:
     return MAIN_CHECKOUT / ".claude/tasks_videos" / f"{task}.mp4"
 
@@ -169,7 +175,7 @@ def video_lines(task: str, can_attach: bool = True) -> tuple[list[str], list[str
     if not (video.exists() and poster.exists()):
         return [], []
     marker = f"<!-- video {video_id(task)} -->"
-    if can_attach and gh_attaches():
+    if can_attach and gh_attaches() and repo_is_private():
         return ([marker, f"[![Before/after video: click to play it with sound]({poster})]({video})",
                  "Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).", ""],
                 ["--attach", str(poster), "--attach", str(video)])

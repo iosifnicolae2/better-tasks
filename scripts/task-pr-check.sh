@@ -1,6 +1,6 @@
 #!/bin/sh
 # Checks bin/task_pr.py on a scratch repo with a stand-in gh: the draft PR before the approval, its video, its URL
-# last, a new video in place of the old one, --ready, straight to main's review PR and its close.
+# last, a public repo's video on the videos branch and a private one's attached, a new video in place of the old one, --ready, straight to main's review PR and its close.
 # Run: sh scripts/task-pr-check.sh (the plugin test runner can't start a shell). Prints "ok" or what failed.
 set -u
 script="$(cd "$(dirname "$0")/.." && pwd)/bin/task_pr.py"
@@ -21,6 +21,8 @@ pr = json.load(open(state)) if os.path.exists(state) else None
 arg = lambda name: args[args.index(name) + 1] if name in args else None
 if args == ["--version"]:
     print("gh version 2.102.0 (2026-09-30)")
+elif args[:2] == ["repo", "view"]:
+    print(os.environ.get("REPO_VISIBILITY", "PUBLIC"))
 elif args[:2] == ["pr", "view"]:
     if not pr: sys.exit(1)
     print(pr["url"] if "-q" in args else json.dumps(pr))
@@ -62,6 +64,8 @@ out="$(pr open T-9)"
 [ "$(pr_field isDraft)" = True ] || fail "the review PR is not a draft"
 pr_field body | grep -q '^> For review only' || fail "the review PR doesn't say it never merges"
 pr_field body | grep -q '<!-- video ' || fail "the PR has no video"
+grep 'pr create' "$work/gh.log" | grep -q -- --attach && fail "a public repo's video was attached (it opens only signed in)"
+git ls-remote --heads origin better-tasks-videos | grep -q . || fail "a public repo's video is not on the videos branch"
 git fetch -q origin
 git ls-tree -r --name-only origin/task/T-9 | grep -q c.txt && fail "the review PR holds another task's file"
 [ "$(git show origin/task/T-9:b.txt)" = b2 ] || fail "the review PR lacks the task's last commit"
@@ -87,7 +91,8 @@ git checkout -qb dev
 commit d.txt d "Dev change (T-11)"
 printf 'video' >.claude/tasks_videos/T-11.mp4
 printf 'poster' >.claude/tasks_videos/T-11.png
-pr open T-11 >/dev/null
+REPO_VISIBILITY=PRIVATE pr open T-11 >/dev/null
+grep 'pr create' "$work/gh.log" | tail -1 | grep -q -- --attach || fail "a private repo's video was not attached"
 [ "$(pr_field base)" = main ] || fail "the dev PR goes into $(pr_field base)"
 [ "$(pr_field isDraft)" = True ] || fail "the dev PR is not a draft before the yes"
 pr_field body | grep -q 'For review only' && fail "a dev PR says it is for review only"
