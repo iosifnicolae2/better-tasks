@@ -2,13 +2,17 @@
 # The project's own virtual display (macOS), one recording at a time: a second recording in the same project
 # waits its turn; another project has its own display and records at the same time. Made once and kept
 # (no screen redraws per recording), in a row below the lowest physical screen, so the real screens stay put.
+# It looks like the main screen: its "looks like" size and its Retina scale (the first real screen's when the
+# main one is virtual; 1920x1080 at 1x when none answers). A kept display that no longer matches is made anew.
 # A crashed recording frees its turn: the lock dies with its process; a start ends by itself after --minutes.
 #   record-display.sh run [--size WxH] [--label text] -- <command...>
 #       waits its turn, runs the command with BT_DISPLAY_ID, BT_DISPLAY_BOUNDS ("x y w h") and
 #       BT_DISPLAY_CAPTURE (for screencapture -D) set, then gives the turn back.
 #   record-display.sh start [--size WxH] [--minutes n] [--label text]
 #       the same over several commands: prints those values and the turn's pid; stop it when done.
+#   --size WxH: the display's "looks like" size instead of the main screen's (the scale is still the main screen's)
 #   record-display.sh stop <pid> | status | remove (the project's display) | arrange (every virtual display below the screens)
+#   record-display.sh look: the look the display copies, "w=.. h=.. scale=.. from=<screen>"
 #   record-display.sh screens: the real screens, "<id><tab><name>" each; virtuals: the virtual displays' ids
 #   record-display.sh dim|undim <file>: external screens' brightness to 0 over DDC/CI, or back; ddc: what each answers
 #   record-display.sh off <file> <ids> <pid>: those screens off (no signal) while <pid> lives; on <file>: back on
@@ -65,15 +69,27 @@ detached() { # <output file> <command...>
   echo $!
 }
 
-# The project's display: the kept one, or a new one. Prints its id.
+# The look the display should have now, as the keeper's ready line says it: "WxH@scale".
+wanted_look() {
+  look="$("$exe" look ${size:+--size "$size"})"
+  echo "$(field "$look" w)x$(field "$look" h)@$(field "$look" scale)"
+}
+
+# The project's display: the kept one while it still looks like the main screen, or a new one. Prints its id.
 display_id() {
   if [ -s "$base.display" ] && kill -0 "$(field "$(cat "$base.display")" pid)" 2>/dev/null; then
-    field "$(cat "$base.display")" id
-    return
+    if [ "$(field "$(cat "$base.display")" look)" = "$(wanted_look)" ]; then
+      field "$(cat "$base.display")" id
+      return
+    fi
+    remove >/dev/null
+    while holder_alive "$base.keeper"; do sleep 0.1; done
   fi
   pid="$(detached "$base.display" "$exe" display --lock "$base.keeper" \
-    --name "better-tasks $project" --serial "$(slot)" --size "$size")"
-  field "$(await_ready "$base.display" "$pid")" id
+    --name "better-tasks $project" --serial "$(slot)" ${size:+--size "$size"})"
+  id="$(field "$(await_ready "$base.display" "$pid")" id)"
+  "$exe" fit "$id" ${size:+--size "$size"} | grep -v '^ready' >&2 || true
+  echo "$id"
 }
 
 # The display's serial: a slot number reused across projects. macOS remembers each serial's place, so only
@@ -131,7 +147,7 @@ display_values() {
   BT_DISPLAY_CAPTURE="$(field "$where" capture)"
 }
 
-size=1920x1080 minutes=20 label="" screen=""
+size="" minutes=20 label="" screen=""
 parse_options() {
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -200,6 +216,7 @@ case "$command" in
   stop) stop "$@" ;;
   status) status ;;
   remove) remove ;;
+  look) "$exe" look ;;
   arrange) "$exe" arrange ;;
   screens) "$exe" screens ;;
   virtuals) "$exe" virtuals ;;
@@ -208,5 +225,5 @@ case "$command" in
   ddc) "$exe" ddc ;;
   off) exec "$exe" off "$@" ;;
   on) "$exe" on "$@" ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
