@@ -29,3 +29,9 @@ Keep the rule short and lean: principles only.
 - 2026-10-07: Plan: setting `batchDeviceTests` (boolean, default true, /config row "Batch device tests", config.json too), a {% if %} line in lead.md Routing and teammate.md's top list, tests in rules.test.ts and demovideo-style settings test.
 - 2026-10-07: Commit b73eac2. `sh scripts/test.sh` 348 pass; settings-doc --check current; instructions-doc renders both lines. AFTER (live, tmux, `claude --plugin-dir` on this checkout, same scratch project): settings page shows "Batch device tests  on" under Testing & videos; `"batchDeviceTests": false` in the project's config.json shows "◆ Batch device tests  off". Fresh lead asked to quote its feature-flag rules: on, it quotes the Routing line; off, "none of my better-tasks rules mention feature flags". Mid-session switch to off also drops it. Captures: scratchpad/t091/cap/after-*.
 - 2026-10-07: Video made (41 s, spec scratchpad/t091/spec.json): settings row before/after, the lead quoting its rule on and off. The private path in the lead captures is covered.
+- 2026-10-07: PR: https://github.com/iosifnicolae2/better-tasks/pull/51 (draft, review only). Commits b73eac2 (setting, rule lines, tests, settings skill), 28edef4 (notes). Not checked: a real batched run with two teammates on one device build (the rule is guidance; nothing enforces it). No release changes. Not toggled through the settings page live, since that writes the user's real /config; the press is covered by tests/pane.test.ts.
+
+### For the user
+PR: https://github.com/iosifnicolae2/better-tasks/pull/51
+T-091 (#51) Batch device builds and tests: unrelated tasks share a branch behind feature flags
+New setting "Batch device tests", on by default. When it's on, the lead puts tasks that don't touch each other into one shared build, each behind its own feature flag, so one build and one device run tests them all; each flag comes out once its task works. Off: the rule is gone.
