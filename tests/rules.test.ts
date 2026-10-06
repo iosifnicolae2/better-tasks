@@ -114,7 +114,7 @@ describe('the shipped templates', () => {
   })
 
   test('caches: the lead acts on an idle teammate before its cache runs out, or keeps a waiting one warm with a short note; a finished one is stopped; the teammate does not sit idle', async () => {
-    expect(await rule('lead.md')).toContain('answer, route or unblock it promptly. One that must wait, on the user say, gets a one-line note shortly before, to keep it warm; one that is finished is stopped, not kept warm.')
+    expect(await rule('lead.md')).toContain('answer, route or unblock it promptly. One waiting on the user, for an approval say, gets a one-line note shortly before, to keep it warm; one whose task is closed is stopped instead.')
     expect(await rule('teammate.md')).toContain("Don't sit idle mid-task: keep going, and report promptly")
     expect(await rule('status-check.md')).toContain('act on an idle teammate whose cache expires soon (or send it a one-line note)')
   })
