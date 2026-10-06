@@ -161,6 +161,7 @@ describe('the shipped templates', () => {
     expect(await rule('pull-request.md', { gitFlow: 'dev-prs' })).toContain('task_pr.py open <id> --body-file')
     expect(await rule('pull-request.md', { gitFlow: 'worktree-prs' })).toContain('open again with --ready')
     expect(await rule('contribute.md', {}, { upstreamPr: 'never' })).toContain("don't ask")
+    expect(await rule('contribute.md')).toContain('`sh <fork>/scripts/test.sh`')
     expect(await rule('done.md', { gitFlow: 'worktree-prs' })).toContain('then your PR marked ready (`better-tasks:pull-request`)')
   })
 
