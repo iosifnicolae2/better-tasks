@@ -52,12 +52,19 @@ if ! git update-ref "refs/heads/$branch" "$commit" "$base"; then
 fi
 
 # The checked-out branch moved: the shared index takes the new blobs of these paths only, so git status
-# doesn't show them as reverted. Paths a peer staged stay as they are.
+# doesn't show them as reverted (a later plain commit would undo this one). Paths a peer staged stay as they
+# are. Another git command holding the index lock: wait for it, up to 10 s; still held, say what to run.
 if [ "$branch" = "$current" ]; then
   unset GIT_INDEX_FILE
-  for path in "$@"; do
-    [ "$path" = --end-- ] && continue
-    GIT_INDEX_FILE="$shared_index" git reset -q "$commit" -- "$path" 2>/dev/null || true
+  for path in "$@"; do [ "$path" = --end-- ] || set -- "$@" "$path"; shift; done
+  tries=0
+  until git reset -q "$commit" -- "$@" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 50 ]; then
+      echo "land.sh: committed, but the shared index stayed locked ($shared_index.lock): run  git reset -q -- $*" >&2
+      break
+    fi
+    sleep 0.2
   done
 fi
 echo "$commit"
