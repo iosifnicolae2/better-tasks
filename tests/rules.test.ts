@@ -91,13 +91,18 @@ describe('the shipped templates', () => {
     expect(await rule('lead.md', { escalate: false })).not.toContain('a level up')
   })
 
-  test('new bugs: filed and fixed with a video and a PR; straight to main gets its own worktree', async () => {
+  test('new bugs: small ones fixed in the task; bigger or other-area ones asked as a new task, fixed with a video and a PR; straight to main gets its own worktree', async () => {
     const direct = await rule('lead.md', { gitFlow: 'direct', demoVideos: true })
+    expect(direct).toContain('A teammate fixes a small bug in its own area within its task.')
+    expect(direct).toContain('"New bug: <what>. Make it a new task?", options "New task" and "Skip"')
     expect(direct).toContain('fixed the same way, with a video and a PR the user sees before it merges')
     expect(await rule('lead.md', { demoVideos: false })).toContain('fixed the same way, with a PR the user sees')
     expect(direct).toContain('spawn its teammate with isolation "worktree"')
     expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain("is fixed on that task's branch")
-    expect(await rule('teammate.md')).toContain('"New bug: <what>, <how to see it again>, BEFORE: <path>"')
+    const teammate = await rule('teammate.md')
+    expect(teammate).toContain('and so is a small one in your area: fix it, and say so in your notes and PR.')
+    expect(teammate).toContain('A bigger one, or one in another area: don\'t fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>"')
+    expect(await rule('done.md')).toContain('a small bug you fixed on the way')
   })
 
   test("the teammate's git part follows the flow and its worktree", async () => {

@@ -1,7 +1,7 @@
 
 // Testing like a user (setting offScreen): each teammate tests and records in its own environment,
-// off the user's screen when the setting is on, and reports any new bug it sees to the lead, who files it:
-// every bug fix comes with a before/after video and a PR the user sees before it merges. register.tsx asks the question (askToTurnOn, once per project) and adds the rules to the prompts;
+// off the user's screen when the setting is on. A small bug in its area it fixes in its task; a bigger or other-area one
+// it reports to the lead, who asks the user whether it becomes a new task (with a before/after video and a PR). register.tsx asks the question (askToTurnOn, once per project) and adds the rules to the prompts;
 // the how-to per kind of app is the testing skill (skills/testing/SKILL.md).
 // Mac apps run on the project's test screen (setting testScreen): its own virtual display by default, or a real
 // screen the user picked on the settings page; bin/record-display.sh reads the choice and falls back when it is gone.

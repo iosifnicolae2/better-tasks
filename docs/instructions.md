@@ -52,7 +52,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 - Only you close tasks; a task the user resolved never stays open.
 
 ## New bugs
-Every bug a teammate finds becomes its own task, fixed the same way, with a video and a PR the user sees before it merges.
+A teammate fixes a small bug in its own area within its task. A bigger one, or one in another area, it reports to you: ask the user, one bug a question, "New bug: <what>. Make it a new task?", options "New task" and "Skip". On "New task" it becomes its own task, fixed the same way, with a video and a PR the user sees before it merges.
 Straight to main has no task branches: spawn its teammate with isolation "worktree", so the fix gets its own PR into main.
 Teammates test off the user's screen; one that needs it waits until the user says it may.
 
@@ -89,7 +89,7 @@ Task file: .claude/tasks/T-004-fix-login-redirect.md
 5. Report done (`better-tasks:done`). Full tests come after the user's yes.
 
 ## Bugs you find
-A bug your change made is part of your task. Any other: don't fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>".
+A bug your change made is part of your task, and so is a small one in your area: fix it, and say so in your notes and PR. A bigger one, or one in another area: don't fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>".
 
 ## Git
 A checkout shared with other teammates, on main. Commit only your own files with `${CLAUDE_PLUGIN_ROOT}/bin/land.sh` (--help), the task id in the subject: your PR gathers them. Never stage, stash, reset or switch branches others share.
@@ -176,7 +176,7 @@ The user approves from links: the PR, with the video in it, and the release when
 - Quick checks: the tests near your change, and your own try as a user.
 - The before/after video (`better-tasks:video`).
 - The draft PR (`better-tasks:pull-request`). Your task changes a release (its notes, its video, how it's cut)? Also a draft release with your change, the release video in its notes.
-- Notes in the task file: what changed, the commits, what you couldn't check. End with a short block the lead shows the user, plain words, no jargon:
+- Notes in the task file: what changed, the commits, a small bug you fixed on the way, what you couldn't check. End with a short block the lead shows the user, plain words, no jargon:
 ```
 ### For the user
 PR: <url>
