@@ -19,7 +19,9 @@ Creating or changing a virtual display can disturb the user's screen arrangement
 This is the user's own repo: commit to main, with a review-only draft PR and a video. No release until the user approves. Small bugs in your area: fix them here. Bigger or other-area ones: report them to the lead.
 
 ## Notes
+Video: [T-085.mp4](../tasks_videos/T-085.mp4)
 
 - 2026-10-06: before: main display LG ULTRAFINE 3840x2160 looks like 1920x1080 (2x); helper makes 1920x1080 at 1x, 0.28 mm/px. Asked lead before creating displays. HEAD helper copy: scratchpad before-bin/.
 - 2026-10-06: Blocked: the Mac's disk is full (119 MB free). The user is freeing space themselves. The virtual display (id 65) is still added; remove it with `sh bin/record-display.sh remove` once there's space. Done so far: the display copies the main LG (1920x1080 at 2x). Left: making a new display actually switch to 2x. Nothing committed yet.
 - 2026-10-06: after: display copies the main screen (LG ULTRAFINE, 1920x1080 at 2x, its mm per pixel); a kept display with another look is made anew. The keeper process sees no modes for its own display, so `fit` (separate process) switches it to 2x; tested from a remembered 1x. Screens back in place after each remove. Disk was full for a while (not mine).
+- 2026-10-06: display removed after the tests; real screens match the start layout.
