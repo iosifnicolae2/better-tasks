@@ -2,8 +2,8 @@
 id: T-059
 title: Release video skips tasks committed straight to main (v0.11.5 went out without one)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-video-2
 rolled: 0
 order: -2
@@ -35,3 +35,4 @@ After your yes I add this video to the v0.11.5 release notes (same release, no n
 Is everything OK?
 
 2026-10-06: Finished: full tests pass (315), plus settings-doc --check, skills-check, video-branch-check. Also fixed the opening sentence for one video ("Here is the one with a video", 3cb600d). v0.11.5 notes now open with the release video (gh release edit, same tag): https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.5 ; video and poster on better-tasks-videos (14d524a). Straight to main: commits ead2087, 3cb600d are final (not pushed; the next release ships them).
+- 2026-10-06: Release video finds tasks committed straight to main as well as PR merges; v0.11.5 notes now open with its video
