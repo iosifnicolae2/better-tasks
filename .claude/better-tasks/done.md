@@ -17,5 +17,5 @@ Release: <url, only when your task changes a release>
 - Tell the lead: "<id> done: <PR url>, see <task file>". Then wait.
 
 ## After the user's answer
-- Changes asked: make them, a new video if it changed, run the PR's open again, report again.
+- Changes asked: make them{% if demoVideos %}, a new video if it changed{% endif %}, run the PR's open again, report again.
 - "<id> accepted: finish it": the full tests, then {% if isReviewPr %}your review PR closed{% else %}your PR marked ready{% endif %} (`better-tasks:pull-request`). Then "<id> finished: <PR url>".

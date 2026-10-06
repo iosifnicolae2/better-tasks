@@ -47,7 +47,7 @@ describe('teammate agent types', () => {
   })
 
   test('inherit says whose model it is', () => {
-    expect(describeChoice({ model: 'inherit', effort: 'high' })).toBe("the manager's own model at high effort")
+    expect(describeChoice({ model: 'inherit', effort: 'high' })).toBe("the lead's own model at high effort")
   })
 
 })

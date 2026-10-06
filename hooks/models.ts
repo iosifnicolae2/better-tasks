@@ -26,9 +26,9 @@ const ABOUT: Record<Level, { tasks: string; examples: string }> = {
   hard: { tasks: 'Hard tasks', examples: 'deep debugging, security work, changes across several areas' },
 }
 
-/** "sonnet at xhigh effort"; inherit reads as the manager's own model. */
+/** "sonnet at xhigh effort"; inherit reads as the lead's own model. */
 export function describeChoice({ model, effort }: ModelChoice): string {
-  return `${model === 'inherit' ? "the manager's own model" : model} at ${effort} effort`
+  return `${model === 'inherit' ? "the lead's own model" : model} at ${effort} effort`
 }
 
 /** One agent type per level, with its model and effort. */

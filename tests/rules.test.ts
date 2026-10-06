@@ -92,8 +92,9 @@ describe('the shipped templates', () => {
   })
 
   test('new bugs: filed and fixed with a video and a PR; straight to main gets its own worktree', async () => {
-    const direct = await rule('lead.md', { gitFlow: 'direct' })
+    const direct = await rule('lead.md', { gitFlow: 'direct', demoVideos: true })
     expect(direct).toContain('fixed the same way, with a video and a PR the user sees before it merges')
+    expect(await rule('lead.md', { demoVideos: false })).toContain('fixed the same way, with a PR the user sees')
     expect(direct).toContain('spawn its teammate with isolation "worktree"')
     expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain("is fixed on that task's branch")
     expect(await rule('teammate.md')).toContain('"New bug: <what>, <how to see it again>, BEFORE: <path>"')

@@ -316,7 +316,7 @@ Open or create them from the settings page ("This project").
 
 ## Part: Skill video
 - Source: .claude/better-tasks/video.md, rendered by register.tsx `skill.prompt` (skills/video/SKILL.md holds its name and description)
-- Loads: on skill load (its description is always in the skill list): How a better-tasks teammate makes the before/after video of its task, its functional test and what the user sees (spec, demo-video.sh, poster, the Video line). Load it at done, when before/after videos are on.
+- Loads: on skill load (its description is always in the skill list): How a better-tasks teammate makes the before/after video of its task, its functional test and what the user sees (spec, demo-video.sh, poster, the Video line). Load it once your change works, before you open your PR, when before/after videos are on.
 
 ```markdown
 # Before/after video
@@ -367,9 +367,9 @@ Create a task file. By default it goes to "currently working on" (when: now) and
 Input: {"type":"object","properties":{"title":{"type":"string"},"goal":{"type":"string"},"when":{"type":"string","enum":["now","this-sprint","next-sprint","backlog"]}},"required":["title","goal"]}
 
 ### task_update
-Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note. Only the lead closes a task (status done or cancelled), once the user resolves it. status "done" also logs it in docs/tasks.md (pass a summary as note, and the commits).
+Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note. Only the lead closes a task (status done or cancelled), once the user resolves it. status "done" also logs it in the finished-task log (the logFile setting; pass a summary as note, and the commits).
 
-Input: {"type":"object","properties":{"id":{"type":"string"},"status":{"type":"string","enum":["todo","doing","done","cancelled"]},"when":{"type":"string","enum":["now","this-sprint","next-sprint","backlog"]},"owner":{"type":"string"},"title":{"type":"string"},"goal":{"type":"string"},"note":{"type":"string"},"commits":{"type":"string"}},"required":["id"]}
+Input: {"type":"object","properties":{"id":{"type":"string"},"status":{"type":"string","enum":["todo","doing","done","cancelled"]},"when":{"type":"string","enum":["now","this-sprint","next-sprint","backlog"]},"owner":{"type":"string"},"title":{"type":"string"},"goal":{"type":"string"},"note":{"type":"string"},"commits":{"type":"string","description":"With status done: the commits, from the task file"}},"required":["id"]}
 
 ### task_note
 Add a dated note to an existing task: what the user just said about it (an observation, a bug, a wish). Use it instead of task_create when the message refers to a task. The result names the owner to point to the note.
@@ -379,7 +379,7 @@ Input: {"type":"object","properties":{"id":{"type":"string"},"note":{"type":"str
 ### task_search
 Full-text search over all tasks, closed ones too: id, title, goal and notes. All words must match; title matches rank first. Use it to find the task a message refers to when "Open tasks" in your context does not show it.
 
-Input: {"type":"object","properties":{"query":{"type":"string"},"limit":{"type":"number"}},"required":["query"]}
+Input: {"type":"object","properties":{"query":{"type":"string"},"limit":{"type":"number","description":"Most hits returned (default 20)"}},"required":["query"]}
 
 ### task_list
 List open tasks, one line each. sprint: current (default, includes currently working on), next, backlog, or all (done too).
@@ -387,12 +387,12 @@ List open tasks, one line each. sprint: current (default, includes currently wor
 Input: {"type":"object","properties":{"sprint":{"type":"string","enum":["current","next","backlog","all"]}}}
 
 ### sprint_goal
-Set the current sprint's one-line goal.
+Set the current sprint's one-line goal, replacing the one it has; it shows in your context line (goal: …). Use it when the user says what this sprint is for. Other sprints are not changed.
 
 Input: {"type":"object","properties":{"goal":{"type":"string"}},"required":["goal"]}
 
 ### project_init
-Write starter override files for this project in .claude/tasks/ (config.json, coordinator.md, teammate.md, task-template.md, tips.md). Existing files are kept. Use when the user wants to customize better-tasks here.
+Write starter override files for this project: .claude/tasks/config.json, task-template.md and tips.md, and .claude/better-tasks/lead.md and teammate.md. Existing files are kept. Use when the user wants to customize better-tasks here.
 
 Input: {"type":"object"}
 

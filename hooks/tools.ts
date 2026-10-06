@@ -34,7 +34,7 @@ export const TOOLS: readonly ToolSpec[] = [
     description:
       'Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note. ' +
       'Only the lead closes a task (status done or cancelled), once the user resolves it. ' +
-      'status "done" also logs it in docs/tasks.md (pass a summary as note, and the commits).',
+      'status "done" also logs it in the finished-task log (the logFile setting; pass a summary as note, and the commits).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -45,7 +45,7 @@ export const TOOLS: readonly ToolSpec[] = [
         title: { type: 'string' },
         goal: { type: 'string' },
         note: { type: 'string' },
-        commits: { type: 'string' },
+        commits: { type: 'string', description: 'With status done: the commits, from the task file' },
       },
       required: ['id'],
     },
@@ -68,7 +68,7 @@ export const TOOLS: readonly ToolSpec[] = [
       'rank first. Use it to find the task a message refers to when "Open tasks" in your context does not show it.',
     inputSchema: {
       type: 'object',
-      properties: { query: { type: 'string' }, limit: { type: 'number' } },
+      properties: { query: { type: 'string' }, limit: { type: 'number', description: 'Most hits returned (default 20)' } },
       required: ['query'],
     },
   },
@@ -82,14 +82,16 @@ export const TOOLS: readonly ToolSpec[] = [
   },
   {
     name: 'sprint_goal',
-    description: "Set the current sprint's one-line goal.",
+    description:
+      "Set the current sprint's one-line goal, replacing the one it has; it shows in your context line (goal: …). " +
+      'Use it when the user says what this sprint is for. Other sprints are not changed.',
     inputSchema: { type: 'object', properties: { goal: { type: 'string' } }, required: ['goal'] },
   },
   {
     name: 'project_init',
     description:
-      'Write starter override files for this project in .claude/tasks/ (config.json, coordinator.md, teammate.md, ' +
-      'task-template.md, tips.md). Existing files are kept. Use when the user wants to customize better-tasks here.',
+      'Write starter override files for this project: .claude/tasks/config.json, task-template.md and tips.md, and ' +
+      '.claude/better-tasks/lead.md and teammate.md. Existing files are kept. Use when the user wants to customize better-tasks here.',
   },
   {
     name: 'team_status',
@@ -152,8 +154,8 @@ const isClosing = (status: TaskStatus | undefined) => status === 'done' || statu
 /** Why a teammate may not close a task, and what it does instead. */
 function leadCloses(task: Task): string {
   return (
-    `Only the lead closes ${task.id}, once the user marks it resolved. Write in the task file's notes what changed, ` +
-    `how to test it and the commits, send the lead "${task.id} done: <commits>, see ${task.file}", and wait.`
+    `Only the lead closes ${task.id}, once the user marks it resolved. Report done instead: the better-tasks:done skill ` +
+    `(notes in ${task.file}, then "${task.id} done: <PR url>, see ${task.file}" to the lead), and wait.`
   )
 }
 

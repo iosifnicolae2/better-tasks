@@ -35,7 +35,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 - Only you close tasks; a task the user resolved never stays open.
 
 ## New bugs
-Every bug a teammate finds becomes its own task, fixed the same way, with a video and a PR the user sees before it merges.
+Every bug a teammate finds becomes its own task, fixed the same way, with {% if demoVideos %}a video and {% endif %}a PR the user sees before it merges.
 {% if gitFlow == "direct" %}
 Straight to main has no task branches: spawn its teammate with isolation "worktree", so the fix gets its own PR into main.
 {% else %}
