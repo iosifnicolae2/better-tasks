@@ -59,6 +59,22 @@ claude plugin update better-tasks@better-tasks
 Restart Claude Code. Updates bring the latest [release](https://github.com/iosifnicolae2/better-tasks/releases), not every commit on main. In a project that pins better-tasks, saying Yes to the startup question also moves the pin.
 
 <details>
+<summary>Update fails: "its source doesn't match its extraKnownMarketplaces entry", or "already at the latest version"?</summary>
+
+Your Claude Code settings pin better-tasks to a release, and better-tasks before v0.11.8 can't move that pin. Unstick it once, `vX.Y.Z` being the [latest release](https://github.com/iosifnicolae2/better-tasks/releases):
+
+1. In `~/.claude/settings.json`, under `extraKnownMarketplaces` → `better-tasks` → `source`, set `"ref"` to `"vX.Y.Z"`.
+2. Run:
+
+   ```sh
+   claude plugin marketplace add iosifnicolae2/better-tasks#vX.Y.Z
+   claude plugin update --scope user better-tasks@better-tasks
+   ```
+
+Installed per project too? In each such project's folder: `claude plugin update --scope project better-tasks@better-tasks`. Restart Claude Code. From then on, Yes to the startup question updates it. No `"ref"` in that entry? The update commands at the top of this section are all it takes.
+</details>
+
+<details>
 <summary>Uninstall</summary>
 
 ```sh
