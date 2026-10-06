@@ -26,3 +26,9 @@ Video: [T-081.mp4](../tasks_videos/T-081.mp4)
 - 2026-10-06: Rules: lead.md "Every message is filed" sets dependsOn when filing; Routing bullet: start only once dependencies are done, parallel / chained, never two teammates on the same files, start what a close unblocked. status-check.md: "start what is next whose dependencies are done". README task bullet, docs/instructions.md regenerated. Releases and approvals untouched.
 - 2026-10-06: Small guard on the way: tasks kept in plugin state from before the field (a plugin update mid-session) read as no dependencies (`dependenciesOf`), so the board can't crash on them.
 - 2026-10-06: Commit 1b6700f. `claude plugin test .` 336 pass; tsc clean; instructions-doc and templates current; yaml-check same 7 old files as before the change. AFTER (live, tmux, `claude --plugin-dir` on this checkout, same scratch project): the lead passed dependsOn: ["T-001"], the file got `dependsOn: [T-001]`, task_list "· waits on T-001", the board "⧗ T-001" and "not started · waits on T-001"; moved to currently working on, the lead didn't start it ("two teammates on the same price code"); closing T-001 returned "Unblocked: T-003 …" and the lead named T-003 to start next. Not checked: a real spawn after the unblock (told the lead not to spawn in the test).
+- 2026-10-06: PR: https://github.com/iosifnicolae2/better-tasks/pull/46 . No draft release: nothing about releases changed.
+
+### For the user
+PR: https://github.com/iosifnicolae2/better-tasks/pull/46
+T-081 (#46) Task dependencies: tasks can depend on others, and the lead plans and starts work by them
+A task can now wait on other tasks. The lead sets this when it files a task, and starts the task only once those are done: independent tasks run side by side, dependent ones one after another. The task list and the board show "waits on T-001", and when a task closes, the lead starts what it was holding up.
