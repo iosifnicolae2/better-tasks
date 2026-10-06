@@ -6,7 +6,7 @@ import { Board, ICONS, ProjectHeader, TITLES, prIn, projectTitle, sectionsOf, sh
 import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } from './board'
 import { searchTasks } from './search'
 import { taskIdIn } from './spawn'
-import { ConfigPage } from './configpage'
+import { ConfigPage, FIELDS, nextOption } from './configpage'
 import type { ConfigValue, ProjectFacts } from './configpage'
 import { defaultBrowserId, handlersArgv, videoPage, videoPagePath, VIDEOS_FOLDER } from './demovideo'
 
@@ -135,40 +135,13 @@ async function connectedScreens($: EngineInterface): Promise<string[]> {
   return screensSeen?.names ?? []
 }
 
-/** A value from the settings page: /config, or the project's config.json for a setting only a project has (the git flow). */
+/** A setting only a project has (the git flow): the settings page saves it to the project's config.json. Its /config rows: the ui.press hook. */
 async function setConfig($: EngineInterface, options: PluginOptions, field: string, value: ConfigValue): Promise<void> {
-  if (PROJECT_KEYS.includes(field)) {
-    const problem = await saveProjectValue(filesOf($, options), field, value)
-    if (problem) $.ui.toast(`better-tasks: ${problem}`)
-    else await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
-    $.ui.invalidate('ui.render')
-    return
-  }
-  const written = await writeOption($, field, value)
-  if (written && !written.deny && value === true) await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
-}
-
-/** One of our /config rows, each key spelled out: the settings page writes better-tasks' own settings and nothing else. */
-function writeOption($: EngineInterface, field: string, value: ConfigValue): ReturnType<EngineInterface['config']['set']> | undefined {
-  switch (field) {
-    case 'editor': return $.config.set({ key: 'better-tasks.editor', value })
-    case 'longCache': return $.config.set({ key: 'better-tasks.longCache', value })
-    case 'statusEvery': return $.config.set({ key: 'better-tasks.statusEvery', value })
-    case 'keepAwake': return $.config.set({ key: 'better-tasks.keepAwake', value })
-    case 'openPrInBrowser': return $.config.set({ key: 'better-tasks.openPrInBrowser', value })
-    case 'demoVideos': return $.config.set({ key: 'better-tasks.demoVideos', value })
-    case 'videoQuality': return $.config.set({ key: 'better-tasks.videoQuality', value })
-    case 'easyModel': return $.config.set({ key: 'better-tasks.easyModel', value })
-    case 'easyEffort': return $.config.set({ key: 'better-tasks.easyEffort', value })
-    case 'normalModel': return $.config.set({ key: 'better-tasks.normalModel', value })
-    case 'normalEffort': return $.config.set({ key: 'better-tasks.normalEffort', value })
-    case 'hardModel': return $.config.set({ key: 'better-tasks.hardModel', value })
-    case 'hardEffort': return $.config.set({ key: 'better-tasks.hardEffort', value })
-    case 'escalate': return $.config.set({ key: 'better-tasks.escalate', value })
-    case 'sprintWeeks': return $.config.set({ key: 'better-tasks.sprintWeeks', value })
-    case 'sprintStart': return $.config.set({ key: 'better-tasks.sprintStart', value })
-    default: return undefined
-  }
+  if (!PROJECT_KEYS.includes(field)) return
+  const problem = await saveProjectValue(filesOf($, options), field, value)
+  if (problem) $.ui.toast(`better-tasks: ${problem}`)
+  else await update($, turnedOnState, last => ({ field, count: last.count + 1 }))
+  $.ui.invalidate('ui.render')
 }
 
 
@@ -435,6 +408,36 @@ export function registerPane(on: On, options: PluginOptions): void {
     const page = e.args.trim() === 'config' ? 'config' : 'board'
     await openPane($, options, page)
     return { text: `Sprint board opened. If its keys do nothing, ctrl+x tab gives it the keyboard.${dockTip(e.presentation)}` }
+  })
+
+  // A /config row pressed on the settings page: its next value, written here on the hook's own $, each key
+  // spelled out, so the page writes better-tasks' own settings and nothing else.
+  on('ui.press', { plugin: 'better-tasks', requestId: PANE }, async ($, e, next) => {
+    const field = FIELDS.find(one => `cfg-${one.field}` === e.element)
+    if (field === undefined || PROJECT_KEYS.includes(field.field)) return next(e)
+    const value = field.stored(nextOption(field.options, field.value(await projectSettings(filesOf($, options), options))))
+    let written: { deny?: string }
+    switch (field.field) {
+      case 'editor': written = await $.config.set({ key: 'better-tasks.editor', value }); break
+      case 'longCache': written = await $.config.set({ key: 'better-tasks.longCache', value }); break
+      case 'statusEvery': written = await $.config.set({ key: 'better-tasks.statusEvery', value }); break
+      case 'keepAwake': written = await $.config.set({ key: 'better-tasks.keepAwake', value }); break
+      case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value }); break
+      case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value }); break
+      case 'videoQuality': written = await $.config.set({ key: 'better-tasks.videoQuality', value }); break
+      case 'easyModel': written = await $.config.set({ key: 'better-tasks.easyModel', value }); break
+      case 'easyEffort': written = await $.config.set({ key: 'better-tasks.easyEffort', value }); break
+      case 'normalModel': written = await $.config.set({ key: 'better-tasks.normalModel', value }); break
+      case 'normalEffort': written = await $.config.set({ key: 'better-tasks.normalEffort', value }); break
+      case 'hardModel': written = await $.config.set({ key: 'better-tasks.hardModel', value }); break
+      case 'hardEffort': written = await $.config.set({ key: 'better-tasks.hardEffort', value }); break
+      case 'escalate': written = await $.config.set({ key: 'better-tasks.escalate', value }); break
+      case 'sprintWeeks': written = await $.config.set({ key: 'better-tasks.sprintWeeks', value }); break
+      case 'sprintStart': written = await $.config.set({ key: 'better-tasks.sprintStart', value }); break
+      default: return next(e)
+    }
+    if (!written.deny && value === true) await update($, turnedOnState, last => ({ field: field.field, count: last.count + 1 }))
+    return { element: e.element }
   })
 
   // In Claude Code's own /config menu our rows read "Better Tasks: …", so they are easy to find.
