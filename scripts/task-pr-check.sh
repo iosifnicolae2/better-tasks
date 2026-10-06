@@ -1,6 +1,7 @@
 #!/bin/sh
 # Checks bin/task_pr.py on a scratch repo with a stand-in gh: the draft PR before the approval, its video, its URL
-# last, a public repo's video on the videos branch and a private one's attached, a new video in place of the old one, --ready, straight to main's review PR and its close.
+# last, the video attached and shown as a player too (what opens it to visitors), a new video in place of the old one,
+# the videos branch when gh can't attach, --ready, straight to main's review PR and its close.
 # Run: sh scripts/task-pr-check.sh (the plugin test runner can't start a shell). Prints "ok" or what failed.
 set -u
 script="$(cd "$(dirname "$0")/.." && pwd)/bin/task_pr.py"
@@ -19,18 +20,22 @@ args = sys.argv[1:]
 open(os.path.join(os.environ["PR_STATE"], "gh.log"), "a").write(" ".join(args[:2] + [a for a in args if a.startswith("--") and a not in ("--body", "--title")]) + "\n")
 pr = json.load(open(state)) if os.path.exists(state) else None
 arg = lambda name: args[args.index(name) + 1] if name in args else None
+def attached(body):
+    """As gh does: a link to an attached file becomes the upload's link; a bare path on its own line stays."""
+    files = [args[i + 1] for i, a in enumerate(args) if a == "--attach"]
+    for n, path in enumerate(files):
+        body = body.replace(f"]({path})", f"](https://github.com/user-attachments/assets/{os.path.basename(path)}-{len(open(os.path.join(os.environ['PR_STATE'], 'gh.log')).readlines())}-{n})")
+    return body
 if args == ["--version"]:
-    print("gh version 2.102.0 (2026-09-30)")
-elif args[:2] == ["repo", "view"]:
-    print(os.environ.get("REPO_VISIBILITY", "PUBLIC"))
+    print(os.environ.get("GH_VERSION", "gh version 2.102.0 (2026-09-30)"))
 elif args[:2] == ["pr", "view"]:
     if not pr: sys.exit(1)
     print(pr["url"] if "-q" in args else json.dumps(pr))
 elif args[:2] == ["pr", "create"]:
-    pr = {"url": "https://github.com/someone/app/pull/7", "body": arg("--body"), "isDraft": "--draft" in args, "base": arg("--base")}
+    pr = {"url": "https://github.com/someone/app/pull/7", "body": attached(arg("--body")), "isDraft": "--draft" in args, "base": arg("--base")}
     json.dump(pr, open(state, "w")); print("Creating pull request\n" + pr["url"])
 elif args[:2] == ["pr", "edit"]:
-    pr["body"] = arg("--body"); json.dump(pr, open(state, "w"))
+    pr["body"] = attached(arg("--body")); json.dump(pr, open(state, "w"))
 elif args[:2] == ["pr", "ready"]:
     pr["isDraft"] = False; json.dump(pr, open(state, "w"))
 elif args[:2] == ["pr", "close"]:
@@ -64,8 +69,11 @@ out="$(pr open T-9)"
 [ "$(pr_field isDraft)" = True ] || fail "the review PR is not a draft"
 pr_field body | grep -q '^> For review only' || fail "the review PR doesn't say it never merges"
 pr_field body | grep -q '<!-- video ' || fail "the PR has no video"
-grep 'pr create' "$work/gh.log" | grep -q -- --attach && fail "a public repo's video was attached (it opens only signed in)"
-git ls-remote --heads origin better-tasks-videos | grep -q . || fail "a public repo's video is not on the videos branch"
+# The player: the uploaded video's link on its own line, the same link as the picture's (GitHub opens it to visitors).
+video_url="$(pr_field body | sed -n 's#^\[!\[Before/after video.*\](\(https://github.com/user-attachments/assets/[^)]*\))$#\1#p')"
+[ -n "$video_url" ] || fail "the picture doesn't link to the uploaded video: $(pr_field body)"
+pr_field body | grep -qx "$video_url" || fail "the video is not shown as a player under its picture"
+pr_field body | grep -q "$PWD/.claude" && fail "the PR still links a local file"
 git fetch -q origin
 git ls-tree -r --name-only origin/task/T-9 | grep -q c.txt && fail "the review PR holds another task's file"
 [ "$(git show origin/task/T-9:b.txt)" = b2 ] || fail "the review PR lacks the task's last commit"
@@ -76,6 +84,9 @@ printf 'second video' >.claude/tasks_videos/T-9.mp4
 pr open T-9 >/dev/null
 [ "$(pr_field body)" != "$old_body" ] || fail "a new video didn't replace the old one"
 [ "$(pr_field body | grep -c '<!-- video ')" = 1 ] || fail "the PR shows two videos"
+[ "$(pr_field body | grep -c 'Or play it here')" = 1 ] || fail "the PR shows two players"
+grep 'pr edit' "$work/gh.log" | grep -q -- --attach || fail "the new video was not attached"
+pr_field body | grep -q "$PWD/.claude" && fail "the new video's PR still links a local file"
 before="$(wc -l <"$work/gh.log")"
 pr open T-9 >/dev/null
 tail -n +"$((before + 1))" "$work/gh.log" | grep -q 'pr edit' && fail "the same video was put up again"
@@ -91,8 +102,9 @@ git checkout -qb dev
 commit d.txt d "Dev change (T-11)"
 printf 'video' >.claude/tasks_videos/T-11.mp4
 printf 'poster' >.claude/tasks_videos/T-11.png
-REPO_VISIBILITY=PRIVATE pr open T-11 >/dev/null
-grep 'pr create' "$work/gh.log" | tail -1 | grep -q -- --attach || fail "a private repo's video was not attached"
+GH_VERSION="gh version 2.98.0 (2026-06-01)" pr open T-11 >/dev/null
+grep 'pr create' "$work/gh.log" | tail -1 | grep -q -- --attach && fail "gh 2.98 can't attach, but was asked to"
+git ls-remote --heads origin better-tasks-videos | grep -q . || fail "without gh 2.99+ the video is not on the videos branch"
 [ "$(pr_field base)" = main ] || fail "the dev PR goes into $(pr_field base)"
 [ "$(pr_field isDraft)" = True ] || fail "the dev PR is not a draft before the yes"
 pr_field body | grep -q 'For review only' && fail "a dev PR says it is for review only"
