@@ -582,7 +582,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-gitFlow', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-videoQuality', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-gitFlow', 'cfg-longCache', 'cfg-statusEvery', 'cfg-keepAwake', 'cfg-batchDeviceTests', 'cfg-videoQuality', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
@@ -590,6 +590,7 @@ for (const surface of SURFACES) {
       ['better-tasks.longCache', false],
       ['better-tasks.statusEvery', 20],
       ['better-tasks.keepAwake', false],
+      ['better-tasks.batchDeviceTests', false],
       ['better-tasks.videoQuality', 'high'],
       ['better-tasks.easyModel', 'fable'],
       ['better-tasks.easyEffort', 'medium'],

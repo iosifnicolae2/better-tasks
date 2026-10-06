@@ -440,6 +440,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       case 'keepAwake': written = await $.config.set({ key: 'better-tasks.keepAwake', value: value }); break
       case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value: value }); break
       case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value: value }); break
+      case 'batchDeviceTests': written = await $.config.set({ key: 'better-tasks.batchDeviceTests', value: value }); break
       case 'videoQuality': written = await $.config.set({ key: 'better-tasks.videoQuality', value: value }); break
       case 'easyModel': written = await $.config.set({ key: 'better-tasks.easyModel', value: value }); break
       case 'easyEffort': written = await $.config.set({ key: 'better-tasks.easyEffort', value: value }); break

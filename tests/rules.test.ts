@@ -69,7 +69,7 @@ describe('the shipped templates', () => {
   test('every file renders under every git flow, videos, off-screen and model setting, with no tag left', async () => {
     for (const gitFlow of GIT_FLOWS) {
       for (const flag of [true, false]) {
-        const values = { gitFlow, demoVideos: flag, offScreen: !flag, escalate: flag, testScreen: flag ? 'virtual' : 'DELL' }
+        const values = { gitFlow, demoVideos: flag, offScreen: !flag, escalate: flag, batchDeviceTests: flag, testScreen: flag ? 'virtual' : 'DELL' }
         for (const name of RULE_FILES) {
           for (const facts of [{ isWorktree: flag, isHard: flag, hasTypes: flag, hasOwnPrTemplate: flag, upstreamPr: flag ? 'ask' : 'never' }]) {
             const text = await rule(name, values, facts)
@@ -89,6 +89,14 @@ describe('the shipped templates', () => {
     expect(lead).toContain('"<id> accepted: finish it": the full tests, then its PR')
     expect(lead).toContain('`better-tasks:teammate-normal` (opus at medium effort)')
     expect(await rule('lead.md', { escalate: false })).not.toContain('a level up')
+  })
+
+  test('batched device tests: on by default, the lead batches unrelated tasks behind feature flags and the teammate flags its change; off, neither line', async () => {
+    expect(settingsOf({}).batchDeviceTests).toBe(true)
+    expect(await rule('lead.md')).toContain('each behind its own feature flag, so one build and one device run test them all. Once a task is confirmed working, its flag and the old path come out before it closes.')
+    expect(await rule('teammate.md')).toContain('Batched with other tasks for one build? Put your change behind its own feature flag')
+    expect(await rule('lead.md', { batchDeviceTests: false })).not.toContain('feature flag')
+    expect(await rule('teammate.md', { batchDeviceTests: false })).not.toContain('feature flag')
   })
 
   test('new bugs: small ones fixed in the task; bigger or other-area ones asked as a new task, fixed with a video and a PR; straight to main gets its own worktree', async () => {

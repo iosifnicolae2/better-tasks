@@ -66,6 +66,12 @@
       "description": "The before/after videos' size: low = 720p small file, medium = 1080p (a few MB a minute), high = 1080p sharper, bigger file. One of: low, medium, high.",
       "default": "medium"
     },
+    "batchDeviceTests": {
+      "type": "boolean",
+      "title": "Batch device tests",
+      "description": "When builds or device tests are slow, tasks that don't touch each other share one build, each behind its own feature flag, so one device run tests them all. Each flag comes out once its task works.",
+      "default": true
+    },
     "pullRequests": {
       "type": "boolean",
       "title": "PR per task",
