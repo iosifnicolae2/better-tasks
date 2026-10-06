@@ -120,6 +120,16 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'general',
+    field: 'maxTeammates',
+    label: 'Team size',
+    describe: 'At most this many teammates at once; similar tasks go to the same teammate, one after another. no limit: as many as the manager spawns.',
+    options: ['3 teammates', '5 teammates', '8 teammates', '10 teammates', 'no limit'],
+    value: settings => (settings.maxTeammates > 0 ? `${settings.maxTeammates} teammates` : 'no limit'),
+    initial: '5 teammates',
+    stored: value => (value === 'no limit' ? 0 : Number.parseInt(value, 10)),
+  },
+  {
+    group: 'general',
     field: 'keepAwake',
     label: 'Keep the Mac awake',
     describe: 'Holds caffeinate while any teammate runs.',

@@ -4,6 +4,7 @@ import { GIT_FLOWS } from '../hooks/gitflow'
 import { NO_FACTS, RULE_FILES, renderRule, rulesChangedNote, varsOf } from '../hooks/rules'
 import type { Facts } from '../hooks/rules'
 import { settingsOf } from '../hooks/settings'
+import { overLimit } from '../hooks/team'
 import { changedSections, render, sectionsOf, templateOf } from '../hooks/template'
 import type { Sources } from '../hooks/template'
 import { starterFiles } from '../hooks/texts'
@@ -100,6 +101,16 @@ describe('the shipped templates', () => {
     expect(await rule('teammate.md')).toContain('and the lead asks for a feature flag? One for your change, off by default')
     expect(await rule('lead.md', { batchDeviceTests: false })).not.toContain('feature flag')
     expect(await rule('teammate.md', { batchDeviceTests: false })).not.toContain('feature flag')
+  })
+
+  test('team size: 5 by default; the lead groups similar tasks onto one teammate and spawns only under the limit; 0: no limit', async () => {
+    expect(settingsOf({}).maxTeammates).toBe(5)
+    const lead = await rule('lead.md')
+    expect(lead).toContain('Group similar or related tasks onto one teammate, one after another: a teammate may own several.')
+    expect(lead).toContain('only while the team is under 5; at the limit, queue the task with a fitting owner or wait for one to finish.')
+    expect(lead).not.toContain('A few teammates at once')
+    expect(await rule('lead.md', { maxTeammates: 0 })).not.toContain('at the limit')
+    expect(overLimit([], 'cart', 0, [])).toBeUndefined()
   })
 
   test('new bugs: small ones fixed in the task; bigger or other-area ones asked as a new task, fixed with a video and a PR; straight to main gets its own worktree', async () => {
