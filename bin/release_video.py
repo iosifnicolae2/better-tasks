@@ -139,6 +139,8 @@ def opening_words(version: str, since: str, tasks: list, shown: list) -> str:
     count = f'{len(tasks)} change{"s" if len(tasks) != 1 else ""}{f" since {since}" if since else ""}'
     if len(shown) == len(tasks):
         return f'{project_name()} {version}: {count}, each before and after.'
+    if len(shown) == 1:
+        return f'{project_name()} {version}: {count}. Here is the one with a video, before and after.'
     return f'{project_name()} {version}: {count}. Here are the {len(shown)} with a video, each before and after.'
 
 
