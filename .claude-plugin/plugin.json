@@ -1,11 +1,21 @@
 {
   "name": "better-tasks",
+  "displayName": "better-tasks",
   "description": "Plan and track tasks inside Claude Code, kept as plain Markdown files in your project, with weekly sprints, a sprint board and agent teammates.",
   "author": {
     "name": "Iosif Nicolae",
     "email": "iosif@bringes.io"
   },
+  "homepage": "https://github.com/iosifnicolae2/better-tasks",
+  "repository": "https://github.com/iosifnicolae2/better-tasks",
   "license": "MIT",
+  "keywords": [
+    "tasks",
+    "sprints",
+    "project-management",
+    "agent-teams",
+    "markdown"
+  ],
   "types": "./types/index.d.ts",
   "userConfig": {
     "editor": {
