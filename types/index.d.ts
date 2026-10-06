@@ -14,7 +14,9 @@ export type Task = {
   /** Place within its section, smallest first; ties go by id. */
   order: number
   created: string
-  /** The ids of the tasks it needs done first ("dependsOn: [T-071, T-072]"); empty for most. */
+  /** Its labels ("labels: [checkout, api]"), lower case; tasks group by them and can depend on them. */
+  labels: string[]
+  /** What it needs done first: task ids, or labels (every other open task with it) ("dependsOn: [T-071, checkout]"). */
   dependsOn: string[]
   /** Absolute path of the task file. */
   file: string

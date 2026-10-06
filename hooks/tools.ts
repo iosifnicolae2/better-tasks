@@ -7,12 +7,16 @@ import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
 import {
+  byLabel,
   createTask,
   dependencyProblem,
   findTask,
   isOpen,
+  labelOf,
+  labelProblem,
   listTasks,
   nextId,
+  readsAsId,
   taskLine,
   taskRef,
   taskWithId,
@@ -22,6 +26,7 @@ import {
   WHEN_LABELS,
   whenOf,
 } from './tasks'
+import type { Links } from './tasks'
 import { cacheText, findMate, mateLine, refreshTeam } from './team'
 import { searchTasks } from './search'
 import { initProject } from './texts'
@@ -33,8 +38,9 @@ const STATUS = { type: 'string', enum: ['todo', 'doing', 'done', 'cancelled'] }
 const DEPENDS_ON = {
   type: 'array',
   items: { type: 'string' },
-  description: 'Ids of the tasks it needs done first: same files or area, needs their result, or ships after them',
+  description: 'What it needs done first (same files or area, needs their result, ships after them): task ids, or labels (every other open task with that label)',
 }
+const LABELS = { type: 'array', items: { type: 'string' }, description: 'Its labels: feature or area words, e.g. "checkout"' }
 
 export const TOOLS: readonly ToolSpec[] = [
   {
@@ -43,10 +49,10 @@ export const TOOLS: readonly ToolSpec[] = [
       'Create a task file. By default it goes to "currently working on" (when: now) and you route it at once. ' +
       'Only when the user names a sprint or the backlog, pass when: this-sprint, next-sprint or backlog; then nothing starts. ' +
       "Put the user's words and decisions in goal: written once here, the teammate reads them from the file. " +
-      'dependsOn: the open tasks it must wait for; it starts once they are done.',
+      'labels group it with related tasks; dependsOn: the tasks, or labels, it must wait for; it starts once they are done.',
     inputSchema: {
       type: 'object',
-      properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN, dependsOn: DEPENDS_ON },
+      properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN, labels: LABELS, dependsOn: DEPENDS_ON },
       required: ['title', 'goal'],
     },
   },
@@ -54,7 +60,7 @@ export const TOOLS: readonly ToolSpec[] = [
     name: 'task_update',
     description:
       'Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note, ' +
-      'dependsOn (replaces its list; [] clears it). ' +
+      'labels and dependsOn (each replaces its list; [] clears it). ' +
       'Only the lead closes a task (status done or cancelled), once the user resolves it. ' +
       'status "done" also logs it in the finished-task log (the logFile setting; pass a summary as note, and the commits).',
     inputSchema: {
@@ -68,6 +74,7 @@ export const TOOLS: readonly ToolSpec[] = [
         goal: { type: 'string' },
         note: { type: 'string' },
         commits: { type: 'string', description: 'With status done: the commits, from the task file' },
+        labels: LABELS,
         dependsOn: DEPENDS_ON,
       },
       required: ['id'],
@@ -97,10 +104,12 @@ export const TOOLS: readonly ToolSpec[] = [
   },
   {
     name: 'task_list',
-    description: 'List open tasks, one line each. sprint: current (default, includes currently working on), next, backlog, or all (done too).',
+    description:
+      'List open tasks, one line each. sprint: current (default, includes currently working on), next, backlog, or all (done too). ' +
+      'group: label lists them under each label (a task with two labels under both).',
     inputSchema: {
       type: 'object',
-      properties: { sprint: { type: 'string', enum: ['current', 'next', 'backlog', 'all'] } },
+      properties: { sprint: { type: 'string', enum: ['current', 'next', 'backlog', 'all'] }, group: { type: 'string', enum: ['label'] } },
     },
   },
   {
@@ -136,7 +145,9 @@ type Input = {
   sprint?: string
   query?: string
   limit?: number
+  labels?: string[]
   dependsOn?: string[]
+  group?: string
 }
 
 /** The call as the hook saw it: the tool's short name, its input, and who called. */
@@ -148,10 +159,10 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
   if (run.name === 'task_create') {
     const when = input.when ?? 'now'
     const tasks = await listTasks(io)
-    const dependsOn = canonical(input.dependsOn, tasks)
-    const problem = dependencyProblem(nextId(tasks, settings.tasks), dependsOn, tasks)
+    const draft: Links = { id: nextId(tasks, settings.tasks), status: 'todo', labels: [], dependsOn: [] }
+    const { labels, dependsOn, problem } = linksOf(input, draft, tasks, settings)
     if (problem) return { deny: problem }
-    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when, dependsOn })
+    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when, labels, dependsOn })
     const waits = waitsText(task, tasks)
     const next =
       when !== 'now' ? 'Not started: it waits in its sprint.'
@@ -164,10 +175,9 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     const task = taskWithId(tasks, input.id ?? '')
     if (!task) return { deny: `No task ${input.id}.` }
     if (isClosing(input.status) && run.agentId !== undefined) return { deny: leadCloses(task) }
-    const dependsOn = input.dependsOn && canonical(input.dependsOn, tasks)
-    const problem = dependsOn && dependencyProblem(task.id, dependsOn, tasks)
+    const { labels, dependsOn, problem } = linksOf(input, task, tasks, settings)
     if (problem) return { deny: problem }
-    const changed = await changeTask(io, task, { ...input, dependsOn }, config)
+    const changed = await changeTask(io, task, { ...input, labels, dependsOn }, config)
     const day = await today(io)
     const after = await listTasks(io)
     const lines = [taskLine(changed, day, config, after)]
@@ -182,7 +192,7 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     return { result: `Noted on ${taskRef(noted)} ${noted.title}.\n${await ownerHint(io, noted)}` }
   }
   if (run.name === 'task_search') return { result: await taskSearch(io, input.query ?? '', input.limit, settings) }
-  if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
+  if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings, input.group === 'label') }
   if (run.name === 'sprint_goal') return { result: await setGoal(io, input.goal ?? '', settings) }
   if (run.name === 'team_status') return { result: await teamStatus(io) }
   if (run.name === 'project_init') return { result: await projectInit(io) }
@@ -191,10 +201,20 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
 
 const isClosing = (status: TaskStatus | undefined) => status === 'done' || status === 'cancelled'
 
-/** The ids as their tasks spell them ("t-71" is T-071's); an unknown one stays as given, for the error to name. */
-const canonical = (ids: readonly string[] = [], tasks: readonly Task[]) => [
-  ...new Set(ids.map(id => taskWithId(tasks, id)?.id ?? id.trim()).filter(Boolean)),
-]
+const unique = (items: readonly string[]) => [...new Set(items.filter(Boolean))]
+
+/**
+ * The labels and dependsOn a call gives, as stored (a task id as its task spells it, "t-71" is T-071; else a label, lower case),
+ * and why `task` can't have them. Left out of the call: undefined, the task keeps its own.
+ */
+function linksOf(input: Input, task: Links, tasks: readonly Task[], settings: Settings) {
+  const labels = input.labels && unique(input.labels.map(labelOf))
+  const stored = (item: string) => taskWithId(tasks, item)?.id ?? (readsAsId(item, settings.tasks.prefix) ? item.trim() : labelOf(item))
+  const dependsOn = input.dependsOn && unique(input.dependsOn.map(stored))
+  const linked = { ...task, labels: labels ?? task.labels, dependsOn: dependsOn ?? task.dependsOn }
+  const problem = (labels && labelProblem(labels, settings.tasks.prefix)) || dependencyProblem(linked, tasks)
+  return { labels, dependsOn, problem }
+}
 
 const withWaits = (text: string, task: Task, tasks: readonly Task[]) => {
   const waits = waitsText(task, tasks)
@@ -216,7 +236,7 @@ function leadCloses(task: Task): string {
   )
 }
 
-async function taskList(io: Io, which: string, settings: Settings): Promise<string> {
+async function taskList(io: Io, which: string, settings: Settings, isByLabel = false): Promise<string> {
   const config = settings.sprint
   const day = await today(io)
   const current = sprintStart(day, config)
@@ -228,7 +248,10 @@ async function taskList(io: Io, which: string, settings: Settings): Promise<stri
   const pick = picks[which] ?? (() => true)
   const all = await listTasks(io)
   const tasks = all.filter(task => pick(task.sprint) && (which === 'all' || isOpen(task)))
-  return tasks.length === 0 ? 'No tasks.' : tasks.map(task => taskLine(task, day, config, all)).join('\n')
+  if (tasks.length === 0) return 'No tasks.'
+  const lines = (some: readonly Task[]) => some.map(task => taskLine(task, day, config, all)).join('\n')
+  if (!isByLabel) return lines(tasks)
+  return [...byLabel(tasks)].map(([label, some]) => `${label || 'no label'}:\n${lines(some)}`).join('\n\n')
 }
 
 async function setGoal(io: Io, goal: string, settings: Settings): Promise<string> {

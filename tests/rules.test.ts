@@ -115,9 +115,9 @@ describe('the shipped templates', () => {
     expect(done).toContain('the ones a release ships too, goes the same way: "T-078 (#43)"')
   })
 
-  test('dependencies: set when a task is filed; work starts by them, in parallel or in a chain, and the status check follows them', async () => {
+  test('labels and dependencies: set when a task is filed; work starts by them, in parallel or in a chain, and the status check follows them', async () => {
     const lead = await rule('lead.md')
-    expect(lead).toContain('Give it dependsOn: the open tasks it must wait for (same files or area, needs their result, ships after them).')
+    expect(lead).toContain('Give it labels (its feature or area) and dependsOn: the tasks, or labels, it must wait for (same files or area, needs their result, ships after them).')
     expect(lead).toContain('- Start a task only once its dependencies are done ("waits on" marks the others): independent tasks in parallel, dependent ones one after another, never two teammates on the same files. When a task closes, start what it unblocked.')
     expect(await rule('status-check.md')).toContain('start what is next whose dependencies are done')
   })

@@ -3,7 +3,7 @@ import type { ElementTable } from 'claude-code'
 import type { Task, Teammate, When } from '../types'
 import type { SprintConfig } from './sprints'
 import { cacheText, stateOf } from './team'
-import { isOpen, taskRef, whenOf } from './tasks'
+import { isOpen, labelsOf, taskRef, whenOf } from './tasks'
 
 // The board page of the Sprint pane: the task list (sections, then the collapsed closed tasks) in a
 // window of fixed height, and under it, pinned to the bottom, the selected task's box and the key line
@@ -39,6 +39,12 @@ export function sectionsOf(tasks: readonly Task[], day: string, config: SprintCo
     title: TITLES[when],
     tasks: tasks.filter(task => isOpen(task) && whenOf(task, day, config) === when),
   }))
+}
+
+/** A section grouped by label: its tasks by their first label, A to Z, the ones with none last; the order kept within each. */
+export function groupedByLabel(section: Section): Section {
+  const labelOf = (task: Task) => labelsOf(task)[0] ?? '\uffff'
+  return { ...section, tasks: [...section.tasks].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) }
 }
 
 /** "Sep 28–Oct 4", or "Oct 5–11" within one month. */
@@ -187,6 +193,7 @@ export type BoardActions = {
   /** Move: the task follows ↑↓ until Enter. */
   startMoving: (task: Task) => void
   toggleClosed: () => void
+  toggleByLabel: () => void
   openSearch: () => void
   setQuery: (query: string) => void
   closeSearch: () => void
@@ -216,6 +223,8 @@ export type BoardProps = {
   team: Teammate[]
   /** Per open task id that waits on others: their refs ("T-071 (#39), T-072"). */
   blockers?: Record<string, string>
+  /** Each section's tasks under label headings (g); the sections arrive grouped (groupedByLabel). */
+  isByLabel?: boolean
   /** Whether the pane holds the keyboard; the selection is bright only then. */
   hasKeys: boolean
   /** The pane body's height; the list gets what the bottom box leaves. Unknown: no window. */
@@ -259,7 +268,7 @@ export function Board(props: BoardProps) {
         {window}
       </Box>
       <Detail ui={ui} selected={selected} hasKeys={hasKeys} actions={actions} />
-      {isSearching ? <Box height={1} /> : <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} actions={actions} />}
+      {isSearching ? <Box height={1} /> : <KeyLine ui={ui} hasKeys={hasKeys} selected={selected} isByLabel={props.isByLabel === true} actions={actions} />}
     </Box>
   )
 }
@@ -345,7 +354,7 @@ function Lit({ ui, text, ranges, indent = '', isDim }: LitProps) {
 }
 
 /** Every line of the list, one row each: the four sections, then the closed tasks. */
-function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team, blockers = {}, hasKeys, canSpin, actions }: BoardProps): Line[] {
+function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team, blockers = {}, isByLabel, hasKeys, canSpin, actions }: BoardProps): Line[] {
   const { Text } = ui
   const ids = sections.flatMap(section => section.tasks.map(task => task.id))
   const roles = selected?.isMoving ? rowRoles(ids, selected.task.id) : undefined
@@ -370,7 +379,14 @@ function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team
       lines.push({ node: <Text color="subtle" wrap="truncate-end">  {sprint?.goal ? `◎ ${sprint.goal}` : ' '}</Text> })
     }
     if (section.tasks.length === 0) lines.push({ node: <Text color="subtle">  —  empty</Text> })
-    for (const task of section.tasks) lines.push(row(task, stillUnlessSelected(task)))
+    const hasLabels = isByLabel && section.tasks.some(task => labelsOf(task).length > 0)
+    section.tasks.forEach((task, at) => {
+      const label = labelsOf(task)[0] ?? ''
+      if (hasLabels && (at === 0 || label !== (labelsOf(section.tasks[at - 1]!)[0] ?? ''))) {
+        lines.push({ node: <Text color="subtle" wrap="truncate-end">  # {label || 'no label'}</Text> })
+      }
+      lines.push(row(task, stillUnlessSelected(task)))
+    })
   }
   lines.push(blank())
   const isLocked = roles !== undefined || lockedTo !== undefined
@@ -529,7 +545,7 @@ function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps,
     <>
       <DetailLine ui={ui}>
         <Text bold wrap="truncate-end">{taskRef(task)}  {task.title}</Text>
-        <Text color="subtle">{place}</Text>
+        <Text color="subtle">{[place, labelsOf(task).join(', ')].filter(Boolean).join(' · ')}</Text>
       </DetailLine>
       <DetailLine ui={ui}>
         <Box flexShrink={0}><Text color="subtle">⎿</Text></Box>
@@ -627,7 +643,7 @@ export function KeyHint({ ui, keys, word }: { ui: Ui; keys: string; word: string
   )
 }
 
-type KeyLineProps = { ui: Ui; hasKeys: boolean; selected?: Selected; actions: BoardActions }
+type KeyLineProps = { ui: Ui; hasKeys: boolean; selected?: Selected; isByLabel: boolean; actions: BoardActions }
 
 /** The keys of each mode, as the key line shows them: the key, then what it does. */
 export const KEY_HINTS = {
@@ -641,7 +657,7 @@ export const KEY_HINTS = {
  * is in, then search and settings; while the pane does not hold the keys, the one way to give them
  * to it, so a key that does nothing is never a mystery.
  */
-function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
+function KeyLine({ ui, hasKeys, selected, isByLabel, actions }: KeyLineProps) {
   const { Box, Button, Text } = ui
   if (!hasKeys) {
     return (
@@ -656,6 +672,7 @@ function KeyLine({ ui, hasKeys, selected, actions }: KeyLineProps) {
     <Box flexDirection="row" columnGap={2} height={1} overflow="hidden">
       {hints.map(([keys, word]) => <KeyHint ui={ui} keys={keys} word={word} />)}
       {!isLocked && <Button key="search" plain dimColor hotkey="f" label="search" onPress={actions.openSearch} />}
+      {!isLocked && <Button key="labels" plain dimColor hotkey="g" label={isByLabel ? 'ungroup' : 'by label'} onPress={actions.toggleByLabel} />}
       {!isLocked && <Button key="config" plain dimColor hotkey="c" label="settings" onPress={actions.showConfig} />}
     </Box>
   )
