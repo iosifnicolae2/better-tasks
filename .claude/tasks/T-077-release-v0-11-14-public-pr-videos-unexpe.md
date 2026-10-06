@@ -2,8 +2,8 @@
 id: T-077
 title: Release v0.11.14 (public PR videos + unexpected-bugs rule)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-4
 rolled: 0
 order: -2
@@ -20,3 +20,4 @@ The user approved one release with T-075 and T-076 once T-076 was approved, whic
 3. Report the tag and the release URL.
 
 ## Notes
+- 2026-10-06: v0.11.14 published with the release video: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.14 (T-075 public PR videos, T-076 unexpected-bugs rule).
