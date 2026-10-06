@@ -360,6 +360,7 @@ def intro(tasks: list[str], options: argparse.Namespace) -> str:
     note = REVIEW_NOTE if is_direct() and not options.here else ""
     if len(tasks) == 1:
         return note
+    note = note.replace("closes with the task.", "closes with its tasks.")
     listed = "\n".join(f"- {task} {task_title(task_file(task), task)}" for task in tasks)
     return f"{note}{BUNDLE_HEADING}\n{listed}\n\n"
 
