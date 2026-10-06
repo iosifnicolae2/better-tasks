@@ -2,8 +2,8 @@
 id: T-074
 title: Release v0.11.13 (one-task-at-a-time approval rule)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-3
 rolled: 0
 order: -2
@@ -17,3 +17,4 @@ User approved: "Push and release" v0.11.13.
 3. Report the tag and the release URL.
 
 ## Notes
+- 2026-10-06: v0.11.13 published with the release video: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.13
