@@ -21,7 +21,7 @@ this script).
 
 Straight to main: the PR is for review only, a draft that never merges (the commits reach main with the lead's push).
 It goes into `task/T-004-base`, the commit before the task's first, so it shows the task's changes alone.
-`open --here` pushes this checkout's HEAD as `task/T-004` and opens its PR.
+`open --here` (the default in a worktree) pushes this checkout's HEAD as `task/T-004` and opens its PR into main.
 
 `close`, when the task closes without a merge (straight to main, or dropped): closes its PR, deletes its branches.
 
@@ -234,7 +234,8 @@ def open_pr(task: str, options: argparse.Namespace) -> int:
     upstream = f"{remote}/{main}"
     git("fetch", "--quiet", remote)
     branch = f"task/{task}"
-    if options.here:
+    if options.here or ROOT != MAIN_CHECKOUT:
+        options.here = True
         return open_here(task, branch, upstream, main, options)
     if options.ready and is_direct():
         sys.exit("task_pr: straight to main: the PR is for review only and stays a draft; close it with the task")
@@ -390,7 +391,7 @@ def main() -> int:
     opened.add_argument("--body-file", help="the PR description (default: from the task file and the commits)")
     opened.add_argument("--ready", action="store_true", help="after the user's yes and the full tests: ready to merge, no longer a draft")
     opened.add_argument("--dry-run", action="store_true", help="build the branch, push nothing")
-    opened.add_argument("--here", action="store_true", help="push this checkout's HEAD (a worktree's branch) instead of picking commits from dev")
+    opened.add_argument("--here", action="store_true", help="push this checkout's HEAD instead of picking commits from dev (the default in a worktree)")
     closed = sub.add_parser("close", help="the task closed without a merge: close its PR, delete its branches")
     closed.add_argument("task", help="the task id, e.g. T-004")
     sub.add_parser("sync", help="after a merge: main follows origin's main, dev takes it in")
