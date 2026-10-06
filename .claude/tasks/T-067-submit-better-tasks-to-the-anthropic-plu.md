@@ -26,9 +26,10 @@ Video: [T-067.mp4](../tasks_videos/T-067.mp4)
 - 2026-10-06: Commits: 634e8c4 plugin.json displayName, homepage, repository, keywords; 0cfcc01 README "What it runs, reads and sends" + support line (committed by hand through a private index, only my hunk: a peer's uncommitted git-flow line in README stays theirs; so the pre-commit secret scan did not run on it, a text-only change).
 - 2026-10-06: Checks: `claude plugin validate .` passes before and after (T-067/before-validate.txt, after-validate.txt), one warning left: no `version` in plugin.json, kept out per the project rule (finding 1 in submission.md). Not checked: the portal's own validation and security scan (only the portal runs them).
 - 2026-10-06: Not changed, other areas' call (submission.md "Open findings"): the README's sample .mp4 (binary, held for review), unpinned `uv pip install` in bin/kokoro-setup.sh, root CLAUDE.md warning under --strict, release.sh writing `version` / moving a release branch. The policy bans generating audio/video: the Kokoro-narrated videos may draw a question.
+- PR: https://github.com/iosifnicolae2/better-tasks/pull/37
 - The submission should track the tag of the next release (v0.11.11), which carries these commits.
 
 ### For the user
-PR: <PR>
+PR: https://github.com/iosifnicolae2/better-tasks/pull/37
 T-067 Submit better-tasks to the Anthropic plugin directory
 The submission is ready to read, not sent: every field of the claude.ai/directory/manage form, filled in (T-067/submission.md). plugin.json gained a display name, homepage and keywords; the README now says what better-tasks runs, reads and sends, and where to get support. Seven points for you to decide before it goes out are listed there; the main one is that plugin.json has no version.
