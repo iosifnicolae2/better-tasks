@@ -24,3 +24,9 @@ Waits on T-091 (#51) and T-092: same files (lead.md, teammate.md). The same team
 - 2026-10-07: BEFORE: no line on caches or idling in lead.md, teammate.md or status-check.md; team_status shows "cache warm Nm" with no flag. Capture: scratchpad/t093/before.txt.
 - 2026-10-07: Commit 0528da9: lead.md Routing line (act promptly on an idle teammate; a one-line note before its cache runs out when it must wait; stop it once its task is closed), teammate.md line (don't sit idle mid-task, report promptly), status-check.md clause, team_status/context line "cache warm 9m · expires soon" for an idle or waiting teammate with 10 min or less (team.ts expiresSoon; inside one status check's gap). Tests 351 pass.
 - 2026-10-07: Live check 1 (scratchpad/t093/after1.txt): the lead read "one that is finished is stopped" as "done reporting" and stopped a teammate still waiting on approval: a bug my wording made. Reworded: "One waiting on the user, for an approval say, gets a one-line note shortly before, to keep it warm; one whose task is closed is stopped instead." Live check 2 (after2.txt): the lead keeps the waiting teammate and plans the note before expiry, stops it only once the task is closed. Not checked live: the "expires soon" flag (needs ~45 idle minutes on the 1-hour cache; covered by the team_status test). No video: text-only change.
+- 2026-10-07: PR: https://github.com/iosifnicolae2/better-tasks/pull/53 (draft, review only, no video).
+
+### For the user
+PR: https://github.com/iosifnicolae2/better-tasks/pull/53
+T-093 (#53) Don't let teammates' caches expire: act promptly, or send a short keep-warm note
+The lead now answers idle teammates promptly; one waiting on you for approval gets a short note before its cache runs out, and it's stopped only once its task is closed. Teammates don't sit idle mid-task, and the team list marks a cache that expires soon.
