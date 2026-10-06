@@ -48,3 +48,4 @@ Is everything OK?
 - 2026-10-06: Step 1 done by the user's run of fix-update.sh: `claude plugin list` shows better-tasks 0.11.8 (user) and 0.11.8 (project, church-hub); ~/.claude/settings.json pins v0.11.8. This project's pin, v0.10.8 -> v0.11.8, is committed.
 - 2026-10-06: User ran fix-update.sh and restarted (Done). Lead verified: user install 0.11.8, ~/.claude/settings.json ref v0.11.8, project .claude/settings.json ref v0.11.8. Accepted.
 - 2026-10-06: Updater moves a release pin in the user's settings too; one-line fix-update.sh unsticks older installs (README); this Mac and project now on v0.11.8
+- 2026-10-06: Finished: full tests pass (claude plugin test . 318 pass; instructions-doc current). Straight to main, so no PR: the commits are final (1dff2dd, 6e87537, 3e13c37, 588f1b4). No video: nothing on screen beyond one log line.
