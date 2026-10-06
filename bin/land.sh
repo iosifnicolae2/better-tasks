@@ -13,7 +13,8 @@ messages=""
 while [ "$1" != -- ] && [ "$1" != --end-- ]; do
   case "$1" in
     -b) branch="$2"; shift 2 ;;
-    -m) messages="$messages$2
+    -m) messages="${messages:+$messages
+}$2
 "; shift 2 ;;
     *) echo "land.sh: unknown argument $1 (usage: land.sh [-b branch] -m message -- paths)" >&2; exit 2 ;;
   esac
