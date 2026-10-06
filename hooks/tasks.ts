@@ -28,6 +28,7 @@ export function parseTask(text: string, file: string): Task {
     rolled: Number(field('rolled')) || 0,
     order: Number(field('order')) || 0,
     created: field('created'),
+    dependsOn: idsIn(field('dependsOn')),
     file,
     body,
   }
@@ -38,8 +39,15 @@ export function formatTask(task: Task): string {
     const raw = task[name]
     return typeof raw === 'string' ? yamlValue(oneLine(raw)) : String(raw)
   }
-  const head = FIELDS.map(name => `${name}: ${value(name)}`.trimEnd()).join('\n')
-  return `---\n${head}\n---\n${task.body}`
+  const head = FIELDS.map(name => `${name}: ${value(name)}`.trimEnd())
+  const ids = dependenciesOf(task)
+  if (ids.length > 0) head.push(`dependsOn: [${ids.map(yamlValue).join(', ')}]`)
+  return `---\n${head.join('\n')}\n---\n${task.body}`
+}
+
+/** The ids a dependsOn value lists: "[T-071, T-072]", or the same without brackets. */
+export function idsIn(value: string): string[] {
+  return value.replace(/^\[|\]$/g, '').split(',').map(readYamlValue).filter(Boolean)
 }
 
 export function slugOf(title: string): string {
@@ -62,6 +70,67 @@ export function nextId(tasks: readonly Task[], naming: TaskNaming = DEFAULT_NAMI
 
 export function isOpen(task: Task): boolean {
   return task.status === 'todo' || task.status === 'doing'
+}
+
+/** Its dependencies' ids; none for a task kept in state from before the field existed (a plugin update mid-session). */
+export const dependenciesOf = (task: Task): readonly string[] => task.dependsOn ?? []
+
+const sameId = (one: string, other: string) => one.trim().toLowerCase() === other.trim().toLowerCase()
+
+/** The task with this id, whatever its case. */
+export function taskWithId(tasks: readonly Task[], id: string): Task | undefined {
+  return tasks.find(task => sameId(task.id, id))
+}
+
+/** The dependencies `task` still waits on: the ones open. A closed (done or cancelled) or deleted one no longer holds it. */
+export function blockersOf(task: Task, tasks: readonly Task[]): Task[] {
+  return dependenciesOf(task).map(id => taskWithId(tasks, id)).filter((one): one is Task => one !== undefined && isOpen(one))
+}
+
+/** A task is blocked while a dependency is open: it isn't started until they are all done. */
+export function isBlocked(task: Task, tasks: readonly Task[]): boolean {
+  return blockersOf(task, tasks).length > 0
+}
+
+/** "waits on T-071 (#39), T-072", or '' when nothing holds the task. */
+export function waitsText(task: Task, tasks: readonly Task[]): string {
+  const blockers = blockersOf(task, tasks)
+  return blockers.length > 0 ? `waits on ${blockers.map(taskRef).join(', ')}` : ''
+}
+
+/** Why task `id` can't depend on `ids`: an unknown id, itself, or a cycle. Undefined when it can. */
+export function dependencyProblem(id: string, ids: readonly string[], tasks: readonly Task[]): string | undefined {
+  const unknown = ids.filter(dep => !taskWithId(tasks, dep))
+  if (unknown.length > 0) return `No task ${unknown.join(', ')}: dependsOn takes the ids of existing tasks.`
+  if (ids.some(dep => sameId(dep, id))) return `${id} can't depend on itself.`
+  const cycle = cycleThrough(id, ids, tasks)
+  return cycle ? `That makes a cycle, ${cycle.join(' → ')}: drop one of these dependencies.` : undefined
+}
+
+/** A path of dependencies from `id` back to itself, once `id` depends on `ids`; undefined when there is none. */
+function cycleThrough(id: string, ids: readonly string[], tasks: readonly Task[]): string[] | undefined {
+  const idsOf = (one: string) => {
+    const task = taskWithId(tasks, one)
+    return sameId(one, id) ? ids : task ? dependenciesOf(task) : []
+  }
+  const seen = new Set<string>()
+  const walk = (path: readonly string[]): string[] | undefined => {
+    for (const next of idsOf(path.at(-1)!)) {
+      const name = taskWithId(tasks, next)?.id ?? next
+      if (sameId(name, id)) return [...path, id]
+      if (seen.has(name)) continue
+      seen.add(name)
+      const found = walk([...path, name])
+      if (found) return found
+    }
+    return undefined
+  }
+  return walk([id])
+}
+
+/** The open tasks that waited on `closed` and wait on nothing now. */
+export function unblockedBy(closed: Task, tasks: readonly Task[]): Task[] {
+  return tasks.filter(task => isOpen(task) && dependenciesOf(task).some(id => sameId(id, closed.id)) && !isBlocked(task, tasks))
 }
 
 /** The task's pull request: the link on its last "PR: <url>" note line (a bare url or a markdown link). */
@@ -136,12 +205,13 @@ export const WHEN_LABELS: Record<When, string> = {
   backlog: 'backlog',
 }
 
-/** One line per task, for the model. */
-export function taskLine(task: Task, today: string, config: SprintConfig): string {
+/** One line per task, for the model; `tasks` tells what it waits on. */
+export function taskLine(task: Task, today: string, config: SprintConfig, tasks: readonly Task[] = []): string {
   const parts = [`${taskRef(task)} [${task.status}] ${task.title}`, WHEN_LABELS[whenOf(task, today, config)]]
   if (task.owner) parts.push(`owner ${task.owner}`)
   if (task.rolled > 0) parts.push(`rolled ${task.rolled}x`)
-  return parts.join(' · ')
+  if (isOpen(task)) parts.push(waitsText(task, tasks))
+  return parts.filter(Boolean).join(' · ')
 }
 
 // ---- With files: the task files of the session's project ----
@@ -170,7 +240,7 @@ export async function listTasks(files: Files): Promise<Task[]> {
 }
 
 export async function findTask(files: Files, id: string): Promise<Task | undefined> {
-  return (await listTasks(files)).find(task => task.id.toLowerCase() === id.trim().toLowerCase())
+  return taskWithId(await listTasks(files), id)
 }
 
 /** Writes the task file, then publishes the fresh list. */
@@ -179,7 +249,7 @@ export async function saveTask(files: Files, task: Task): Promise<void> {
   await listTasks(files)
 }
 
-export type NewTask = { title: string; goal: string; when: When }
+export type NewTask = { title: string; goal: string; when: When; dependsOn?: string[] }
 
 export async function createTask(files: Files, input: NewTask): Promise<Task> {
   const settings = await settingsFrom(files)
@@ -198,6 +268,7 @@ export async function createTask(files: Files, input: NewTask): Promise<Task> {
     rolled: 0,
     order: edgeOrder(tasks, place, input.when === 'now' ? 'top' : 'bottom'),
     created: day,
+    dependsOn: input.dependsOn ?? [],
     file: `${await tasksDir(files)}/${fileNameOf(settings.tasks, id, title)}`,
     body: bodyOf(input.goal, template, { id, title, created: day }),
   }

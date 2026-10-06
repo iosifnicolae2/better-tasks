@@ -14,6 +14,8 @@ export type Task = {
   /** Place within its section, smallest first; ties go by id. */
   order: number
   created: string
+  /** The ids of the tasks it needs done first ("dependsOn: [T-071, T-072]"); empty for most. */
+  dependsOn: string[]
   /** Absolute path of the task file. */
   file: string
   /** Everything after the frontmatter. */

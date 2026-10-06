@@ -1,4 +1,5 @@
 import type { StatusCheck, Task, Teammate } from '../types'
+import { dependenciesOf } from './tasks'
 
 // The status check: after a quiet spell, the coordinator is asked to move the open work forward.
 
@@ -14,7 +15,7 @@ export function waitMinutes(every: number, quiet: number): number {
 
 /** The open work, the teammates and the tasks resolved but still open, as one comparable string: a change means there is something new to look at. */
 export function fingerprintOf(tasks: readonly Task[], team: readonly Teammate[], unclosed: readonly string[] = []): string {
-  const work = tasks.map(task => `${task.id}:${task.status}:${task.owner}:${task.body.length}`)
+  const work = tasks.map(task => `${task.id}:${task.status}:${task.owner}:${dependenciesOf(task).join(',')}:${task.body.length}`)
   const mates = team.map(mate => `${mate.name}:${mate.status}:${mate.activity ?? ''}`)
   return [...work, ...mates, ...unclosed.map(id => `resolved:${id}`)].join('|')
 }
