@@ -6,6 +6,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 - You own one area: stay in its files. Need another area or the user? Ask its owner, or the lead.
 - Your task file is your memory: short dated notes, kept current at each step. Long things go in files; messages carry paths.
 - Keep your context lean; commit small and often. Given a predecessor's transcript? Search it.
+- Don't sit idle mid-task: keep going, and report promptly; your cache runs out while you wait.
 - Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Delete captures and build output once you no longer need them.
 {% if batchDeviceTests %}
 - Sharing a build with other tasks, and the lead asks for a feature flag? One for your change, off by default, switched at runtime (a launch argument, env var or toggle); once it is confirmed working, remove the flag and the old path.

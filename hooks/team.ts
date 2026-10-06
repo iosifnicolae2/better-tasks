@@ -107,7 +107,17 @@ export function overLimit(team: readonly Teammate[], name: string, max: number, 
     'queued after its current one (task_update owner, then SendMessage), or wait until one finishes.'
 }
 
+/** Minutes of cache left at which a waiting teammate is flagged: inside one status check's gap. */
+export const EXPIRES_SOON = 10
+
+/** A teammate that waits, warm but about to go cold: the lead acts on it now, or sends it a note. */
+export function expiresSoon(mate: Teammate): boolean {
+  const waits = ['idle', 'waiting'].includes(stateOf(mate))
+  return waits && mate.cache === 'warm' && (mate.cacheMinutesLeft ?? 0) <= EXPIRES_SOON
+}
+
 export function mateLine(mate: Teammate): string {
   const fill = mate.percent === undefined ? 'context ?' : `context ${mate.percent} %`
-  return [mate.name, mate.effort, stateOf(mate), fill, cacheText(mate), mate.activity].filter(Boolean).join(' · ')
+  const soon = expiresSoon(mate) ? 'expires soon' : undefined
+  return [mate.name, mate.effort, stateOf(mate), fill, cacheText(mate), soon, mate.activity].filter(Boolean).join(' · ')
 }
