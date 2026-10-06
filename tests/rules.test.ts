@@ -113,6 +113,12 @@ describe('the shipped templates', () => {
     expect(overLimit([], 'cart', 0, [])).toBeUndefined()
   })
 
+  test('caches: the lead acts on an idle teammate before its cache runs out, or keeps a waiting one warm with a short note; a finished one is stopped; the teammate does not sit idle', async () => {
+    expect(await rule('lead.md')).toContain('answer, route or unblock it promptly. One that must wait, on the user say, gets a one-line note shortly before, to keep it warm; one that is finished is stopped, not kept warm.')
+    expect(await rule('teammate.md')).toContain("Don't sit idle mid-task: keep going, and report promptly")
+    expect(await rule('status-check.md')).toContain('act on an idle teammate whose cache expires soon (or send it a one-line note)')
+  })
+
   test('new bugs: small ones fixed in the task; bigger or other-area ones asked as a new task, fixed with a video and a PR; straight to main gets its own worktree', async () => {
     const direct = await rule('lead.md', { gitFlow: 'direct', demoVideos: true })
     expect(direct).toContain('A teammate fixes a small bug in its own area within its task.')

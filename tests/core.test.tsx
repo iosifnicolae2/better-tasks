@@ -808,7 +808,10 @@ test('a cold cache is a signal, not a block: a successor gets its predecessor\'s
   await clock.advance(14 * 60_000)
   expect(await status()).toBe('auth · idle · context 10 % · cache warm 41m')
 
-  await clock.advance(42 * 60_000)
+  await clock.advance(32 * 60_000)
+  expect(await status()).toBe('auth · idle · context 10 % · cache warm 9m · expires soon') // inside one status check's gap
+
+  await clock.advance(10 * 60_000)
   expect(await status()).toBe('auth · idle · context 10 % · cache cold')
   const cold = await $.tool.call({ tool: 'SendMessage', tool_use_id: 's1', to: 'auth', message: 'and the signup' })
   expect(cold.result).toBe('sent')
