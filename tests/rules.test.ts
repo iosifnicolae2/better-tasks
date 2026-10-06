@@ -141,6 +141,8 @@ describe('the shipped templates', () => {
 
   test('the skills follow the settings: quality, off-screen, the test screen, the PR flow, the upstream answer', async () => {
     expect(await rule('video.md', { videoQuality: 'low' })).toContain('--quality low')
+    expect(await rule('video.md', {})).toContain('Never show secrets or personal data')
+    expect(await rule('pull-request.md', {})).toContain('No secrets or personal data')
     expect(await rule('testing.md', { offScreen: true })).toContain("the project's own virtual display")
     expect(await rule('testing.md', { offScreen: true })).toContain("off the user's screen")
     expect(await rule('testing.md', { offScreen: false, testScreen: 'DELL' })).toContain('"DELL"')
