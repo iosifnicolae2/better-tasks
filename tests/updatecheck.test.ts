@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { activeInstall, declaresMarketplace, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, updateArgv, updateQuestion } from '../hooks/updatecheck'
+import { activeInstall, declaredTag, declaresMarketplace, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, updateArgv, updateQuestion, versionAt, withDeclaredTag } from '../hooks/updatecheck'
 
 const LS_REMOTE = ['aaa\trefs/tags/v0.9.0', 'bbb\trefs/tags/v0.10.7', 'ccc\trefs/tags/v0.10.10', 'ddd\trefs/tags/nightly', 'eee\trefs/tags/v1.0.0-rc1'].join('\n')
 const ROOT = '/work/app'
@@ -45,6 +45,18 @@ describe('the startup update check', () => {
     expect(activeInstall('not json', `${CACHE}/0.10.7`, ROOT)).toBeUndefined()
   })
 
+  test('after an update, the version at the updated scope: its entry has moved to the new folder', () => {
+    const list = JSON.stringify([
+      { id: 'better-tasks@better-tasks', version: '0.11.3', scope: 'user', installPath: `${CACHE}/0.11.3` },
+      { id: 'better-tasks@better-tasks', version: '0.11.7', scope: 'project', installPath: `${CACHE}/0.11.7`, projectPath: ROOT },
+      { id: 'better-tasks@better-tasks', version: '0.9.0', scope: 'local', installPath: `${CACHE}/0.9.0`, projectPath: '/other' },
+    ])
+    expect(versionAt(list, 'project', ROOT)).toBe('0.11.7')
+    expect(versionAt(list, 'user', ROOT)).toBe('0.11.3')
+    expect(versionAt(list, 'local', ROOT)).toBeUndefined()
+    expect(versionAt('not json', 'user', ROOT)).toBeUndefined()
+  })
+
   test('a source from the shared settings never reads as an option or another transport', () => {
     expect(lsRemoteArgv('--upload-pack=touch /tmp/x')).toEqual(['git', 'ls-remote', '--tags', '--refs', '--', '--upload-pack=touch /tmp/x'])
     for (const source of ['--upload-pack=touch /tmp/x', '-c core.sshCommand=touch /tmp/x', 'ext::sh -c touch% /tmp/x', '-owner/repo', 'https://x.com/a b', 'file:///tmp/repo']) {
@@ -53,6 +65,7 @@ describe('the startup update check', () => {
     expect(repinArgv('someone/better-tasks', '--help')).toBeUndefined()
     expect(repinArgv('someone/better-tasks', 'v1.0.0')).toEqual(['claude', 'plugin', 'marketplace', 'add', '--scope', 'project', '--', 'someone/better-tasks#v1.0.0'])
     expect(repinArgv('https://git.example.com/bt.git', 'v1.0.0')?.at(-1)).toBe('https://git.example.com/bt.git#v1.0.0')
+    expect(repinArgv('someone/better-tasks', 'v1.0.0', 'user')?.slice(4, 6)).toEqual(['--scope', 'user'])
     expect(updateArgv('--evil')).toEqual(['claude', 'plugin', 'update', '--scope', 'user', '--', 'better-tasks@better-tasks'])
     expect(updateArgv('project')).toEqual(['claude', 'plugin', 'update', '--scope', 'project', '--', 'better-tasks@better-tasks'])
   })
@@ -65,6 +78,19 @@ describe('the startup update check', () => {
     expect(declaresMarketplace(undefined)).toBe(false)
     expect(declaresMarketplace('not json')).toBe(false)
     expect(declaresMarketplace('null')).toBe(false)
+  })
+
+  test('a user pin (`marketplace add owner/repo#tag` writes one) moves to the new release, the rest of the settings kept', () => {
+    const source = { source: 'github', repo: 'iosifnicolae2/better-tasks', ref: 'v0.11.3' }
+    const user = JSON.stringify({ theme: 'dark', extraKnownMarketplaces: { 'better-tasks': { source }, other: { source: { repo: 'a/b' } } } })
+    expect(declaredTag(user)).toBe('v0.11.3')
+    expect(JSON.parse(withDeclaredTag(user, 'v0.11.8') ?? '{}')).toEqual({ theme: 'dark', extraKnownMarketplaces: { 'better-tasks': { source: { ...source, ref: 'v0.11.8' } }, other: { source: { repo: 'a/b' } } } })
+    const unpinned = JSON.stringify({ extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' } } } })
+    for (const text of [unpinned, JSON.stringify({ extraKnownMarketplaces: { 'better-tasks': { source: { ...source, ref: 'main' } } } }), '{}', 'not json', undefined]) {
+      expect(declaredTag(text)).toBeUndefined()
+      expect(withDeclaredTag(text, 'v0.11.8')).toBeUndefined()
+    }
+    expect(withDeclaredTag(user, '--help')).toBeUndefined()
   })
 
   test('the question is short and plain', () => {

@@ -7,7 +7,7 @@ import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { OFF_LINE } from './projectsetup'
 import { addSource, hasTeamInstall, maySelfCommit, needsPin, pinCommit, pinnedTag, repoUrl, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, updateCommit, withTeamInstall } from './teaminstall'
-import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArgv, MANAGED_SETTINGS, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, restartLine, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updateQuestion } from './updatecheck'
+import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArgv, MANAGED_SETTINGS, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, restartLine, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updateQuestion, versionAt, withDeclaredTag } from './updatecheck'
 import type { Install } from './updatecheck'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder, migrateRules } from './migrate'
@@ -432,15 +432,20 @@ async function updateTo($: EngineInterface, tag: string, install: Install): Prom
   const hadEdits = await hasSharedEdits($)
   const run = async (argv: string[]) => $.process.run(argv, { cwd: await $.session.root(), timeoutMs: 180_000 })
   const isDeclared = await isDeclaredByUser($)
-  const fetchArgv = isPinnedHere && !isDeclared ? repinArgv(addSource(shared), tag) : refreshArgv
-  if (fetchArgv === undefined) return $.ui.log(`better-tasks: the better-tasks source in ${SHARED_SETTINGS} is not an owner/repo or https URL; update it yourself`)
+  const userPath = `${await claudeDirOf($)}/settings.json`
+  const user = (await $.fs.read(userPath).catch(() => undefined)) ?? ''
+  const userRepinned = withDeclaredTag(user, tag)
+  const fetchArgv = userRepinned !== undefined ? repinArgv(addSource(user), tag, 'user') : isPinnedHere && !isDeclared ? repinArgv(addSource(shared), tag) : refreshArgv
+  if (fetchArgv === undefined) return $.ui.log(`better-tasks: the better-tasks source in ${userRepinned !== undefined ? userPath : SHARED_SETTINGS} is not an owner/repo or https URL; update it yourself`)
+  // A user pin lets only an add from that same source#tag through: the pin moves first, back when the add fails.
+  if (userRepinned !== undefined) await $.fs.write(userPath, userRepinned)
   const moved = await run(fetchArgv)
+  if (moved.exitCode !== 0 && userRepinned !== undefined) await $.fs.write(userPath, user)
   if (moved.exitCode !== 0) return $.ui.log(`better-tasks: could not fetch ${tag}: ${moved.stderr.trim()}`)
   if (isPinnedHere && isDeclared) await pinSharedTo($, shared, tag)
   const pinNote = isPinnedHere ? ` ${SHARED_SETTINGS} now pins ${tag}. ${await selfCommit($, updateCommit(tag), hadEdits)}` : ''
   const updated = await run(updateArgv(install.scope))
-  const now = await installOf($)
-  if (updated.exitCode !== 0 || now?.version !== tag.slice(1)) {
+  if (updated.exitCode !== 0 || (await versionNow($, install.scope)) !== tag.slice(1)) {
     return $.ui.log(`better-tasks: could not update to ${tag}: ${(updated.stderr || updated.stdout).trim()}. Try: ${updateArgv(install.scope).join(' ')}`)
   }
   $.ui.log(`${restartLine(tag)}${pinNote}`)
@@ -471,6 +476,12 @@ async function pinTagOf($: EngineInterface, shared: string | undefined): Promise
 async function releasesOf($: EngineInterface, shared: string | undefined): Promise<string[]> {
   const listed = await $.process.run(lsRemoteArgv(repoUrl(shared)), { timeoutMs: 20_000 }).catch(() => undefined)
   return listed?.exitCode === 0 ? releaseTags(listed.stdout) : []
+}
+
+/** The version installed at `scope` now (updatecheck.ts). */
+async function versionNow($: EngineInterface, scope: string): Promise<string | undefined> {
+  const listed = await $.process.run(listArgv, { timeoutMs: 30_000 }).catch(() => undefined)
+  return listed?.exitCode === 0 ? versionAt(listed.stdout, scope, await $.session.root()) : undefined
 }
 
 /** The install this session runs; undefined for a linked install (the user's own checkout). */

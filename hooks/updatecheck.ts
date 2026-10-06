@@ -61,6 +61,15 @@ export function activeInstall(listJson: string, pluginRoot: string, projectRoot:
 }
 
 /**
+ * The version installed at `scope` (this project's entry, for project or local), from `claude plugin list --json`.
+ * After an update the entry lives in the new release's folder, so it is found by scope, not by the plugin's folder.
+ */
+export function versionAt(listJson: string, scope: string, projectRoot: string): string | undefined {
+  const entry = parseList(listJson).find(each => each.id === PLUGIN_ID && (each.scope ?? 'user') === scope && (scope === 'user' || each.projectPath === projectRoot))
+  return typeof entry?.version === 'string' ? entry.version : undefined
+}
+
+/**
  * The release to offer, or undefined when there is nothing to ask: none newer than both the installed
  * release and the project's pin, or the user already said No to it.
  */
@@ -83,10 +92,13 @@ export function pinTarget(tags: string[], installed: string | undefined): string
 
 export const lsRemoteArgv = (url: string) => ['git', 'ls-remote', '--tags', '--refs', '--', url]
 export const listArgv = ['claude', 'plugin', 'list', '--json']
-/** Moves the project's pinned marketplace to `tag`: the shared settings and Claude Code's copy of the marketplace. Undefined for a source or tag of another shape. */
-export function repinArgv(source: string, tag: string): string[] | undefined {
+/**
+ * Moves the marketplace pinned in the project's (or the user's) settings to `tag`: those settings and Claude Code's
+ * copy of the marketplace. Undefined for a source or tag of another shape.
+ */
+export function repinArgv(source: string, tag: string, scope: 'project' | 'user' = 'project'): string[] | undefined {
   if (!isSafeSource(source) || !isReleaseTag(tag)) return undefined
-  return ['claude', 'plugin', 'marketplace', 'add', '--scope', 'project', '--', `${source}#${tag}`]
+  return ['claude', 'plugin', 'marketplace', 'add', '--scope', scope, '--', `${source}#${tag}`]
 }
 export const refreshArgv = ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE_NAME]
 
@@ -98,11 +110,35 @@ export const MANAGED_SETTINGS = ['/Library/Application Support/ClaudeCode/manage
  * then takes its source from there alone and refuses `marketplace add` from any other, a project's pin included.
  */
 export function declaresMarketplace(settingsText: string | undefined): boolean {
+  return declarationOf(settingsText) !== undefined
+}
+
+/**
+ * The release tag the user's settings pin better-tasks to; undefined when they pin none. `claude plugin marketplace
+ * add owner/repo#tag` writes such a pin, and then only an add from that same source#tag is let through.
+ */
+export function declaredTag(settingsText: string | undefined): string | undefined {
+  const ref = declarationOf(settingsText)?.source?.ref
+  return isReleaseTag(ref) ? ref : undefined
+}
+
+/** The user's settings with their better-tasks pin moved to `tag`, the rest kept; undefined when they pin no release. */
+export function withDeclaredTag(settingsText: string | undefined, tag: string): string | undefined {
+  if (declaredTag(settingsText) === undefined || !isReleaseTag(tag)) return undefined
+  const settings = JSON.parse(settingsText ?? '{}')
+  settings.extraKnownMarketplaces[MARKETPLACE_NAME].source.ref = tag
+  return `${JSON.stringify(settings, null, 2)}\n`
+}
+
+type Declaration = { source?: { ref?: unknown } }
+
+function declarationOf(settingsText: string | undefined): Declaration | undefined {
   try {
     const declared = JSON.parse(settingsText ?? '{}')?.extraKnownMarketplaces
-    return typeof declared === 'object' && declared !== null && Object.hasOwn(declared, MARKETPLACE_NAME)
+    const isObject = typeof declared === 'object' && declared !== null
+    return isObject && Object.hasOwn(declared, MARKETPLACE_NAME) ? (declared[MARKETPLACE_NAME] ?? {}) : undefined
   } catch {
-    return false
+    return undefined
   }
 }
 export const updateArgv = (scope: string) => ['claude', 'plugin', 'update', '--scope', SCOPES.includes(scope) ? scope : 'user', '--', PLUGIN_ID]
