@@ -23,3 +23,4 @@ The user approved this plan: release v0.11.12 once the portal shows 0 blocking i
 3. Report the tag and the release URL. directory-2 (T-070) then points the portal draft at the tag and submits.
 
 ## Notes
+- 2026-10-06: v0.11.12 published: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.12. Local main matched c1cd830's plugin content; pushed. Run from a temporary clean clone (config.json left untouched). No video: no task since v0.11.11 had one.
