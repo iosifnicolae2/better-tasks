@@ -183,7 +183,7 @@ export const FIELDS: readonly Field[] = [
     group: 'testing',
     field: 'batchDeviceTests',
     label: 'Batch device tests',
-    describe: 'When builds or device tests are slow, tasks that don’t touch each other share one build, each behind its own feature flag, removed once it works.',
+    describe: 'When builds or device tests are slow: each task its own instance where possible, else unrelated tasks share one build, risky ones behind a short-lived feature flag.',
     options: ON_OFF,
     value: settings => (settings.batchDeviceTests ? 'on' : 'off'),
     initial: 'on',

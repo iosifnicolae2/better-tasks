@@ -69,7 +69,7 @@
     "batchDeviceTests": {
       "type": "boolean",
       "title": "Batch device tests",
-      "description": "When builds or device tests are slow, tasks that don't touch each other share one build, each behind its own feature flag, so one device run tests them all. Each flag comes out once its task works.",
+      "description": "When builds or device tests are slow, each task gets its own instance (simulator, emulator, app copy) where possible; else tasks that don't touch each other share one build, risky ones behind a short-lived feature flag that comes out once the task works.",
       "default": true
     },
     "pullRequests": {
