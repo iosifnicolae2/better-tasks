@@ -83,13 +83,27 @@ Installed per project? Add `--scope project` to `update` and `uninstall`.
 
 ## 🔒 What it runs, reads and sends
 
-better-tasks has no server and collects no data: nothing is sent to its author or to any analytics.
+better-tasks has no server and collects no data: nothing is sent to its author or to any analytics. It works through Claude Code's plugin hooks ([hooks/](hooks/)) and the scripts in [bin/](bin/), all in this repo.
 
-- **Files it writes**: your tasks in `.claude/tasks/` and its settings in `.claude/tasks/config.json`, in your project. Once per machine it asks Claude to add a line to your `~/.claude/CLAUDE.md` pointing at its team rules; you approve that edit.
+- **Files it writes**: your tasks in `.claude/tasks/`, its settings in `.claude/tasks/config.json`, the finished-task log `docs/tasks.md`, sprint goals in `.claude/tasks/sprints.md` and before/after videos in `.claude/tasks_videos/`, all in your project. It also writes files other tools obey:
+  - `.gitignore`: adds `.claude/worktrees/`, so teammates' worktrees stay out of git.
+  - `.idea/`: marks `.claude/worktrees/` excluded in IntelliJ, only in a project that has `.idea/`.
+  - `.claude/settings.json` (the project's): adds better-tasks, pinned to a release, when you answer "everyone on this project", and moves that pin when you say Yes to an update. It commits only that file.
+  - `~/.claude/settings.json`: moves your pin of better-tasks to the new release when you say Yes to an update (back as it was if the update fails).
+  - `~/.claude/CLAUDE.md` and `~/.claude/settings.json` through Claude, with your approval: see the prompts below.
 - **Files it reads**: your project, Claude Code's settings (to pin and update the plugin), and a finished teammate's transcript in `~/.claude/projects/`, which only its successor is pointed at.
-- **Programs it runs, on your machine**: `git`; `gh` for pull requests, with your own GitHub login; your editor, to open a task; on macOS `caffeinate` (setting `keepAwake`), and for `/away` `pmset` and a small virtual-display helper compiled from [bin/](bin/).
+- **Settings and environment**: in this Claude Code process it sets `CLAUDE_CODE_PROMPT_CACHE_TTL` and `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL` to `1h` (setting `longCache`), unless you set a TTL yourself. Its settings page writes only its own `/config` rows (`better-tasks.*`) or the project's `.claude/tasks/config.json`. When you turn a setting on, it sets up what that setting needs (the Kokoro voice for videos, `gh` for pull requests).
+- **Slash commands it runs**: `/config`, only when you press "All Claude Code settings" on its settings page. It adds `/better-tasks` and `/away`.
+- **Prompts it submits, in your session**:
+  - Once per machine: asks Claude to add a line to `~/.claude/CLAUDE.md` pointing at its team rules. You approve the edit.
+  - When agent teams are off: asks Claude to add `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` to the `env` block of `~/.claude/settings.json` (you approve the edit) and then to ask you to restart.
+  - After `statusEvery` quiet minutes (10 by default, 0 turns it off) with open work and nothing in your prompt box: a status check asking the lead to move the open tasks forward ([.claude/better-tasks/status-check.md](.claude/better-tasks/status-check.md)).
+  - "Start" on a task of the board: a prompt to start that task.
+- **What it adds to Claude's prompts**: its team rules in the system prompt, and beside each of your prompts a short block with the sprint, the open tasks and its reminders. Its skills read with the settings in force filled in. All the texts: [docs/instructions.md](docs/instructions.md).
+- **Tool calls it changes or answers**: a named teammate's Agent call gets its task's title as the description, the teammate rules and its predecessor's transcript path added to the prompt, the agent type of its level, and a worktree when the git flow uses them. Its own tools (`mcp__better-tasks__*`) are answered by the plugin itself. It never answers a permission question: you do. Its teammate agent types run in `default` permission mode, so a teammate asks you as Claude Code would (a lead in bypass, accept-edits or auto mode gives its teammates that mode, as Claude Code does).
+- **Programs it runs, on your machine**: `git`; `gh` for pull requests, with your own GitHub login; `claude plugin marketplace` and `claude plugin update` when you say Yes to an update; your editor or the default app (`open`), to open a task or a video; on macOS `caffeinate` (setting `keepAwake`), and for `/away` `pmset`, `osascript` and a small virtual-display helper compiled from [bin/](bin/). With videos on: `ffmpeg`, `uv` and the Kokoro voice ([bin/demo-video.sh](bin/demo-video.sh)).
+- **Credentials**: none of its own. `gh` uses your GitHub login. Before it opens a PR for you to approve, [bin/open-pr.sh](bin/open-pr.sh) reads `gh auth token` to check that the PR's video loads, and sends it only to GitHub's own hosts.
 - **Network**: `git ls-remote` on this GitHub repo at startup, to see if a release is out. With "PR per task", `gh` talks to GitHub for your repo, and better-tasks installs or updates `gh` with Homebrew if it is missing or too old. With before/after videos on, a one-time setup installs the Kokoro voice (`uv` fetches packages from PyPI and the voice model from Hugging Face) into `~/.local/share/better-tasks/kokoro`, and each video goes to its PR on GitHub (attached by `gh`, or on a `videos` branch of your repo). Nothing else.
-- **Environment**: it sets Claude Code's prompt-cache TTL to 1 hour (setting `longCache`) unless you set one.
 
 Questions, bugs or a security report: [open an issue](https://github.com/iosifnicolae2/better-tasks/issues) or write to iosif@bringes.io.
 
