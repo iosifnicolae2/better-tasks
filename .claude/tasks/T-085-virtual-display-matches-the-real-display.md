@@ -25,3 +25,12 @@ Video: [T-085.mp4](../tasks_videos/T-085.mp4)
 - 2026-10-06: Blocked: the Mac's disk is full (119 MB free). The user is freeing space themselves. The virtual display (id 65) is still added; remove it with `sh bin/record-display.sh remove` once there's space. Done so far: the display copies the main LG (1920x1080 at 2x). Left: making a new display actually switch to 2x. Nothing committed yet.
 - 2026-10-06: after: display copies the main screen (LG ULTRAFINE, 1920x1080 at 2x, its mm per pixel); a kept display with another look is made anew. The keeper process sees no modes for its own display, so `fit` (separate process) switches it to 2x; tested from a remembered 1x. Screens back in place after each remove. Disk was full for a while (not mine).
 - 2026-10-06: display removed after the tests; real screens match the start layout.
+- 2026-10-06: done. Commits d0e6b85 (helper: look, fit, remake on mismatch), 24899d9 (notes). PR: https://github.com/iosifnicolae2/better-tasks/pull/49
+  Follows: the main screen; the first real screen when the main is virtual; fallback 1920x1080 at 1x. Refresh stays 30 Hz (recording only).
+  Not run yet: scripts/record-display-check.sh (adds two more virtual displays): with the full tests after the yes. No other test covers these files.
+  Opening TextEdit once by mistake during the before capture (it opened on the main screen, Open panel only); quit it right away.
+
+### For the user
+PR: https://github.com/iosifnicolae2/better-tasks/pull/49
+T-085 (#49) Virtual display matches the real displays' resolution and scaling
+The test screen now copies your main screen's size and Retina scaling (1920x1080 at 2x, before 1x), so text and recordings look as sharp as on your own screen. It follows your main screen if you change it.
