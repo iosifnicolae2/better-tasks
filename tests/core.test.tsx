@@ -1272,7 +1272,7 @@ test('in a GitHub project startup asks about videos, then the git flow; the flow
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
   expect(asked.map(one => one.question)).toEqual([QUESTION, expect.stringContaining('Recommended here: Shared dev branch, PR per task (a Flutter app to build and install once for every change).')])
-  expect(asked[1]?.options.slice(0, 3)).toEqual(['Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
+  expect(asked[1]?.options.slice(0, 3)).toEqual(['Shared dev branch, PR per task (Recommended)', 'Worktree and PR per task', 'Straight to main'])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ '//': 'notes', demoVideos: false, gitFlow: 'dev-prs' })
   expect(host.notices).toContain('better-tasks: made the dev branch here, from this commit: teammates land on it, PRs go to main')
   expect(host.spawnedArgv.map(argv => argv.at(-1)?.split('/').pop())).toEqual(['gh-update.sh']) // gh --version printed nothing: gh missing
@@ -1299,7 +1299,7 @@ test('without a GitHub remote startup does not ask for the git flow, and asks in
   host.runOutput['git remote -v'] = 'origin\thttps://github.com/someone/app.git (fetch)\n'
   await $.session.start(SESSION)
   await clock.advance(QUIET_PROMPT_BOX)
-  expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Straight to main (one person, no app to install and no CI on PRs).')])
+  expect(asked).toEqual([QUESTION, expect.stringContaining('Recommended here: Worktree and PR per task (a copy is cheap to set up).')])
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '')).toEqual({ demoVideos: false }) // "No" names no flow: asked again next time
 })
 
@@ -1362,7 +1362,20 @@ test('off-screen is on by default and never asked; the rules follow', async ($, 
   expect(composed.sections.at(-1)?.text).toContain('Teammates test off the user\'s screen;')
 })
 
-test('straight to main, the default: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {
+test('a worktree and a PR per task, the default with a GitHub remote: a named teammate gets its own worktree', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  host.runOutput['git remote -v'] = 'origin\thttps://github.com/someone/app.git (fetch)\n'
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
+  expect(named.result).toEqual({ isolation: 'worktree' })
+  const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
+  expect(composed.sections.at(-1)?.text).toContain('## Git flow\nA worktree and a PR per task.')
+})
+
+test('straight to main, the default without a GitHub remote: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)

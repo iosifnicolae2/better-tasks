@@ -1,6 +1,6 @@
 import type { PluginOptions } from 'claude-code'
 
-import { flowOf, GIT_FLOWS } from './gitflow'
+import { DEFAULT_FLOW, flowOf, GIT_FLOWS } from './gitflow'
 import type { GitFlow } from './gitflow'
 import type { Files } from './io'
 import type { SprintConfig } from './sprints'
@@ -138,7 +138,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   videoQuality: 'medium',
   releaseVideos: true,
   pullRequests: false,
-  gitFlow: 'direct',
+  gitFlow: DEFAULT_FLOW,
   devBranch: 'dev',
   excludeWorktreesFromIde: true,
   prTemplate: '',

@@ -10,11 +10,14 @@ import type { ProjectFacts, Probe } from '../hooks/gitflow'
 const SOLO_LIGHT: ProjectFacts = { hasGitHub: true, cacheMb: 300, app: '', authors: 1, prChecks: false }
 
 describe('git flow', () => {
-  test('gitFlow names the flow; the old "PR per task" switch still means worktree and PR; else straight to main', () => {
-    expect(flowOf({})).toBe('direct')
+  test('gitFlow names the flow; the old switches still mean theirs; else a worktree and PR per task', () => {
+    expect(flowOf({})).toBe('worktree-prs')
+    expect(flowOf({ pullRequests: false, worktree: false })).toBe('worktree-prs')
     expect(flowOf({ gitFlow: 'dev-prs', pullRequests: true })).toBe('dev-prs')
+    expect(flowOf({ gitFlow: 'direct' })).toBe('direct')
     expect(flowOf({ pullRequests: true })).toBe('worktree-prs')
-    expect(flowOf({ gitFlow: 'nonsense' })).toBe('direct')
+    expect(flowOf({ worktree: true })).toBe('direct')
+    expect(flowOf({ gitFlow: 'nonsense' })).toBe('worktree-prs')
   })
 
   test('worktrees only in the worktree flow, or straight to main with the old worktree switch', () => {
@@ -32,16 +35,16 @@ describe('git flow', () => {
     expect(recommend({ ...SOLO_LIGHT, app: 'an Xcode app' })).toEqual({ flow: 'dev-prs', reason: 'an Xcode app to build and install once for every change' })
   })
 
-  test('a team or CI on PRs: a worktree and PR each, or the shared dev branch when a copy is heavy', () => {
+  test('a worktree and PR each, or the shared dev branch when a copy is heavy', () => {
     expect(recommend({ ...SOLO_LIGHT, authors: 3 }).flow).toBe('worktree-prs')
     expect(recommend({ ...SOLO_LIGHT, prChecks: true })).toEqual({ flow: 'worktree-prs', reason: 'CI runs on PRs, and a copy is cheap to set up' })
     expect(recommend({ ...SOLO_LIGHT, authors: 2, cacheMb: 82_000 })).toEqual({ flow: 'dev-prs', reason: '2 people commit, and a 80.1 GB build cache for every copy' })
     expect(recommend({ ...SOLO_LIGHT, prChecks: true, cacheMb: undefined })).toEqual({ flow: 'dev-prs', reason: 'CI runs on PRs, and a build cache too big to measure quickly for every copy' })
   })
 
-  test('solo, no app, no CI on PRs: straight to main, however big the build', () => {
-    expect(recommend(SOLO_LIGHT)).toEqual({ flow: 'direct', reason: 'one person, no app to install and no CI on PRs' })
-    expect(recommend({ ...SOLO_LIGHT, cacheMb: undefined }).flow).toBe('direct')
+  test('solo, no app, no CI on PRs: a worktree and PR each too, unless a copy is heavy', () => {
+    expect(recommend(SOLO_LIGHT)).toEqual({ flow: 'worktree-prs', reason: 'a copy is cheap to set up' })
+    expect(recommend({ ...SOLO_LIGHT, cacheMb: 3072 })).toEqual({ flow: 'dev-prs', reason: 'a 3 GB build cache for every copy' })
   })
 
   test('people count once per name or email; bots are not people', () => {
@@ -72,7 +75,7 @@ describe('git flow', () => {
     const question = flowQuestion({ flow: 'dev-prs', reason: 'a Flutter app to install' })
     expect(question).toContain('Straight to main: small commits land on main in this checkout.')
     expect(question).toContain('Recommended here: Shared dev branch, PR per task (a Flutter app to install).')
-    expect(flowOptions('dev-prs')).toEqual(['Shared dev branch, PR per task (Recommended)', 'Straight to main', 'Worktree and PR per task'])
+    expect(flowOptions('dev-prs')).toEqual(['Shared dev branch, PR per task (Recommended)', 'Worktree and PR per task', 'Straight to main'])
     expect(flowOfAnswer('Shared dev branch, PR per task (Recommended)')).toBe('dev-prs')
     expect(flowOfAnswer('Worktree and PR per task')).toBe('worktree-prs')
     expect(flowOfAnswer('let me think')).toBeUndefined()

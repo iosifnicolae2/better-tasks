@@ -17,7 +17,7 @@ export const SETTING_DOCS: Record<string, Doc> = {
   editor: { group: 'General', about: 'Opens task files from the board. auto: IntelliJ in a JetBrains terminal, VS Code in VS Code, else the default app.' },
   gitFlow: {
     group: 'Git & PRs',
-    about: 'How teammates\' work reaches main. direct ("Straight to main"): small commits on main, no branches, no PRs except a bug fix\'s (its own worktree and PR). dev-prs ("Shared dev branch, PR per task"): everyone commits on the dev branch in one checkout, a PR per task. worktree-prs ("Worktree and PR per task"): each teammate its own git worktree, branch and PR. Asked once per project at the first start.',
+    about: 'How teammates\' work reaches main. worktree-prs ("Worktree and PR per task"), the default: each teammate its own git worktree, branch and PR, merged once the user approves it. dev-prs ("Shared dev branch, PR per task"): everyone commits on the dev branch in one checkout, a PR per task. direct ("Straight to main"): small commits on main, no branches, no PRs except a bug fix\'s (its own worktree and PR). Asked once per project at the first start, with a GitHub remote; without one, no PRs, so direct.',
   },
   devBranch: { group: 'Git & PRs', about: 'The shared branch of the dev-prs git flow.' },
   longCache: { group: 'General', about: '1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself.' },

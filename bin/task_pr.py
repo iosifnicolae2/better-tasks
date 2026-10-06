@@ -83,9 +83,9 @@ def tasks_folder() -> Path:
 
 
 def is_direct() -> bool:
-    """Straight to main: the project's git flow (better-tasks' default; the old "pullRequests" switch said otherwise)."""
+    """Straight to main: the project's git flow, or the old "worktree" switch without one (the default is a PR per task)."""
     flow = config().get("gitFlow")
-    return flow == "direct" or (flow is None and config().get("pullRequests") is not True)
+    return flow == "direct" or (flow is None and config().get("pullRequests") is not True and config().get("worktree") is True)
 
 
 def branches(options: argparse.Namespace) -> tuple[str, str]:

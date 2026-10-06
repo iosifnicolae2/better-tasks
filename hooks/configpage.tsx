@@ -1,6 +1,6 @@
 import { KeyHint } from './board'
 import type { Ui } from './board'
-import { FLOW_LABELS, GIT_FLOWS } from './gitflow'
+import { DEFAULT_FLOW, FLOW_LABELS, GIT_FLOWS } from './gitflow'
 import { EFFORTS, LEVELS, MODELS, VIDEO_QUALITIES } from './settings'
 import type { Level, Settings, VideoQuality } from './settings'
 import { VIRTUAL_SCREEN } from './testenv'
@@ -92,11 +92,11 @@ export const FIELDS: readonly Field[] = [
     group: 'git',
     field: 'gitFlow',
     label: 'Git flow',
-    describe: 'How teammates’ work reaches main. Straight to main: one checkout, a PR only for a bug fix. Shared dev branch: one checkout on dev, a PR per task. Worktree: a copy and a PR each. Saved in this project’s config.json.',
+    describe: 'How teammates’ work reaches main. Worktree and PR per task (the default): a copy and a PR each. Shared dev branch: one checkout on dev, a PR per task. Straight to main: one checkout, a PR only for a bug fix. Saved in this project’s config.json.',
     options: GIT_FLOWS.map(flow => FLOW_LABELS[flow]),
     value: settings => FLOW_LABELS[settings.gitFlow],
-    initial: FLOW_LABELS.direct,
-    stored: label => GIT_FLOWS.find(flow => FLOW_LABELS[flow] === label) ?? 'direct',
+    initial: FLOW_LABELS[DEFAULT_FLOW],
+    stored: label => GIT_FLOWS.find(flow => FLOW_LABELS[flow] === label) ?? DEFAULT_FLOW,
   },
   {
     group: 'general',

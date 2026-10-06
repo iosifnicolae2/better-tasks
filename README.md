@@ -14,7 +14,7 @@ A Claude Code plugin. Your tasks are Markdown files in your project; a team of C
 - 🤖 **A team of agents**: a lead routes each task to a teammate; teammates work in parallel.
 - 🎥 **Before/after video**: after each task you get a short narrated video to review it ([see an example](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)). Turn it on with the `demoVideos` setting. A release can come with one video of all its tasks' videos: `bin/release-video.sh` (setting `releaseVideos`).
 - ✅ **You approve**: no task closes without your yes.
-- 🔀 **Your git flow**: straight to main, a shared `dev` branch, or a worktree and PR per task. Asked once per project.
+- 🔀 **Your git flow**: a worktree and PR per task (the default), a shared `dev` branch, or straight to main. Asked once per project.
 - 🗂️ **Sprint board**: `/better-tasks` shows sprints, goals, the backlog and search.
 - 🌙 **`/away`**: screens off, the Mac keeps working; the virtual test displays stay on.
 

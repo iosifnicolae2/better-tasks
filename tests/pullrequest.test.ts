@@ -4,8 +4,10 @@ import { ghProblem, ghUpdateVerdict, hasGitHub } from '../hooks/pullrequest'
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
-  test('off until chosen; the old switch reads as the worktree flow', () => {
-    expect(settingsOf({}).gitFlow).toBe('direct')
+  test('on until chosen otherwise, or without a GitHub remote; the old switch reads as the worktree flow', () => {
+    expect(settingsOf({}).gitFlow).toBe('worktree-prs')
+    expect(settingsOf({ hasGitHub: false }).gitFlow).toBe('direct')
+    expect(settingsOf({ hasGitHub: false, gitFlow: 'dev-prs' }).gitFlow).toBe('dev-prs')
     expect(settingsOf({ pullRequests: true }).gitFlow).toBe('worktree-prs')
   })
 

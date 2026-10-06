@@ -71,6 +71,8 @@ const resolvedState = atom({ plugin: 'better-tasks', key: 'resolved' } as const,
 /** The teammate agent types as last registered (JSON of their specs); '' until they are (models.ts). */
 const typesState = atom({ plugin: 'better-tasks', key: 'teammateTypes' } as const, '')
 const rulesState = atom({ plugin: 'better-tasks', key: 'rulesSent' } as const, { shown: '', lead: '', teammate: '' } as RulesSent)
+/** This project has no GitHub remote (seen at session start): no PRs, so if it chose no flow, straight to main. */
+const noGitHubState = atom({ plugin: 'better-tasks', key: 'noGitHub' } as const, false)
 const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, filed: false, question: false, prompted: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
@@ -88,6 +90,8 @@ export const register: Register = (on, options) => {
     await declareTools($)
     await declareCommands($)
     await update($, rulesState, () => ({ shown: '', lead: '', teammate: '' }))
+    const noGitHub = !(await hasGitHubRemote($))
+    await update($, noGitHubState, () => noGitHub)
     await useLongCache($).catch(error => logFailure($, 'the 1-hour cache', error))
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
@@ -358,7 +362,7 @@ async function startQuestions($: EngineInterface): Promise<void> {
     await askToTurnOn($, { field: 'demoVideos', question: QUESTION, header: 'Videos' })
   }
   const { values } = await readOverrides(ioOf($))
-  const isChosen = FLOW_KEYS.some(key => key in values) || settings.gitFlow !== 'direct'
+  const isChosen = FLOW_KEYS.some(key => key in values) || pluginOptions.pullRequests === true
   if (!isChosen) await askGitFlow($)
   else if (hasPrs(settings.gitFlow)) await checkGh($)
 }
@@ -783,13 +787,14 @@ function ioOf($: EngineInterface): Io {
         force5mEnv: await $.env.get('FORCE_PROMPT_CACHING_5M'),
       }),
     run: argv => $.process.run(argv),
-    config: () => projectSettings(io, pluginOptions),
+    config: () => settingsNow($),
   }
   return io
 }
 
-function settingsNow($: EngineInterface): Promise<Settings> {
-  return projectSettings(ioOf($), pluginOptions)
+async function settingsNow($: EngineInterface): Promise<Settings> {
+  const hasGitHub = !(await read($, noGitHubState))
+  return projectSettings(ioOf($), hasGitHub ? pluginOptions : { ...pluginOptions, hasGitHub })
 }
 
 /** One dim line when the project's config.json has problems (each bad key is skipped, the rest still applies). */
