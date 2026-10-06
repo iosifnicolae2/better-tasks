@@ -53,8 +53,8 @@ function run(argv) {
   windows.forEach(([, window]) => window.orderOut(null))
   if (windows.length > 0) $.NSCursor.unhide
   $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.01)) // shows it now
-  if (holder && holder.running) { holder.terminate; holder.waitUntilExit }
   restore(statusFile, displayHelper)
+  if (holder && holder.running) { holder.terminate; holder.waitUntilExit }
 }
 
 /** Starts the helper that holds the screens off while this process lives; returns it and the ids it turned off. */
@@ -156,8 +156,8 @@ function dimDisplays(statusFile, displays) {
 }
 
 function restore(statusFile, displayHelper) {
-  runHelper(displayHelper, 'on', `${statusFile}.off`)
   restoreBrightness(statusFile)
+  runHelper(displayHelper, 'on', `${statusFile}.off`)
   runHelper(displayHelper, 'undim', `${statusFile}.ddc`)
 }
 
