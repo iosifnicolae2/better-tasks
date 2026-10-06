@@ -7,7 +7,7 @@ import { taskIdIn } from './spawn'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintNumber, sprintStart, sprintTitle } from './sprints'
 import type { SprintConfig } from './sprints'
-import { isBlocked, isOpen, listTasks, taskRef, today, waitsText, WHEN_LABELS, whenOf } from './tasks'
+import { isBlocked, isOpen, labelsText, listTasks, taskRef, today, waitsText, WHEN_LABELS, whenOf } from './tasks'
 import { isActive, mateLine, refreshTeam } from './team'
 
 // The main session as coordinator: its rules and a small context block per prompt.
@@ -65,7 +65,7 @@ export function openTaskLines(tasks: readonly Task[], day: string, config: Sprin
   const shown = [...open.filter(isNear), ...open.filter(task => !isNear(task)).sort(newest).slice(0, OTHERS_SHOWN)]
   if (shown.length === 0) return []
   const line = (task: Task) =>
-    [`- ${taskRef(task)} ${task.title}`, WHEN_LABELS[whenOf(task, day, config)], task.owner, waitsText(task, tasks)].filter(Boolean).join(' · ')
+    [`- ${taskRef(task)} ${task.title}`, WHEN_LABELS[whenOf(task, day, config)], task.owner, labelsText(task), waitsText(task, tasks)].filter(Boolean).join(' · ')
   const hidden = open.length - shown.length
   return ['Open tasks (match the message against these):', ...shown.map(line), ...(hidden > 0 ? [`- … ${hidden} more: task_list`] : [])]
 }

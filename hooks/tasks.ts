@@ -28,7 +28,8 @@ export function parseTask(text: string, file: string): Task {
     rolled: Number(field('rolled')) || 0,
     order: Number(field('order')) || 0,
     created: field('created'),
-    dependsOn: idsIn(field('dependsOn')),
+    labels: listIn(field('labels')).map(labelOf).filter(Boolean),
+    dependsOn: listIn(field('dependsOn')),
     file,
     body,
   }
@@ -39,15 +40,19 @@ export function formatTask(task: Task): string {
     const raw = task[name]
     return typeof raw === 'string' ? yamlValue(oneLine(raw)) : String(raw)
   }
-  const head = FIELDS.map(name => `${name}: ${value(name)}`.trimEnd())
-  const ids = dependenciesOf(task)
-  if (ids.length > 0) head.push(`dependsOn: [${ids.map(yamlValue).join(', ')}]`)
+  const list = (name: string, items: readonly string[]) => (items.length > 0 ? [`${name}: [${items.map(yamlValue).join(', ')}]`] : [])
+  const head = [...FIELDS.map(name => `${name}: ${value(name)}`.trimEnd()), ...list('labels', labelsOf(task)), ...list('dependsOn', dependenciesOf(task))]
   return `---\n${head.join('\n')}\n---\n${task.body}`
 }
 
-/** The ids a dependsOn value lists: "[T-071, T-072]", or the same without brackets. */
-export function idsIn(value: string): string[] {
+/** The items a one-line YAML list holds: "[T-071, checkout]", or the same without brackets. */
+export function listIn(value: string): string[] {
   return value.replace(/^\[|\]$/g, '').split(',').map(readYamlValue).filter(Boolean)
+}
+
+/** A label as stored: lower case, a dash for spaces, only letters, digits and . _ / - ("Check out" is "check-out"). */
+export function labelOf(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}._/-]/gu, '')
 }
 
 export function slugOf(title: string): string {
@@ -68,69 +73,116 @@ export function nextId(tasks: readonly Task[], naming: TaskNaming = DEFAULT_NAMI
   return `${naming.prefix}${String(next).padStart(naming.padding, '0')}`
 }
 
-export function isOpen(task: Task): boolean {
+export function isOpen(task: Pick<Task, 'status'>): boolean {
   return task.status === 'todo' || task.status === 'doing'
 }
 
-/** Its dependencies' ids; none for a task kept in state from before the field existed (a plugin update mid-session). */
-export const dependenciesOf = (task: Task): readonly string[] => task.dependsOn ?? []
+/** What links a task to others: its id, status, labels and dependencies. */
+export type Links = Pick<Task, 'id' | 'status' | 'labels' | 'dependsOn'>
+
+/** Its dependencies: task ids and labels. None for a task kept in state from before the field existed (a plugin update mid-session). */
+export const dependenciesOf = (task: Links): readonly string[] => task.dependsOn ?? []
+
+/** Its labels; none for a task kept in state from before the field existed. */
+export const labelsOf = (task: Pick<Task, 'labels'>): readonly string[] => task.labels ?? []
 
 const sameId = (one: string, other: string) => one.trim().toLowerCase() === other.trim().toLowerCase()
 
+const hasLabel = (task: Links, label: string) => labelsOf(task).includes(labelOf(label))
+
 /** The task with this id, whatever its case. */
-export function taskWithId(tasks: readonly Task[], id: string): Task | undefined {
+export function taskWithId<T extends Links>(tasks: readonly T[], id: string): T | undefined {
   return tasks.find(task => sameId(task.id, id))
 }
 
-/** The dependencies `task` still waits on: the ones open. A closed (done or cancelled) or deleted one no longer holds it. */
-export function blockersOf(task: Task, tasks: readonly Task[]): Task[] {
-  return dependenciesOf(task).map(id => taskWithId(tasks, id)).filter((one): one is Task => one !== undefined && isOpen(one))
+/** The tasks one dependency names: the task with that id, else every other task with that label. */
+function tasksNamed<T extends Links>(dependency: string, task: Links, tasks: readonly T[]): T[] {
+  const named = taskWithId(tasks, dependency)
+  return named ? [named] : tasks.filter(other => hasLabel(other, dependency) && !sameId(other.id, task.id))
+}
+
+/** The dependencies `task` still waits on: the open tasks they name. A closed (done or cancelled) or deleted one no longer holds it. */
+export function blockersOf<T extends Links>(task: Links, tasks: readonly T[]): T[] {
+  const open = dependenciesOf(task).flatMap(dependency => tasksNamed(dependency, task, tasks)).filter(isOpen)
+  return open.filter((one, at) => open.indexOf(one) === at)
 }
 
 /** A task is blocked while a dependency is open: it isn't started until they are all done. */
-export function isBlocked(task: Task, tasks: readonly Task[]): boolean {
+export function isBlocked(task: Links, tasks: readonly Links[]): boolean {
   return blockersOf(task, tasks).length > 0
 }
 
-/** "waits on T-071 (#39), T-072", or '' when nothing holds the task. */
+/** "waits on T-071 (#39), label checkout (T-074, T-075)", or '' when nothing holds the task. */
 export function waitsText(task: Task, tasks: readonly Task[]): string {
-  const blockers = blockersOf(task, tasks)
-  return blockers.length > 0 ? `waits on ${blockers.map(taskRef).join(', ')}` : ''
+  const parts = dependenciesOf(task).flatMap(dependency => {
+    const open = tasksNamed(dependency, task, tasks).filter(isOpen)
+    if (open.length === 0) return []
+    return taskWithId(tasks, dependency) ? [taskRef(open[0]!)] : [`label ${labelOf(dependency)} (${open.map(taskRef).join(', ')})`]
+  })
+  return parts.length > 0 ? `waits on ${parts.join(', ')}` : ''
 }
 
-/** Why task `id` can't depend on `ids`: an unknown id, itself, or a cycle. Undefined when it can. */
-export function dependencyProblem(id: string, ids: readonly string[], tasks: readonly Task[]): string | undefined {
-  const unknown = ids.filter(dep => !taskWithId(tasks, dep))
-  if (unknown.length > 0) return `No task ${unknown.join(', ')}: dependsOn takes the ids of existing tasks.`
-  if (ids.some(dep => sameId(dep, id))) return `${id} can't depend on itself.`
-  const cycle = cycleThrough(id, ids, tasks)
-  return cycle ? `That makes a cycle, ${cycle.join(' → ')}: drop one of these dependencies.` : undefined
+/** Whether the text reads as a task id ("T-071", "t-71"), whether or not that task exists. */
+export function readsAsId(text: string, prefix: string): boolean {
+  const trimmed = text.trim()
+  return trimmed.toLowerCase().startsWith(prefix.toLowerCase()) && /^\d+$/.test(trimmed.slice(prefix.length))
 }
 
-/** A path of dependencies from `id` back to itself, once `id` depends on `ids`; undefined when there is none. */
-function cycleThrough(id: string, ids: readonly string[], tasks: readonly Task[]): string[] | undefined {
-  const idsOf = (one: string) => {
-    const task = taskWithId(tasks, one)
-    return sameId(one, id) ? ids : task ? dependenciesOf(task) : []
-  }
+/** Why labels can't be stored: one that reads as a task id would be taken for that task in dependsOn. */
+export function labelProblem(labels: readonly string[], prefix: string): string | undefined {
+  const idLike = labels.filter(label => readsAsId(label, prefix))
+  return idLike.length > 0 ? `${idLike.join(', ')} reads as a task id: pick another label.` : undefined
+}
+
+/**
+ * Why `task` (new or changed, with its labels and dependsOn as they would be) can't be saved: a dependency that names
+ * no task id and no other task's label, itself, or a cycle. Undefined when it can.
+ */
+export function dependencyProblem(task: Links, tasks: readonly Links[]): string | undefined {
+  const others = tasks.filter(other => !sameId(other.id, task.id))
+  const unknown = dependenciesOf(task).filter(dependency => !taskWithId(tasks, dependency) && !others.some(other => hasLabel(other, dependency)))
+  if (unknown.length > 0) return `No task or label ${unknown.join(', ')}: dependsOn takes task ids, or labels other tasks have.`
+  if (dependenciesOf(task).some(dependency => sameId(dependency, task.id))) return `${task.id} can't depend on itself.`
+  const cycle = cycleThrough(task, [...others, task])
+  return cycle ? `That makes a cycle, ${cycle.join(' → ')}: drop one of these dependencies or labels.` : undefined
+}
+
+/** A path of open dependencies from `task` back to itself; undefined when there is none. */
+function cycleThrough(task: Links, tasks: readonly Links[]): string[] | undefined {
   const seen = new Set<string>()
-  const walk = (path: readonly string[]): string[] | undefined => {
-    for (const next of idsOf(path.at(-1)!)) {
-      const name = taskWithId(tasks, next)?.id ?? next
-      if (sameId(name, id)) return [...path, id]
-      if (seen.has(name)) continue
-      seen.add(name)
-      const found = walk([...path, name])
+  const walk = (path: readonly Links[]): string[] | undefined => {
+    for (const next of blockersOf(path.at(-1)!, tasks)) {
+      if (next.id === task.id) return [...path, next].map(one => one.id)
+      if (seen.has(next.id)) continue
+      seen.add(next.id)
+      const found = walk([...path, next])
       if (found) return found
     }
     return undefined
   }
-  return walk([id])
+  return walk([task])
 }
 
-/** The open tasks that waited on `closed` and wait on nothing now. */
+/** The open tasks that waited on `closed` (by its id or a label it has) and wait on nothing now. */
 export function unblockedBy(closed: Task, tasks: readonly Task[]): Task[] {
-  return tasks.filter(task => isOpen(task) && dependenciesOf(task).some(id => sameId(id, closed.id)) && !isBlocked(task, tasks))
+  const waitedOn = (task: Task) => dependenciesOf(task).some(dependency => tasksNamed(dependency, task, [closed]).length > 0)
+  return tasks.filter(task => isOpen(task) && !sameId(task.id, closed.id) && waitedOn(task) && !isBlocked(task, tasks))
+}
+
+/** "labels checkout, api", or '' for a task with none. */
+export function labelsText(task: Pick<Task, 'labels'>): string {
+  return labelsOf(task).length > 0 ? `labels ${labelsOf(task).join(', ')}` : ''
+}
+
+/** Tasks under each label, in the order of `tasks`; a task with several labels is under each, one with none under "". */
+export function byLabel(tasks: readonly Task[]): Map<string, Task[]> {
+  const groups = new Map<string, Task[]>()
+  const labels = [...new Set(tasks.flatMap(labelsOf))].sort()
+  for (const label of [...labels, '']) {
+    const tasksOf = tasks.filter(task => (label === '' ? labelsOf(task).length === 0 : labelsOf(task).includes(label)))
+    if (tasksOf.length > 0) groups.set(label, tasksOf)
+  }
+  return groups
 }
 
 /** The task's pull request: the link on its last "PR: <url>" note line (a bare url or a markdown link). */
@@ -210,6 +262,7 @@ export function taskLine(task: Task, today: string, config: SprintConfig, tasks:
   const parts = [`${taskRef(task)} [${task.status}] ${task.title}`, WHEN_LABELS[whenOf(task, today, config)]]
   if (task.owner) parts.push(`owner ${task.owner}`)
   if (task.rolled > 0) parts.push(`rolled ${task.rolled}x`)
+  parts.push(labelsText(task))
   if (isOpen(task)) parts.push(waitsText(task, tasks))
   return parts.filter(Boolean).join(' · ')
 }
@@ -249,7 +302,7 @@ export async function saveTask(files: Files, task: Task): Promise<void> {
   await listTasks(files)
 }
 
-export type NewTask = { title: string; goal: string; when: When; dependsOn?: string[] }
+export type NewTask = { title: string; goal: string; when: When; labels?: string[]; dependsOn?: string[] }
 
 export async function createTask(files: Files, input: NewTask): Promise<Task> {
   const settings = await settingsFrom(files)
@@ -268,6 +321,7 @@ export async function createTask(files: Files, input: NewTask): Promise<Task> {
     rolled: 0,
     order: edgeOrder(tasks, place, input.when === 'now' ? 'top' : 'bottom'),
     created: day,
+    labels: input.labels ?? [],
     dependsOn: input.dependsOn ?? [],
     file: `${await tasksDir(files)}/${fileNameOf(settings.tasks, id, title)}`,
     body: bodyOf(input.goal, template, { id, title, created: day }),

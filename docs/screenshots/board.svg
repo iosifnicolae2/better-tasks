@@ -270,6 +270,8 @@
 <text x="847.6" y="600.25" fill="rgb(255,255,255)" opacity="0.55" textLength="75.6" xml:space="preserve">: actions</text>
 <text x="940.0" y="600.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">f</text>
 <text x="948.4" y="600.25" fill="rgb(255,255,255)" opacity="0.55" textLength="67.2" xml:space="preserve">: search</text>
-<text x="1032.4" y="600.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">c</text>
-<text x="1040.8" y="600.25" fill="rgb(255,255,255)" opacity="0.55" textLength="84.0" xml:space="preserve">: settings</text>
+<text x="1032.4" y="600.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">g</text>
+<text x="1040.8" y="600.25" fill="rgb(255,255,255)" opacity="0.55" textLength="84.0" xml:space="preserve">: by label</text>
+<text x="1141.6" y="600.25" fill="rgb(215,119,87)" textLength="8.4" xml:space="preserve">c</text>
+<text x="1150.0" y="600.25" fill="rgb(255,255,255)" opacity="0.55" textLength="84.0" xml:space="preserve">: settings</text>
 </svg>

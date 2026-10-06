@@ -23,7 +23,9 @@ export type TaskChange = {
   goal?: string
   note?: string
   commits?: string
-  /** The ids it depends on, replacing its list; [] clears it. */
+  /** Its labels, replacing its list; [] clears it. */
+  labels?: string[]
+  /** What it depends on (task ids, labels), replacing its list; [] clears it. */
   dependsOn?: string[]
 }
 
@@ -55,6 +57,7 @@ export async function changeTask(
   if (change.owner !== undefined) next.owner = oneLine(change.owner)
   if (change.status) next.status = change.status
   if (change.title?.trim()) next.title = oneLine(change.title)
+  if (change.labels) next.labels = change.labels
   if (change.dependsOn) next.dependsOn = change.dependsOn
   if (change.goal?.trim()) next.body = withGoalText(next.body, change.goal)
   if (change.note) next.body = withNote(next.body, day, change.note)

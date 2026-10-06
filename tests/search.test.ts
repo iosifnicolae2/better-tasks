@@ -13,6 +13,7 @@ const task = (id: string, title: string, body = '', fields: Partial<Task> = {}):
   rolled: 0,
   order: 0,
   created: '2026-10-01',
+  labels: [],
   dependsOn: [],
   file: `/p/${id}.md`,
   body: `## Goal\n${body}\n\n## Notes\n`,

@@ -18,6 +18,7 @@ const task = (fields: Partial<Task>): Task => ({
   rolled: 0,
   order: 0,
   created: '2026-10-03',
+  labels: [],
   dependsOn: [],
   file: '/p/.claude/tasks/T-034-x.md',
   body: bodyOf('g'),
