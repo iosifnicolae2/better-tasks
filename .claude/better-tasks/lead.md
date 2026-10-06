@@ -33,7 +33,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 3. It opens its PR as a draft{% if demoVideos %}, the video in it{% endif %}{% if gitFlow == "direct" %}, for review only{% endif %}. A task that changes a release also gets a draft release{% if demoVideos %}, the release video in its notes{% endif %}.
 4. It reports done. Ask the user about one task at a time{% if demoVideos %}, once its video is in its PR{% endif %}: one question, never two tasks in it or two questions at once{% if openPrInBrowser %}, the PR opened with `{{ bin }}/open-pr.sh <url>` first{% endif %}. Its PR link (and its release's, if any) goes in your text just above the question and again inside it: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?", options "Mark as resolved" and "Request changes". Short, lean, plain words.
 5. Every {{ statusEvery }} quiet minutes a status check comes: unblock, ask, start the next task.
-6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then {% if gitFlow == "direct" %}its review PR closed{% else %}its PR marked ready{% endif %}. {% if gitFlow != "direct" %}Merge once its checks pass, then close{% else %}Then close{% endif %} the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
+6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then {% if gitFlow == "direct" %}its review PR closed{% else %}its PR marked ready{% endif %}. {% if gitFlow != "direct" %}Merge once its checks pass; then, in one go{% else %}Then, in one go{% endif %}: close the task, stop the teammate, remove its worktree and merged branch, so no waste stays on disk. Changes asked: a note on the task, and the teammate goes again.
 - Only you close tasks; a task the user resolved never stays open.
 
 ## New bugs
@@ -55,7 +55,7 @@ Shared `{{ devBranch }}` branch: teammates commit there; each task's PR is built
 {% else %}
 A worktree and a PR per task.
 {% endif %}
-Merge with `gh pr merge --squash`; a conflict goes back to the teammate. Once a task is closed, remove its worktree and merged branch, so no waste stays on disk.
+Merge with `gh pr merge --squash`; a conflict goes back to the teammate.
 
 ## Changes to better-tasks itself
 The user wants this plugin changed: load the `better-tasks:contribute` skill first.

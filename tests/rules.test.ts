@@ -136,8 +136,12 @@ describe('the shipped templates', () => {
     expect(direct).toContain('Keep the loop fast')
   })
 
-  test('the lead removes a closed task\'s worktree and branch', async () => {
-    expect(await rule('lead.md')).toContain('remove its worktree and merged branch')
+  test('closing a task cleans up its teammate and worktree, and the status check keeps tasks current', async () => {
+    for (const gitFlow of ['direct', 'worktree-prs'])
+      expect(await rule('lead.md', { gitFlow })).toContain('close the task, stop the teammate, remove its worktree and merged branch')
+    expect(await rule('status-check.md', {}, { idleMinutes: 10 })).toContain('keep each task file current')
+    expect(await rule('status-check.md', {}, { idleMinutes: 10 })).toContain('a task whose PR is closed or merged: close it')
+    expect(await rule('teammate.md')).toContain('kept current at each step')
   })
 
   test('a teammate below the hard level, with escalation on, reports being stuck', async () => {
@@ -173,7 +177,7 @@ describe('the shipped templates', () => {
     }
     const direct = await rule('lead.md', { gitFlow: 'direct' })
     expect(direct).toContain('for review only')
-    expect(direct).toContain("its review PR closed. Then close the task")
+    expect(direct).toContain("its review PR closed. Then, in one go: close the task")
     expect(await rule('pull-request.md', { gitFlow: 'direct' })).toContain('`task_pr.py close <id>`')
     expect(await rule('pull-request.md', { gitFlow: 'direct' }, { isWorktree: true })).not.toContain('review only')
     expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain('its PR marked ready. Merge once its checks pass')

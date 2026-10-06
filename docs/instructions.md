@@ -50,7 +50,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 3. It opens its PR as a draft, the video in it, for review only. A task that changes a release also gets a draft release, the release video in its notes.
 4. It reports done. Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once, the PR opened with `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` first. Its PR link (and its release's, if any) goes in your text just above the question and again inside it: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?", options "Mark as resolved" and "Request changes". Short, lean, plain words.
 5. Every 10 quiet minutes a status check comes: unblock, ask, start the next task.
-6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then its review PR closed. Then close the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
+6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then its review PR closed. Then, in one go: close the task, stop the teammate, remove its worktree and merged branch, so no waste stays on disk. Changes asked: a note on the task, and the teammate goes again.
 - Only you close tasks; a task the user resolved never stays open.
 
 ## New bugs
@@ -60,7 +60,7 @@ Teammates test off the user's screen; one that needs it waits until the user say
 
 ## Git flow
 Straight to main: teammates commit to main; a task's PR is a draft for review that never merges. A bug fix's PR merges.
-Merge with `gh pr merge --squash`; a conflict goes back to the teammate. Once a task is closed, remove its worktree and merged branch, so no waste stays on disk.
+Merge with `gh pr merge --squash`; a conflict goes back to the teammate.
 
 ## Changes to better-tasks itself
 The user wants this plugin changed: load the `better-tasks:contribute` skill first.
@@ -79,7 +79,7 @@ Task file: .claude/tasks/T-004-fix-login-redirect.md
 
 # You are a better-tasks teammate
 - You own one area: stay in its files. Need another area or the user? Ask its owner, or the lead.
-- Your task file is your memory: short dated notes. Long things go in files; messages carry paths.
+- Your task file is your memory: short dated notes, kept current at each step. Long things go in files; messages carry paths.
 - Keep your context lean; commit small and often. Given a predecessor's transcript? Search it.
 - Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Delete captures and build output once you no longer need them.
 - Not getting there? Stop, note what you tried, tell the lead.
@@ -103,7 +103,7 @@ A checkout shared with other teammates, on main. Commit only your own files with
 - Loads: lead only: sent as a prompt after statusEvery quiet minutes with work open
 
 ```markdown
-better-tasks status check: no activity for 10 min. Move the work forward: close what the user resolved, ask about what is done, unblock what is stuck, start what is next whose dependencies are done. Then tell the user in a few short lines what moved, what waits on whom, what is next, each task by its id and PR number ("T-078 (#43)").
+better-tasks status check: no activity for 10 min. Move the work forward: close what the user resolved (a task whose PR is closed or merged: close it, stop its teammate, remove its worktree), keep each task file current (status, owner, PR, notes), ask about what is done, unblock what is stuck, start what is next whose dependencies are done. Then tell the user in a few short lines what moved, what waits on whom, what is next, each task by its id and PR number ("T-078 (#43)").
 ```
 
 ## Part: The context on each user message
