@@ -1,2 +1,2 @@
 <!-- The status check: sent to the lead after statusEvery quiet minutes while tasks are open. -->
-better-tasks status check: no activity for {{ idleMinutes }} min. Move the work forward: close what the user resolved, ask about what is done, unblock what is stuck, start what is next. Then tell the user in a few short lines what moved, what waits on whom, what is next.
+better-tasks status check: no activity for {{ idleMinutes }} min. Move the work forward: close what the user resolved, ask about what is done, unblock what is stuck, start what is next. Then tell the user in a few short lines what moved, what waits on whom, what is next, each task by its id and PR number ("T-078 (#43)").

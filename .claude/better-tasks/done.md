@@ -14,6 +14,7 @@ Release: <url, only when your task changes a release>
 <id> (#<PR number>) <title>
 <what changed, in a line or two>
 ```
+Any other task you name there, the ones a release ships too, goes the same way: "T-078 (#43)".
 - Tell the lead: "<id> done: <PR url>, see <task file>". Then wait.
 
 ## After the user's answer
