@@ -1,12 +1,18 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { defaultBrowserId, setupVerdict, videoPage, videoPagePath, videoPointer, videoSkillSettings, voiceDir } from '../hooks/demovideo'
-import { settingsOf } from '../hooks/settings'
+import { PROJECT_KEYS, settingsOf } from '../hooks/settings'
 
 describe('before/after videos', () => {
   test('off until chosen', () => {
     expect(settingsOf({}).demoVideos).toBe(false)
     expect(settingsOf({ demoVideos: true }).demoVideos).toBe(true)
+  })
+
+  test('release videos: on unless the project turns them off, in its config.json', () => {
+    expect(settingsOf({}).releaseVideos).toBe(true)
+    expect(settingsOf({ releaseVideos: false }).releaseVideos).toBe(false)
+    expect(PROJECT_KEYS).toContain('releaseVideos')
   })
 
   test('video quality: 1080p medium unless chosen; the video skill reads it, the prompt its capture size', () => {
