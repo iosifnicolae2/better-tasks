@@ -27,7 +27,7 @@ import { projectSettings, readOverrides, saveProjectValue } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
-import { contextTokens, isActive, predecessorOf, refreshTeam } from './team'
+import { contextTokens, isActive, overLimit, predecessorOf, refreshTeam } from './team'
 import { NO_FACTS, renderRule, rulesChangedNote, TEMPLATES_DIR, varsOf } from './rules'
 import type { Facts, RuleFile, RulesSent } from './rules'
 import { ourSkill } from './skills'
@@ -185,7 +185,10 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
     if (!e.name || !(await teamsOn($)) || (await isOffHere($))) return next(e)
     const settings = await settingsNow($)
-    const task = spawnTask(await listTasks(ioOf($)), e.prompt, e.name, settings.tasks.prefix)
+    const tasks = await listTasks(ioOf($))
+    const full = overLimit(await refreshTeam(ioOf($)), e.name, settings.maxTeammates, tasks.filter(isOpen))
+    if (full) return { deny: full }
+    const task = spawnTask(tasks, e.prompt, e.name, settings.tasks.prefix)
     const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
     const handover = await handoverOf($, e.name)
     const hasTypes = (await read($, typesState)) !== ''

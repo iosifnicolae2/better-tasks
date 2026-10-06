@@ -437,6 +437,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       case 'editor': written = await $.config.set({ key: 'better-tasks.editor', value: value }); break
       case 'longCache': written = await $.config.set({ key: 'better-tasks.longCache', value: value }); break
       case 'statusEvery': written = await $.config.set({ key: 'better-tasks.statusEvery', value: value }); break
+      case 'maxTeammates': written = await $.config.set({ key: 'better-tasks.maxTeammates', value: value }); break
       case 'keepAwake': written = await $.config.set({ key: 'better-tasks.keepAwake', value: value }); break
       case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value: value }); break
       case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value: value }); break

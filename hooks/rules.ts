@@ -48,6 +48,7 @@ export function varsOf(settings: Settings, facts: Facts): Vars {
     testScreen: settings.testScreen,
     isVirtualScreen: settings.testScreen === VIRTUAL_SCREEN,
     statusEvery: settings.statusEvery,
+    maxTeammates: settings.maxTeammates,
     openPrInBrowser: settings.openPrInBrowser,
     escalate: models.escalate,
     hasTypes: facts.hasTypes,

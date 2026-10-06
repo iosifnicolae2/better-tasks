@@ -42,6 +42,12 @@
       "description": "After this many quiet minutes the manager checks the open work and moves it forward. 0 turns it off.",
       "default": 10
     },
+    "maxTeammates": {
+      "type": "number",
+      "title": "Team size (teammates)",
+      "description": "At most this many teammates at once; similar tasks go to the same teammate, one after another. 0: no limit.",
+      "default": 5
+    },
     "keepAwake": {
       "type": "boolean",
       "title": "Keep the Mac awake",

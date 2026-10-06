@@ -52,6 +52,8 @@ export type Settings = {
   longCache: boolean
   /** Minutes of quiet before a status check; 0 = off. */
   statusEvery: number
+  /** Teammates alive at once (running or idle); a spawn past it is refused (register.tsx). 0 = no limit. */
+  maxTeammates: number
   keepAwake: boolean
   /** Teammates make a narrated before/after video of finished work. */
   demoVideos: boolean
@@ -97,6 +99,7 @@ export const FIELDS: Record<string, Field> = {
   worktree: { kind: 'boolean' },
   longCache: { kind: 'boolean' },
   statusEvery: { kind: 'number' },
+  maxTeammates: { kind: 'number' },
   keepAwake: { kind: 'boolean' },
   demoVideos: { kind: 'boolean' },
   offScreen: { kind: 'boolean' },
@@ -135,6 +138,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   worktree: false,
   longCache: true,
   statusEvery: 10,
+  maxTeammates: 5,
   keepAwake: true,
   demoVideos: false,
   offScreen: true,
@@ -177,6 +181,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     worktree: value('worktree') === true,
     longCache: value('longCache') !== false,
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
+    maxTeammates: Math.max(0, Math.floor(Number(value('maxTeammates')) || 0)),
     keepAwake: value('keepAwake') !== false,
     demoVideos: value('demoVideos') === true,
     offScreen: value('offScreen') === true,

@@ -1105,6 +1105,28 @@ test('with before/after videos on, teammates get the pointer to the video skill'
   expect(host.toasts).toEqual([])
 })
 
+test('at the team size limit a new spawn is refused, naming the team and what each owns; a stopped teammate frees a place', { options: { maxTeammates: 2 } }, async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const team = [mate('a1', 'cart'), { ...mate('a2', 'login'), status: 'idle' as const }]
+  const host = fakeHost(on, team)
+  await $.session.start(SESSION)
+  const make = (title: string) => $.tool.call({ ...create, title } as never)
+  const own = (id: string, status: string) => $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u', id, owner: 'cart', status } as never)
+  await make('Cart total')
+  await make('Cart badge')
+  await own('T-001', 'todo')
+  await own('T-002', 'doing')
+  const refused = await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'footer' })
+  expect(refused).toEqual({ deny: 'The team is at its limit of 2 teammates (cart T-002 T-001, login). Give the task to the owner of similar work, queued after its current one (task_update owner, then SendMessage), or wait until one finishes.' })
+  expect(host.spawned).toEqual([])
+  const status = String((await $.tool.call({ tool: 'mcp__better-tasks__team_status', tool_use_id: 'ts' })).result)
+  expect(status).toContain('cart · idle · context ? · T-002 Cart badge, T-001 Cart total') // its current task first
+  team[1] = { ...team[1]!, status: 'completed' }
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a4', description: 'd', prompt: 'p', name: 'footer' })
+  expect(host.spawned).toHaveLength(1)
+})
+
 test('with PR per task on, every named teammate gets its own worktree and the PR rules; the lead merges on approval', { options: { pullRequests: true } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)

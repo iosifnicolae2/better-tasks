@@ -22,6 +22,7 @@ export const SETTING_DOCS: Record<string, Doc> = {
   devBranch: { group: 'Git & PRs', about: 'The shared branch of the dev-prs git flow.' },
   longCache: { group: 'General', about: '1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself.' },
   statusEvery: { group: 'General', about: 'Minutes of quiet before the lead checks the open work and moves it forward. 0: off.' },
+  maxTeammates: { group: 'General', about: 'Teammates alive at once (working or idle). At the limit a new spawn is refused: the lead gives the task to an owner of similar work (a teammate may own several tasks, done one after another) or waits for one to finish. 0: no limit.' },
   keepAwake: { group: 'General', about: 'Holds caffeinate (the Mac stays awake) while any teammate runs.' },
   openPrInBrowser: { group: 'Git & PRs', about: 'When the lead asks the user about a finished task, it first opens that task\'s PR in the default browser (once its video is uploaded) and waits a few seconds for the page to load. Never after the user answered.' },
   demoVideos: { group: 'Testing & videos', about: 'Every finished task comes with a short narrated before/after video (red boxes, arrows, subtitles read aloud by Kokoro, set up once per machine). Asked once per project.' },
