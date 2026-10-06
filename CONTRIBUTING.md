@@ -13,6 +13,7 @@ Ask Claude for the change. It forks this repo, makes the change there, runs the 
 - `sh scripts/record-display-check.sh` (macOS): checks `bin/record-display.sh`: own display per project, one recording at a time, a killed recording frees its turn, the chosen test screen and its fallback.
 - `bun scripts/settings-doc.ts`: regenerates the settings skill after a setting changes (`--check` says whether it is current).
 - `bun scripts/skills-check.ts`: checks the skills still say what the prompts rely on.
+- `bun scripts/instructions-doc.ts`: regenerates [docs/instructions.md](docs/instructions.md), every instruction text better-tasks loads, after a rule or skill text changes (`--check` says whether it is current, `--open` opens it).
 
 Tools: `ffmpeg` and `uv` for videos, `gh` for pull requests, `python3` for the shared-dev-branch flow.
 
