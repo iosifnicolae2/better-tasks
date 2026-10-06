@@ -19,6 +19,7 @@ User's words: "add a short rule to coordinate builds and tests on devices by com
 This is the user's own repo: commit to main, with a review-only draft PR and a video of the setting (e.g. on the settings page). No release until the user approves. Small bugs in your area: fix them here. Bigger or other-area ones: report them to the lead.
 
 ## Notes
+Video: [T-091.mp4](../tasks_videos/T-091.mp4)
 - 2026-10-07: User refines: "when it's possible to launch multiple instances do it.. use the flags only when you need to test different things or the risk of having a problem in two problems is pretty high and you want to test them individually.. use what it's industry standard and which works very well".
 - First choice: when the app or devices allow several instances (simulators, emulators, app copies, test users), run each task's build on its own instance in parallel, with no shared branch or flags needed.
 - Feature flags on a shared build only when instances aren't possible and the builds are slow. Flag a task when it needs to be tested separately (different things), or when two changes are likely to clash and each needs testing on its own. Changes with low risk that don't interact can share one build without flags.
@@ -26,3 +27,5 @@ This is the user's own repo: commit to main, with a review-only draft PR and a v
 Keep the rule short and lean: principles only.
 - 2026-10-07: BEFORE (live, tmux socket t091, Claude Code 2.1.292, `claude --plugin-dir` on a `git archive HEAD` copy, scratch project scratchpad/t091/shop): /better-tasks config has no batch row under Testing & videos; lead.md and teammate.md have no batching or feature-flag line. Capture: scratchpad/t091/cap/before-settings.ansi.
 - 2026-10-07: Plan: setting `batchDeviceTests` (boolean, default true, /config row "Batch device tests", config.json too), a {% if %} line in lead.md Routing and teammate.md's top list, tests in rules.test.ts and demovideo-style settings test.
+- 2026-10-07: Commit b73eac2. `sh scripts/test.sh` 348 pass; settings-doc --check current; instructions-doc renders both lines. AFTER (live, tmux, `claude --plugin-dir` on this checkout, same scratch project): settings page shows "Batch device tests  on" under Testing & videos; `"batchDeviceTests": false` in the project's config.json shows "◆ Batch device tests  off". Fresh lead asked to quote its feature-flag rules: on, it quotes the Routing line; off, "none of my better-tasks rules mention feature flags". Mid-session switch to off also drops it. Captures: scratchpad/t091/cap/after-*.
+- 2026-10-07: Video made (41 s, spec scratchpad/t091/spec.json): settings row before/after, the lead quoting its rule on and off. The private path in the lead captures is covered.
