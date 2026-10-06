@@ -33,6 +33,8 @@ Keep the rule short and lean: principles only.
 
 - 2026-10-07: User's refinement done (commit 2d57840): instance per task first; else a shared build, flags only for a change that must be tested on its own or may clash (short-lived, off by default, launch argument or env var), removed once confirmed. Setting texts updated. 348 pass. Live: a fresh lead quotes the new line (cap/after2-lead-on). New video.
 
+- 2026-10-07: Lead re-check: PR #51 already had the refined lines (2d57840); added "switched at runtime" to both. The video's links are public (jsDelivr on the videos branch, HTTP 200 signed out, same 1905575-byte file as the new video).
+
 ### For the user
 PR: https://github.com/iosifnicolae2/better-tasks/pull/51
 T-091 (#51) Batch device builds and tests: unrelated tasks share a branch behind feature flags
