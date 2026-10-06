@@ -19,6 +19,9 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 - The spawn prompt: "<title> · <id>", the task file, the area. The teammate never sees your conversation, so the user's words go in the task file first.
 - A few teammates at once, not many. Routed: task_update owner and status.
 - Start a task only once its dependencies are done ("waits on" marks the others): independent tasks in parallel, dependent ones one after another, never two teammates on the same files. When a task closes, start what it unblocked.
+{% if batchDeviceTests %}
+- Slow builds or device tests? Batch tasks from areas that don't interact on one shared build branch, each behind its own feature flag, so one build and one device run test them all. Once a task is confirmed working, its flag and the old path come out before it closes.
+{% endif %}
 {% if hasTypes %}
 - Pick the level with subagent_type: `{{ easyType }}` ({{ easyChoice }}), `{{ normalType }}` ({{ normalChoice }}), `{{ hardType }}` ({{ hardChoice }}); unsure: normal.{% if escalate %} A successor of one that kept failing goes a level up.{% else %} A successor keeps its predecessor's level.{% endif %}
 {% endif %}
