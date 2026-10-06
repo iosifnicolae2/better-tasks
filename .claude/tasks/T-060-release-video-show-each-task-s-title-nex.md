@@ -2,8 +2,8 @@
 id: T-060
 title: "Release video: show each task's title next to its number"
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-video-2
 rolled: 0
 order: -2
@@ -41,3 +41,4 @@ To try it: open the release and play its video; look at the T-059 card.
 https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.6
 Is everything OK?
 - 2026-10-06: Finished: full tests pass (316), plus settings-doc --check and skills-check. Video made from the published v0.11.6 card (before) and the regenerated one (after). v0.11.6 notes already carry the new release video. Straight to main: commit 435b62a is final (not pushed; the next release ships it).
+- 2026-10-06: Release video task cards show the title under the task number; corner shows the version; v0.11.6 notes carry the new video
