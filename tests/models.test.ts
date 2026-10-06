@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { DEFAULT_TYPE, describeChoice, leadModelRules, STUCK_RULE, teammateModelRules, teammateTypes, typeOf } from '../hooks/models'
+import { DEFAULT_TYPE, describeChoice, teammateTypes, typeOf } from '../hooks/models'
 import { parseOverrides, settingsOf } from '../hooks/settings'
 
 describe('teammate model settings', () => {
@@ -50,25 +50,4 @@ describe('teammate agent types', () => {
     expect(describeChoice({ model: 'inherit', effort: 'high' })).toBe("the manager's own model at high effort")
   })
 
-  test('the lead rules name the three types with their model and effort, and the escalation', () => {
-    const rules = leadModelRules(models)
-    expect(rules).toContain(`\`${typeOf('easy')}\`, opus at low effort`)
-    expect(rules).toContain(`\`${typeOf('normal')}\`, opus at medium effort`)
-    expect(rules).toContain(`\`${typeOf('hard')}\`, opus at high effort`)
-    expect(rules).toContain(`its successor ("login-2") moves one level up, easy to \`${typeOf('normal')}\`, normal to \`${typeOf('hard')}\``)
-  })
-
-  test('escalation off: the rules say a successor keeps its type', () => {
-    const rules = leadModelRules({ ...models, escalate: false })
-    expect(rules).toContain('Escalation is off')
-    expect(rules).not.toContain('login-2')
-  })
-
-  test('only a teammate below the hard level, with escalation on, is asked to report being stuck', () => {
-    expect(teammateModelRules(models, typeOf('easy'))).toBe(STUCK_RULE)
-    expect(teammateModelRules(models, typeOf('normal'))).toBe(STUCK_RULE)
-    expect(teammateModelRules(models, undefined)).toBe(STUCK_RULE)
-    expect(teammateModelRules(models, typeOf('hard'))).toBe('')
-    expect(teammateModelRules({ ...models, escalate: false }, typeOf('normal'))).toBe('')
-  })
 })

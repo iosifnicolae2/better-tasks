@@ -1,0 +1,150 @@
+import { describe, expect, test } from 'claude-code/testing'
+
+import { GIT_FLOWS } from '../hooks/gitflow'
+import { NO_FACTS, RULE_FILES, renderRule, rulesChangedNote, varsOf } from '../hooks/rules'
+import type { Facts } from '../hooks/rules'
+import { settingsOf } from '../hooks/settings'
+import { changedSections, render, sectionsOf, templateOf } from '../hooks/template'
+import type { Sources } from '../hooks/template'
+import { starterFiles } from '../hooks/texts'
+import { TEMPLATES } from './templates.gen'
+
+const plugin = (name: string) => Promise.resolve(TEMPLATES[name])
+const shipped: Sources = { plugin, project: async () => undefined }
+const withProject = (files: Record<string, string>): Sources => ({ plugin, project: async path => files[path] })
+
+/** One instruction file, rendered from the shipped templates with these settings and facts. */
+function rule(name: (typeof RULE_FILES)[number], values: Record<string, unknown> = {}, facts: Partial<Facts> = {}): Promise<string> {
+  return renderRule(name, shipped, varsOf(settingsOf(values), { ...NO_FACTS, pluginRoot: '/p', ...facts }))
+}
+
+describe('the template syntax', () => {
+  test('values, if, elif, else; a line holding only a tag leaves nothing behind', () => {
+    const template = 'A {{ x }}.\n{% if on %}\nOn.\n{% elif flow == "dev" %}\nDev.\n{% else %}\nOff.\n{% endif %}\nEnd.'
+    expect(render(template, { x: 1, on: true, flow: 'dev' })).toBe('A 1.\nOn.\nEnd.')
+    expect(render(template, { x: 1, on: false, flow: 'dev' })).toBe('A 1.\nDev.\nEnd.')
+    expect(render(template, { x: 1, on: false, flow: 'direct' })).toBe('A 1.\nOff.\nEnd.')
+  })
+
+  test('inline tags, not, and, or, !=; nested ifs inside a hidden one stay hidden', () => {
+    expect(render('x{% if not a and b %}y{% endif %}z', { a: false, b: true })).toBe('xyz')
+    expect(render('{% if a or f != "x" %}y{% endif %}', { a: false, f: 'x' })).toBe('')
+    expect(render('{% if a %}{% if b %}in{% else %}else{% endif %}{% endif %}.', { a: false, b: false })).toBe('.')
+  })
+
+  test('comments are for people; an unknown name or an open if is an error', () => {
+    expect(render('<!-- note {{ nope }} -->\nText.', {})).toBe('Text.')
+    expect(() => render('{{ nope }}', {})).toThrow('unknown name "nope"')
+    expect(() => render('{% if a %}x', { a: true })).toThrow('no {% endif %}')
+  })
+})
+
+describe('project overrides', () => {
+  const shippedText = async (files: Record<string, string>, legacy?: string) => templateOf('lead.md', withProject(files), legacy)
+
+  test('none: the plugin text; the same file (better-tasks itself): no double', async () => {
+    expect(await shippedText({})).toBe(TEMPLATES['lead.md']!)
+    expect(await shippedText({ '.claude/better-tasks/lead.md': TEMPLATES['lead.md']! })).toBe(TEMPLATES['lead.md']!)
+  })
+
+  test('a file of the same name extends by default, replaces with "replace: true"', async () => {
+    expect(await shippedText({ '.claude/better-tasks/lead.md': 'Also mine.' })).toBe(`${TEMPLATES['lead.md']!.trimEnd()}\n\nAlso mine.`)
+    expect(await shippedText({ '.claude/better-tasks/lead.md': '---\nreplace: true\n---\nOnly mine.' })).toBe('Only mine.')
+  })
+
+  test('@/ pulls in the plugin file, @./ a project file', async () => {
+    const own = '---\nreplace: true\n---\nFirst.\n@/status-check.md\n@./docs/rules.md\nLast.'
+    const text = await shippedText({ '.claude/better-tasks/lead.md': own, 'docs/rules.md': 'Our rules.' })
+    expect(text).toBe(`First.\n${TEMPLATES['status-check.md']!.trimEnd()}\nOur rules.\nLast.`)
+  })
+
+  test('the starter files change nothing until written in', async () => {
+    const starter = starterFiles()['.claude/better-tasks/lead.md']!
+    const vars = varsOf(settingsOf({}), NO_FACTS)
+    expect(render(await shippedText({ '.claude/better-tasks/lead.md': starter }), vars)).toBe(render(TEMPLATES['lead.md']!, vars))
+  })
+})
+
+describe('the shipped templates', () => {
+  test('every file renders under every git flow, videos, off-screen and model setting, with no tag left', async () => {
+    for (const gitFlow of GIT_FLOWS) {
+      for (const flag of [true, false]) {
+        const values = { gitFlow, demoVideos: flag, offScreen: !flag, escalate: flag, testScreen: flag ? 'virtual' : 'DELL' }
+        for (const name of RULE_FILES) {
+          for (const facts of [{ isWorktree: flag, isHard: flag, hasTypes: flag, hasOwnPrTemplate: flag, upstreamPr: flag ? 'ask' : 'never' }]) {
+            const text = await rule(name, values, facts)
+            expect(text).not.toMatch(/\{[{%]|[}%]\}/)
+            expect(text.length).toBeGreaterThan(50)
+          }
+        }
+      }
+    }
+  })
+
+  test('the lead: the task scenario, the status check every few minutes, the video before the question, tests and PR after the yes', async () => {
+    const lead = await rule('lead.md', { demoVideos: true, gitFlow: 'worktree-prs', statusEvery: 10 })
+    expect(lead).toContain('## How a task goes')
+    expect(lead).toContain('The video is the functional test')
+    expect(lead).toContain('Every 10 quiet minutes')
+    expect(lead).toContain('It runs the full tests, opens its PR with the video')
+    expect(lead).toContain('`better-tasks:teammate-normal` for normal (opus at medium effort)')
+    expect(await rule('lead.md', { escalate: false })).not.toContain('one level up')
+  })
+
+  test('new bugs: filed and fixed with a video and a PR; straight to main gets its own worktree', async () => {
+    const direct = await rule('lead.md', { gitFlow: 'direct' })
+    expect(direct).toContain('every bug is fixed the same way, with a video and a PR')
+    expect(direct).toContain('spawn its teammate with isolation "worktree"')
+    expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain("its owner fixes it on that task's branch")
+    expect(await rule('teammate.md')).toContain('"New bug: <what you saw>, <how to see it again>, BEFORE: <path>"')
+  })
+
+  test("the teammate's git part follows the flow and its worktree", async () => {
+    const direct = await rule('teammate.md', { gitFlow: 'direct' })
+    expect(direct).toContain('`/p/bin/land.sh -m "<what changed> (<task id>)" -- <your paths>`')
+    expect(direct).not.toContain('pull-request')
+    expect(await rule('teammate.md', { gitFlow: 'dev-prs', devBranch: 'develop' })).toContain('`/p/bin/land.sh -b develop -m')
+    const worktree = await rule('teammate.md', { gitFlow: 'direct' }, { isWorktree: true })
+    expect(worktree).toContain('the `better-tasks:pull-request` skill')
+    expect(worktree).toContain('Claude Code refuses a gh or git command')
+    expect(worktree).not.toContain('land.sh')
+  })
+
+  test('a teammate below the hard level, with escalation on, reports being stuck', async () => {
+    expect(await rule('teammate.md')).toContain('Not getting there after real attempts?')
+    expect(await rule('teammate.md', {}, { isHard: true })).not.toContain('Not getting there')
+    expect(await rule('teammate.md', { escalate: false })).not.toContain('Not getting there')
+  })
+
+  test('the skills follow the settings: quality, off-screen, the test screen, the PR flow, the upstream answer', async () => {
+    expect(await rule('video.md', { videoQuality: 'low' })).toContain('--quality low')
+    expect(await rule('testing.md', { offScreen: true })).toContain("the project's own virtual display")
+    expect(await rule('testing.md', { offScreen: true, testScreen: 'DELL' })).toContain('"DELL", chosen by the user')
+    expect(await rule('testing.md', { offScreen: false })).toContain('Tell the lead first')
+    expect(await rule('pull-request.md', { gitFlow: 'dev-prs' })).toContain('task_pr.py open')
+    expect(await rule('pull-request.md', { gitFlow: 'worktree-prs' })).toContain('gh pr create --base main')
+    expect(await rule('contribute.md', {}, { upstreamPr: 'never' })).toContain("don't ask")
+    expect(await rule('done.md', { gitFlow: 'worktree-prs' })).toContain('then your PR with the video')
+  })
+
+  test('the status check says how long it was quiet', async () => {
+    expect(await rule('status-check.md', {}, { idleMinutes: 12 })).toContain('no activity for 12 min')
+  })
+})
+
+describe('a setting changed mid-session', () => {
+  test('only the changed sections are sent, and the ones dropped are named', () => {
+    const before = '# Rules\nIntro.\n\n## A\nOne.\n\n## B\nTwo.\n\n## C\nThree.'
+    const now = '# Rules\nIntro.\n\n## A\nOne.\n\n## B\nTwo, changed.'
+    expect([...sectionsOf(before).keys()]).toEqual(['', '## A', '## B', '## C'])
+    expect(changedSections(before, now)).toEqual({ changed: ['## B\nTwo, changed.'], dropped: ['## C'] })
+  })
+
+  test("the note gives the lead its sections, and its running teammates' to send", () => {
+    const note = rulesChangedNote({ changed: ['## Git flow\nNew.'], dropped: [] }, { changed: ['## Git\nNew too.'], dropped: ['## Old'] })
+    expect(note).toContain('replace the ones with the same heading')
+    expect(note).toContain('## Git flow\nNew.')
+    expect(note).toContain('Send each running teammate')
+    expect(note).toContain('No longer in force: ## Old.')
+  })
+})

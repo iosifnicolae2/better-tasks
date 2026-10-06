@@ -8,6 +8,7 @@ import { DECLINED_KEY, updateQuestion } from '../hooks/updatecheck'
 import { IGNORE_COMMIT } from '../hooks/ignoreworktrees'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
+import { TEMPLATES } from './templates.gen'
 
 const ROOT = '/project'
 const TASKS = `${ROOT}/.claude/tasks`
@@ -48,6 +49,12 @@ type Host = {
   composer: string
 }
 type Teams = { env: Record<string, string>; settingsEnv: Record<string, string> }
+
+/** The plugin's own instruction templates (tests/templates.gen.ts), at any root but the project's. */
+function pluginTemplate(path: string): string | undefined {
+  const name = path.match(/\/\.claude\/better-tasks\/([^/]+)$/)?.[1]
+  return name && !path.startsWith(`${ROOT}/`) ? TEMPLATES[name] : undefined
+}
 
 /** The engine beneath the plugin: files in memory, a session, the given agents, agent teams on unless said. */
 function fakeHost(
@@ -100,7 +107,7 @@ function fakeHost(
     return { value: undefined }
   })
   on('fs.read', ($, e) => {
-    const text = host.files.get(e.path)
+    const text = host.files.get(e.path) ?? pluginTemplate(e.path)
     return text === undefined ? { deny: `ENOENT ${e.path}` } : { value: text }
   })
   on('fs.write', ($, e) => {
@@ -212,37 +219,71 @@ test('the coordinator rules go into the main session prompt only', async ($, on)
   expect(await idsFor('agent_prompt', MAIN_TOOLS)).toEqual(['agent_prompt']) // a subagent's own prompt
 })
 
-test("the lead pastes the teammate's block: the video and PR above the question, the PR inside it; resolved closes with no new round", async ($, on) => {
+test("the lead's rules: the task scenario, one question per task, the video before it, tests and PR after the yes", async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
-  expect(lead).toContain('Reply text, right before the call: the block\'s "Links:" lines as written: the video file\'s path (Claude Code opens it on click) and the PR')
-  expect(lead).toContain('question: the block\'s "Question:" text as written (its only link the PR, a bare url on its own line; never the video)')
-  expect(lead).toContain('The teammate also leaves a local build ready, not opened: the block\'s "Local build:" line.')
-  expect(lead).toContain('the user asks for it: open or install it for them right away')
-  expect(lead).toContain('Mark as resolved: closing is yours, at once, with no new question to the user')
-  expect(lead).toContain('It changes, updates its PR and video, and reports done again.')
-  expect(lead).not.toContain('accepted: finish it')
-  expect(lead).toContain('the bare url alone on its own line in the question')
+  expect(lead).toMatch(/^# better-tasks: you lead a team of Claude Code teammates\n/)
+  expect(lead).toContain('## How a task goes')
+  expect(lead).toContain('One task per question.')
+  expect(lead).toContain('tell the teammate "<id> accepted: finish it"')
   expect(lead).toContain('load the `better-tasks:contribute` skill')
-  expect(lead).not.toContain('gh repo fork')
+  expect(lead).not.toContain('{%')
 })
 
-test("our skills load with the plugin's path and the settings in force under its title; others pass through", { options: { demoVideos: true, videoQuality: 'low' } }, async ($, on) => {
+test("our skills load as their template, rendered with the settings in force; others pass through", { options: { demoVideos: true, videoQuality: 'low' } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
   on('skill.prompt', ($, e) => ({ text: e.text }))
-  const video = await $.skill.prompt({ skill: 'better-tasks:video', text: '# Video\nRun `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh`.' })
-  expect(video.text).toMatch(/^# Video\n## Settings\n- Video quality: low: make it with `--quality low`/)
-  expect(video.text).toMatch(/Run `\/.*\/bin\/demo-video\.sh`\.$/)
-  expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain('- Off-screen: on.')
-  expect((await $.skill.prompt({ skill: 'better-tasks:contribute', text: 'C' })).text).toContain('- Upstream PR: ask.')
-  expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toBe('D')
+  const video = await $.skill.prompt({ skill: 'better-tasks:video', text: 'pointer' })
+  expect(video.text).toMatch(/^# Before\/after video\n/)
+  expect(video.text).toMatch(/`\/\S+\/bin\/demo-video\.sh spec\.json --quality low`/)
+  expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain("the project's own virtual display")
+  expect((await $.skill.prompt({ skill: 'better-tasks:contribute', text: 'C' })).text).toContain('header "PR upstream"')
+  expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toMatch(/^# Reporting done\n/)
   expect((await $.skill.prompt({ skill: 'commit', text: 'X ${CLAUDE_PLUGIN_ROOT}' })).text).toBe('X ${CLAUDE_PLUGIN_ROOT}')
+})
+
+test('a setting changed mid-session: the system prompt stays as it started; the next message carries only the changed sections, once', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
+  await $.session.start(SESSION)
+  const leadNow = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
+  const started = await leadNow()
+  expect(started).toContain('Straight to main')
+  expect((await $.prompt.submit(prompt('hi'))).context?.join('\n')).not.toContain('a setting changed')
+
+  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ gitFlow: 'worktree-prs' }))
+  const context = (await $.prompt.submit(prompt('go on'))).context?.join('\n') ?? ''
+  expect(context).toContain('better-tasks: a setting changed.')
+  expect(context).toContain('## Git flow\nA worktree and a PR per task')
+  expect(context).not.toContain('## Routing')
+  expect(context).toContain('Send each running teammate')
+  expect(await leadNow()).toBe(started)
+  expect((await $.prompt.submit(prompt('and now'))).context?.join('\n')).not.toContain('a setting changed')
+
+  await $.session.start(SESSION)
+  expect(await leadNow()).toContain('A worktree and a PR per task')
+})
+
+test("a project's file of the same name extends a skill, or replaces it", async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.claude/better-tasks/done.md`]: 'Also run `make lint`{% if demoVideos %} before the video{% endif %}.' })
+  on('skill.prompt', ($, e) => ({ text: e.text }))
+  const extended = (await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text
+  expect(extended).toMatch(/^# Reporting done\n[\s\S]*\n\nAlso run `make lint`\.$/)
+  host.files.set(`${ROOT}/.claude/better-tasks/done.md`, '---\nreplace: true\n---\nOur own way.')
+  expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toBe('Our own way.')
+  host.files.set(`${ROOT}/.claude/better-tasks/done.md`, '{% if nope %}x{% endif %}')
+  expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toMatch(/^# Reporting done\n/)
+  expect(host.notices.some(line => line.includes('.claude/better-tasks/done.md failed'))).toBe(true)
 })
 
 test('with worktree on, a named teammate is spawned in a worktree', { options: { worktree: true } }, async ($, on) => {
@@ -262,7 +303,7 @@ test('a teammate in the shared checkout gets no worktree command rules', async (
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).not.toContain('## gh and git in your worktree')
+  expect(host.spawned[0]).not.toContain('Claude Code refuses a gh or git command')
 })
 
 test('a teammate the lead spawns in a worktree itself gets the worktree command rules', async ($, on) => {
@@ -271,7 +312,7 @@ test('a teammate the lead spawns in a worktree itself gets the worktree command 
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
-  expect(host.spawned[0]).toContain('## gh and git in your worktree')
+  expect(host.spawned[0]).toContain('Claude Code refuses a gh or git command')
 })
 
 const EXCLUDED = '<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />'
@@ -546,7 +587,7 @@ test('project_init writes the starter files once and keeps edits', async ($, on)
   const host = fakeHost(on, [], { [`${ROOT}/.claude/tasks/tips.md`]: 'my tips' })
   await $.session.start(SESSION)
   const first = await $.tool.call({ tool: 'mcp__better-tasks__project_init', tool_use_id: 'i1' })
-  expect(String(first.result)).toContain('Wrote .claude/tasks/config.json, .claude/tasks/coordinator.md')
+  expect(String(first.result)).toContain('Wrote .claude/tasks/config.json, .claude/better-tasks/lead.md')
   expect(String(first.result)).not.toContain('tips.md')
   expect(host.files.get(`${ROOT}/.claude/tasks/tips.md`)).toBe('my tips')
   const again = await $.tool.call({ tool: 'mcp__better-tasks__project_init', tool_use_id: 'i2' })
@@ -715,7 +756,7 @@ test('every named teammate is spawned with the teammate rules; a scout is not', 
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'Finish T-001. Old transcript: x.jsonl', name: 'auth-2' })
   expect(host.spawned.at(-1)).toMatch(/^Finish T-001\. Old transcript: x\.jsonl\n\n# You are a better-tasks teammate\n/)
-  expect(host.spawned.at(-1)).toContain("Given a predecessor's transcript? Search it for what you need")
+  expect(host.spawned.at(-1)).toContain("Given a predecessor's transcript? Search it")
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'Find the login code.' })
   expect(host.spawned.at(-1)).toBe('Find the login code.')
 })
@@ -853,7 +894,7 @@ test('after 10 quiet minutes with work open, the coordinator is asked for a stat
   expect(statusPrompts(host)).toEqual([])
   await clock.advance(60_000)
   expect(statusPrompts(host)).toHaveLength(1)
-  expect(statusPrompts(host)[0]).toContain('better-tasks status check: no activity for 10 min. Move the work forward.\n1. Call team_status.')
+  expect(statusPrompts(host)[0]).toMatch(/^better-tasks status check: no activity for 10 min\. Move the work forward\.\n- team_status/)
 })
 
 test('no status check with nothing open, while a turn runs, or with text in the composer', async ($, on) => {
@@ -973,9 +1014,9 @@ test('with before/after videos on, teammates get the pointer to the video skill'
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).toContain('BEFORE first: before you change anything')
+  expect(host.spawned[0]).toContain('Record the before/after video on your build (`better-tasks:video`)')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).not.toContain('Before/after video')
+  expect(composed.sections.at(-1)?.text).toContain('The video is the functional test')
   expect(host.toasts).toEqual([])
 })
 
@@ -987,24 +1028,11 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'worktree' })
-  expect(host.spawned[0]).toContain('with its video: the `better-tasks:pull-request` skill')
-  expect(host.spawned[0]).toContain('## gh and git in your worktree')
+  expect(host.spawned[0]).toContain("Your PR opens after the user's yes: the `better-tasks:pull-request` skill")
+  expect(host.spawned[0]).toContain('Claude Code refuses a gh or git command')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
-  expect(composed.sections.at(-1)?.text).toContain('its question links only the PR')
-})
-
-test('with PR per task on, the lead opens each PR in the browser before its question, unless openPrInBrowser is off', { options: { pullRequests: true } }, async ($, on) => {
-  mock.store(on)
-  const host = fakeHost(on)
-  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
-  await $.session.start(SESSION)
-  const leadRules = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
-  expect(await leadRules()).toContain('/bin/open-pr.sh <url>`: once the PR\'s video is uploaded it opens the PR in the default browser')
-  expect(await leadRules()).toContain('**One task per question, always.**')
-  host.files.set(`${ROOT}/.claude/tasks/config.json`, JSON.stringify({ openPrInBrowser: false }))
-  expect(await leadRules()).not.toContain('default browser')
-  expect(await leadRules()).toContain('**One task per question, always.**')
+  expect(composed.sections.at(-1)?.text).toContain('opens its PR with the video')
 })
 
 test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {
@@ -1310,10 +1338,9 @@ test('off-screen is on by default and never asked; the rules follow', async ($, 
   expect(asked.some(question => /off-screen|background/i.test(question))).toBe(false)
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).toContain('## Testing like a user')
-  expect(host.spawned[0]).toContain('nor their screen, mouse or keyboard (off-screen is on)')
+  expect(host.spawned[0]).toContain("capture how it is now (the BEFORE), off the user's screen")
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain('## New bugs from testing')
+  expect(composed.sections.at(-1)?.text).toContain('Teammates test off the user\'s screen.')
 })
 
 test('straight to main, the default: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {
@@ -1324,12 +1351,12 @@ test('straight to main, the default: one checkout, and teammates commit only the
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'none' })
-  expect(host.spawned[0]).toContain('## Git flow: straight to main (this project)')
-  expect(host.spawned[0]).toMatch(/`\S+\/bin\/land\.sh -m "<what changed> \(T-004\)" -- <your paths>`/)
+  expect(host.spawned[0]).toContain('you commit straight to main')
+  expect(host.spawned[0]).toMatch(/`\S+\/bin\/land\.sh -m "<what changed> \(<task id>\)" -- <your paths>`/)
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain("no PR, except a bug fix's")
+  expect(composed.sections.at(-1)?.text).toContain("no PRs except a bug fix's")
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'bug', isolation: 'worktree' })
-  expect(host.spawned[1]).toContain('## Pull request per task (on in this project)')
+  expect(host.spawned[1]).toContain('You work in your own git worktree, on its own branch.')
 })
 
 test('the shared dev branch flow: no worktree, land on dev, the PR from the pull-request skill; the lead merges and syncs dev', async ($, on) => {
@@ -1342,14 +1369,13 @@ test('the shared dev branch flow: no worktree, land on dev, the PR from the pull
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'none' })
   expect(host.spawned[0]).toContain('/bin/land.sh -b develop -m')
-  expect(host.spawned[0]).toContain('## Git flow: shared develop branch, a PR per task (this project)')
+  expect(host.spawned[0]).toContain('One checkout on `develop`, shared with the other teammates.')
   const skill = (await $.skill.prompt({ skill: 'better-tasks:pull-request', text: '# PR' })).text
-  expect(skill).toContain('- Git flow: shared dev branch `develop`: follow "Shared dev branch".')
-  expect(skill).toContain('"## Asked for": the user\'s request')
+  expect(skill).toContain('task_pr.py open <id>')
+  expect(skill).toContain('"## Asked for" (the user\'s words)')
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
-  expect(lead).toContain('## Git flow: shared develop branch, a PR per task (on)')
+  expect(lead).toContain('Shared `develop` branch')
   expect(lead).toContain('/bin/task_pr.py sync')
-  expect(lead).toContain('its question links only the PR') // the PR flow's Finishing line, shared
 })
 
 test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {
@@ -1411,11 +1437,11 @@ test('the lead is told which type to spawn for easy, normal, hard and stuck work
   await $.session.start(SESSION)
   const composed = await $.prompt.compose({ ...COMPOSE_BASE })
   const lead = composed.sections.at(-1)?.text ?? ''
-  expect(lead).toContain('`better-tasks:teammate-easy`, opus at low effort')
-  expect(lead).toContain('`better-tasks:teammate-normal`, opus at medium effort')
-  expect(lead).toContain('Hard tasks (deep debugging, security work, changes across several areas): `better-tasks:teammate-hard`, opus at high effort')
-  expect(lead).toContain('its successor ("login-2") moves one level up, easy to `better-tasks:teammate-normal`, normal to `better-tasks:teammate-hard`')
-  expect(lead).toContain('never pass `model`')
+  expect(lead).toContain('`better-tasks:teammate-easy` for easy work (opus at low effort)')
+  expect(lead).toContain('`better-tasks:teammate-normal` for normal (opus at medium effort)')
+  expect(lead).toContain('`better-tasks:teammate-hard` for hard (opus at high effort)')
+  expect(lead).toContain('its successor goes one level up')
+  expect(lead).toContain('Never pass `model`')
 })
 
 test('with escalation off the lead is told a successor keeps its predecessor’s type', { options: { escalate: false } }, async ($, on) => {
@@ -1425,8 +1451,8 @@ test('with escalation off the lead is told a successor keeps its predecessor’s
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   const lead = (await $.prompt.compose({ ...COMPOSE_BASE })).sections.at(-1)?.text ?? ''
-  expect(lead).toContain('Escalation is off: a successor keeps its predecessor')
-  expect(lead).not.toContain('moves one level up')
+  expect(lead).toContain("A successor keeps its predecessor's type, even when it was stuck")
+  expect(lead).not.toContain('one level up')
 })
 
 test('a named teammate gets the normal type unless the lead chose one; a scout is left alone', async ($, on) => {
@@ -1449,9 +1475,9 @@ test('a teammate below the hard level is told to report being stuck, while escal
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-easy' })
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'auth-3', subagent_type: 'better-tasks:teammate-hard' })
-  expect(host.spawned[0]).toContain('## Stuck?')
-  expect(host.spawned[1]).toContain('## Stuck?')
-  expect(host.spawned[2]).not.toContain('## Stuck?')
+  expect(host.spawned[0]).toContain('Not getting there after real attempts?')
+  expect(host.spawned[1]).toContain('Not getting there after real attempts?')
+  expect(host.spawned[2]).not.toContain('Not getting there')
 })
 
 test('with escalation off a teammate is not asked to report being stuck', { options: { escalate: false } }, async ($, on) => {
@@ -1460,7 +1486,7 @@ test('with escalation off a teammate is not asked to report being stuck', { opti
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).not.toContain('## Stuck?')
+  expect(host.spawned[0]).not.toContain('Not getting there')
 })
 
 test('if the types cannot be registered, nothing points at them: no rules, no rewritten spawn, one log line', async ($, on) => {

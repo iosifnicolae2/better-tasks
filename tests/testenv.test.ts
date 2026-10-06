@@ -1,44 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { fieldsWith, nextOption } from '../hooks/configpage'
-import { GIT_FLOWS } from '../hooks/gitflow'
 import { PROJECT_KEYS, settingsOf } from '../hooks/settings'
-import { coordinatorTestingRules, screenNames, testingPointer, testingSkillSettings } from '../hooks/testenv'
-
-describe('testing like a user', () => {
-  test("every teammate's prompt keeps the boundaries and the bug report, and points at the testing skill", () => {
-    for (const isOffScreen of [true, false]) {
-      const rules = testingPointer(isOffScreen)
-      expect(rules).toContain('in your own environment')
-      expect(rules).toContain("never the user's running apps, data or accounts")
-      expect(rules).toContain('"New bug: <what you saw>, <how to see it again>, BEFORE: <path>"')
-      expect(rules).toContain('Capture it first (a screenshot per step: its BEFORE)')
-      expect(rules).toContain('A bug your own change made is part of your task: fix it there.')
-      expect(rules).toContain('load the `better-tasks:testing` skill')
-      expect(rules).not.toContain('headless: true')
-    }
-    expect(testingPointer(true)).toContain('nor their screen, mouse or keyboard (off-screen is on)')
-    expect(testingPointer(false)).not.toContain('off-screen is on')
-  })
-
-  test('the testing skill reads which of its parts applies', () => {
-    expect(testingSkillSettings(true)).toContain('Off-screen: on. Follow "Off-screen"')
-    expect(testingSkillSettings(false)).toContain('Off-screen: off. Follow "On the screen"')
-  })
-
-  test('the lead files every new bug; its fix gets a video and a PR, merged into main or the open task it came from', () => {
-    for (const flow of GIT_FLOWS) {
-      const rules = coordinatorTestingRules(false, flow)
-      expect(rules).toContain('every bug gets fixed with a before/after video and a PR the user sees before it merges')
-      expect(rules).toContain('File it (task_create')
-      expect(rules).not.toContain('Off-screen is on')
-    }
-    expect(coordinatorTestingRules(false, 'worktree-prs')).toContain("so the fix merges into that task's branch")
-    expect(coordinatorTestingRules(false, 'dev-prs')).toContain('lands it on the dev branch and runs task_pr.py open again')
-    expect(coordinatorTestingRules(false, 'direct')).toContain('Spawn its teammate with isolation "worktree"')
-    expect(coordinatorTestingRules(true, 'direct')).toContain('Off-screen is on')
-  })
-})
+import { screenNames } from '../hooks/testenv'
 
 describe('the test screen', () => {
   const screenRow = (screens: string[]) => fieldsWith(screens).find(field => field.field === 'testScreen')!
@@ -70,8 +34,4 @@ describe('the test screen', () => {
     expect(screenNames('')).toEqual([])
   })
 
-  test('the testing skill names the screen', () => {
-    expect(testingSkillSettings(true)).toContain("Test screen: the project's own virtual display")
-    expect(testingSkillSettings(true, 'DELL U2720Q')).toContain('Test screen: "DELL U2720Q", a real screen the user chose')
-  })
 })

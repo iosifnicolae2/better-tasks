@@ -1,5 +1,4 @@
 import type { VideoQuality } from './settings'
-import { skillCall } from './skills'
 
 // Before/after videos (setting demoVideos): the startup question, the one-time Kokoro voice setup
 // (bin/kokoro-setup.sh, outside any project), the teammate's pointer to the video skill (skills/video)
@@ -10,7 +9,7 @@ export const SETTING_KEY = 'better-tasks.demoVideos'
 /** Where bin/demo-video.sh saves a task's video, <task id>.mp4, relative to the project root; git ignores it. */
 export const VIDEOS_FOLDER = '.claude/tasks_videos'
 /** The size a video of each quality fits in (setting videoQuality); bin/demo_video.py holds the same table. */
-const VIDEO_SIZE: Record<VideoQuality, string> = { low: '1280x720', medium: '1920x1080', high: '1920x1080' }
+export const VIDEO_SIZE: Record<VideoQuality, string> = { low: '1280x720', medium: '1920x1080', high: '1920x1080' }
 
 export const QUESTION =
   'Record a short before/after video for each finished task?'
@@ -80,18 +79,4 @@ export function setupVerdict(output: string): { isReady: boolean; text: string }
   return last.startsWith('ready')
     ? { isReady: true, text: 'Kokoro voice ready: before/after videos are on.' }
     : { isReady: false, text: `better-tasks: the Kokoro voice setup ${last || 'failed'}` }
-}
-
-/** The teammate's pointer: capturing is here, so the video skill loads only at done, to make it. */
-export function videoPointer(quality: VideoQuality): string {
-  return `## Before/after video (on in this project)
-Every finished task gets one short narrated video, docs, rules and tooling too. Nothing changes on screen? Show the change itself: the old and the new text (or the diff) rendered, labeled BEFORE and AFTER.
-- BEFORE first: before you change anything, capture the bug, the missing feature or the old text (how: the testing skill), at ${VIDEO_SIZE[quality]} or more, a screenshot per step. Forgot? Capture it from the commit before yours (\`git worktree add <scratchpad>/before <commit>\`).
-- AFTER: the same steps on your change. Keep both in your scratchpad.
-- The video is made at done, before the user is asked: the \`${skillCall('video')}\` skill.`
-}
-
-/** What the video skill reads under its title: this project's quality. */
-export function videoSkillSettings(quality: VideoQuality): string {
-  return `- Video quality: ${quality}: make it with \`--quality ${quality}\`.`
 }

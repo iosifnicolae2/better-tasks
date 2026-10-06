@@ -11,16 +11,15 @@ import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArg
 import type { Install } from './updatecheck'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder } from './migrate'
-import { DEFAULT_TYPE, leadModelRules, teammateModelRules, teammateTypes } from './models'
-import { CONTRIBUTE_POINTER, contributeSkillSettings, readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
+import { DEFAULT_TYPE, teammateTypes, typeOf } from './models'
+import { readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
-import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, videoPointer, videoSkillSettings, voiceDir } from './demovideo'
-import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, leadRules, lookAt, prBodyRules, prSkillSettings, recommend, teammateRules as flowRules, usesWorktree, WORKTREE_COMMAND_RULES } from './gitflow'
+import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, voiceDir } from './demovideo'
+import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, lookAt, recommend, usesWorktree } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
 import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
-import { coordinatorTestingRules, testingPointer, testingSkillSettings } from './testenv'
-import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub, prCoordinatorRules, PR_TEAMMATE_RULES } from './pullrequest'
+import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub } from './pullrequest'
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
@@ -30,12 +29,15 @@ import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
 import { contextTokens, isActive, predecessorOf, refreshTeam } from './team'
-import { fillSkill, ourSkill } from './skills'
-import type { SkillName } from './skills'
-import { projectText } from './texts'
+import { NO_FACTS, renderRule, rulesChangedNote, TEMPLATES_DIR, varsOf } from './rules'
+import type { Facts, RuleFile, RulesSent } from './rules'
+import { ourSkill } from './skills'
+import { changedSections } from './template'
+import type { Sources, Vars } from './template'
+import { EXTEND, overridePath } from './texts'
 import { IGNORE_COMMIT, isNotIgnored, withIgnoreLine, WORKTREES_FOLDER } from './ignoreworktrees'
 import { spawnTask, withSummary } from './spawn'
-import { fingerprintOf, NO_CHECK, statusDecision, statusPrompt } from './status'
+import { fingerprintOf, NO_CHECK, statusDecision } from './status'
 import { startupTips } from './tips'
 import { runTool, TOOLS } from './tools'
 
@@ -71,6 +73,7 @@ const footerState = atom({ plugin: 'better-tasks', key: 'footer' } as const, '')
 const resolvedState = atom({ plugin: 'better-tasks', key: 'resolved' } as const, [] as string[])
 /** The teammate agent types as last registered (JSON of their specs); '' until they are (models.ts). */
 const typesState = atom({ plugin: 'better-tasks', key: 'teammateTypes' } as const, '')
+const rulesState = atom({ plugin: 'better-tasks', key: 'rulesSent' } as const, { shown: '', lead: '', teammate: '' } as RulesSent)
 const turnState = atom({ plugin: 'better-tasks', key: 'turn' } as const, { asked: false, filed: false, question: false, prompted: false } as TurnFacts)
 
 export const register: Register = (on, options) => {
@@ -87,6 +90,7 @@ export const register: Register = (on, options) => {
     }
     await declareTools($)
     await declareCommands($)
+    await update($, rulesState, () => ({ shown: '', lead: '', teammate: '' }))
     await useLongCache($).catch(error => logFailure($, 'the 1-hour cache', error))
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
@@ -113,12 +117,8 @@ export const register: Register = (on, options) => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (!(await teamsOn($)) || (await isOffHere($))) return composed
-    const settings = await settingsNow($)
-    const testing = coordinatorTestingRules(settings.offScreen, settings.gitFlow)
-    const flow = leadRules(settings.gitFlow, binOf($), settings.devBranch, prCoordinatorRules(settings.openPrInBrowser, binOf($)))
-    const models = (await read($, typesState)) ? leadModelRules(settings.models) : ''
-    const instructions = await instructionsNow($, settings)
-    const rules = [await projectText(ioOf($), 'coordinator'), models, testing, flow, instructions, CONTRIBUTE_POINTER].filter(Boolean).join('\n\n')
+    const lead = (await read($, rulesState)).shown || (await rememberRules($)).shown
+    const rules = [lead, await instructionsNow($, await settingsNow($))].filter(Boolean).join('\n\n')
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
@@ -127,7 +127,7 @@ export const register: Register = (on, options) => {
     const computed = await next(e)
     const skill = ourSkill(e.skill)
     if (!skill) return computed
-    return { text: fillSkill(computed.text, $.plugin.root, await skillSettings($, skill)) }
+    return { text: await ruleNow($, `${skill}.md`) }
   })
 
   // A setting turned on in /config (composer) or on our settings page (turnedOn): set up what it needs.
@@ -157,7 +157,7 @@ export const register: Register = (on, options) => {
     await update($, turnState, () => ({ asked: false, filed: false, question: isQuestion(e.text), prompted: true }))
     const settings = await settingsNow($)
     await syncTeammateTypes($, settings).catch(() => undefined)
-    const notices = [await read($, noticeState), unclosedLine(await unclosedIds($)), reminder].filter(Boolean).join('\n')
+    const notices = [await changedRulesNote($), await read($, noticeState), unclosedLine(await unclosedIds($)), reminder].filter(Boolean).join('\n')
     const block = await contextBlock(ioOf($), settings, notices)
     await update($, noticeState, () => '')
     await showStatus($, settings)
@@ -178,18 +178,13 @@ export const register: Register = (on, options) => {
     const settings = await settingsNow($)
     const task = spawnTask(await listTasks(ioOf($)), e.prompt, e.name, settings.tasks.prefix)
     const named = task ? withSummary(e, task) : { description: e.description, prompt: e.prompt }
-    const teammate = await projectText(ioOf($), 'teammate')
     const handover = await handoverOf($, e.name)
     const hasTypes = (await read($, typesState)) !== ''
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
-    const stuck = hasTypes ? teammateModelRules(settings.models, type) : ''
-    const testing = testingPointer(settings.offScreen)
-    const videos = settings.demoVideos ? videoPointer(settings.videoQuality) : ''
-    const flow = flowRules(settings.gitFlow, binOf($), settings.devBranch, PR_TEAMMATE_RULES, e.isolation === 'worktree')
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
-    const commands = isWorktree || e.isolation === 'worktree' ? WORKTREE_COMMAND_RULES : ''
+    const teammate = await ruleNow($, 'teammate.md', { isWorktree: isWorktree || e.isolation === 'worktree', isHard: type === typeOf('hard') })
     const instructions = await instructionsNow($, settings)
-    const prompt = [named.prompt, handover, teammate, stuck, testing, videos, flow, commands, instructions].filter(Boolean).join('\n\n')
+    const prompt = [named.prompt, handover, teammate, instructions].filter(Boolean).join('\n\n')
     return next({
       ...e,
       description: named.description,
@@ -330,15 +325,6 @@ async function transcriptOf($: EngineInterface, agentId: string): Promise<string
 /** The user's Claude Code folder: CLAUDE_CONFIG_DIR, else ~/.claude. */
 async function claudeDirOf($: EngineInterface): Promise<string> {
   return (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
-}
-
-/** The settings a skill follows, as lines for its "## Settings"; '' when it follows none. */
-async function skillSettings($: EngineInterface, skill: SkillName): Promise<string> {
-  if (skill === 'contribute') return contributeSkillSettings(await readUpstreamPr(ioOf($), await claudeDirOf($)))
-  const settings = await settingsNow($)
-  if (skill === 'pull-request') return prSkillSettings(settings.gitFlow, settings.devBranch, await prBodyNow($, settings))
-  if (skill === 'video') return videoSkillSettings(settings.videoQuality)
-  return skill === 'testing' ? testingSkillSettings(settings.offScreen, settings.testScreen) : ''
 }
 
 async function teamsOn($: EngineInterface): Promise<boolean> {
@@ -590,17 +576,72 @@ async function instructionsNow($: EngineInterface, settings: Settings): Promise<
   return instructionsBlock(lines)
 }
 
-/** The PR description's rules, from the template it fills in (prtemplate.ts); a custom path that isn't there is one log line, once. */
-async function prBodyNow($: EngineInterface, settings: Settings): Promise<string> {
+// ---- The instruction templates (rules.ts, template.ts) ----
+
+/** Where the templates come from: the plugin's .claude/better-tasks/, and the project's files for its overrides. */
+function sourcesOf($: EngineInterface): Sources {
+  return {
+    plugin: name => $.fs.read(`${$.plugin.root}/${TEMPLATES_DIR}/${name}`).catch(() => undefined),
+    project: async path => $.fs.read(`${await $.session.root()}/${path}`).catch(() => undefined),
+  }
+}
+
+/** The values the templates read, from the settings in force and these facts. A PR template path that isn't there is one log line, once. */
+async function varsNow($: EngineInterface, facts: Partial<Facts> = {}): Promise<Vars> {
+  const settings = await settingsNow($)
   const template = await findPrTemplate(ioOf($), await $.session.root(), settings.prTemplate, $.plugin.root)
   const missing = template.missing ?? ''
   if (missing && missing !== loggedMissingTemplate) $.ui.log(`better-tasks: PR template not found: ${missing}; using ${template.path}`)
   loggedMissingTemplate = missing
-  return prBodyRules(template)
+  const known = {
+    pluginRoot: $.plugin.root,
+    hasTypes: (await read($, typesState)) !== '',
+    upstreamPr: await readUpstreamPr(ioOf($), await claudeDirOf($)),
+    prTemplate: template.path,
+    hasOwnPrTemplate: template.source !== 'shipped',
+  }
+  return varsOf(settings, { ...NO_FACTS, ...known, ...facts })
 }
 
-/** The plugin's scripts folder (land.sh, task_pr.py, …). */
-const binOf = ($: EngineInterface) => `${$.plugin.root}/bin`
+/** The old overrides in .claude/tasks/ (coordinator.md, teammate.md), read as overrides of lead.md and teammate.md. */
+async function legacyOverride($: EngineInterface, name: RuleFile): Promise<string | undefined> {
+  const old = name === 'lead.md' ? 'coordinator' : name === 'teammate.md' ? 'teammate' : undefined
+  if (!old) return undefined
+  const text = await $.fs.read(`${await $.session.root()}/${overridePath(old)}`).catch(() => undefined)
+  if (text === undefined) return undefined
+  return text.trimStart().startsWith(EXTEND) ? text : `---\nreplace: true\n---\n${text}`
+}
+
+/** One instruction, rendered now. A project override that doesn't render (a typo in a tag) is logged and left out. */
+async function ruleNow($: EngineInterface, name: RuleFile, facts: Partial<Facts> = {}): Promise<string> {
+  const vars = await varsNow($, facts)
+  const sources = sourcesOf($)
+  try {
+    return await renderRule(name, sources, vars, await legacyOverride($, name))
+  } catch (error) {
+    logFailure($, `the project's ${TEMPLATES_DIR}/${name}`, error)
+    return renderRule(name, { ...sources, project: async () => undefined }, vars)
+  }
+}
+
+/** The lead's rules as the session started with them (its system prompt keeps them), and both texts as last sent. */
+async function rememberRules($: EngineInterface): Promise<RulesSent> {
+  const sent = { shown: await ruleNow($, 'lead.md'), lead: '', teammate: await ruleNow($, 'teammate.md') }
+  sent.lead = sent.shown
+  await update($, rulesState, () => sent)
+  return sent
+}
+
+/** A setting changed mid-session: the changed sections, once, as replacing the old ones (the system prompt stays as it started). */
+async function changedRulesNote($: EngineInterface): Promise<string> {
+  const before = await read($, rulesState)
+  if (!before.shown) return ''
+  const now = { lead: await ruleNow($, 'lead.md'), teammate: await ruleNow($, 'teammate.md') }
+  if (now.lead === before.lead && now.teammate === before.teammate) return ''
+  await update($, rulesState, sent => ({ ...sent, ...now }))
+  return rulesChangedNote(changedSections(before.lead, now.lead), changedSections(before.teammate, now.teammate))
+}
+
 
 /** A setting's on/off question: `field` is its key in the project's config.json. */
 /** `answers`: the yes and no labels, when "Enable (recommended)" and "No" don't say what happens. */
@@ -812,7 +853,9 @@ async function checkStatus($: EngineInterface, settings: Settings): Promise<void
     fingerprint: fingerprintOf(tasks, team, await unclosedIds($)),
   })
   await update($, statusState, () => next)
-  if (fire) void $.prompt.submit({ text: statusPrompt(Math.round((now - check.activeAt) / 60_000)) }).catch(() => undefined)
+  if (!fire) return
+  const text = await ruleNow($, 'status-check.md', { idleMinutes: Math.round((now - check.activeAt) / 60_000) })
+  void $.prompt.submit({ text }).catch(() => undefined)
 }
 
 /** The tasks the user resolved that are still open; closed ones leave the list, so a reopened task is not closed again. */

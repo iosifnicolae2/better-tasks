@@ -40,24 +40,3 @@ export function teammateTypes(models: TeammateModels): TeammateType[] {
     ...models[level],
   }))
 }
-
-/** What the lead reads about picking a teammate's model and effort, from the settings. */
-export function leadModelRules(models: TeammateModels): string {
-  const escalation = models.escalate
-    ? `- A teammate that is not reaching the goal (it fails, says it is stuck, goes in circles, or the user asks for the same fix twice): its successor ("login-2") moves one level up, easy to \`${typeOf('normal')}\`, normal to \`${typeOf('hard')}\`. A hard one stays hard: ask the user how to go on. A plain handover (high context, cold cache) keeps the type.`
-    : "- Escalation is off: a successor keeps its predecessor's type, even when it was stuck."
-  return `## Teammate models (settings)
-Pick it with the spawn's subagent_type, which sets model and effort; never pass \`model\`.
-${LEVELS.map(level => `- ${ABOUT[level].tasks} (${ABOUT[level].examples}): \`${typeOf(level)}\`, ${describeChoice(models[level])}.`).join('\n')}
-- Unsure: normal.
-${escalation}`
-}
-
-/** What a teammate below the hard level reads: report being stuck, so the lead can move the task up. */
-export const STUCK_RULE = `## Stuck?
-Not reaching the goal after real attempts, or going in circles? Stop: write what you tried in the task file's notes and tell the lead in one line. It may hand the task to a stronger teammate.`
-
-/** The settings-driven rules for a teammate's spawn prompt: only below the hard level, only while escalation is on. */
-export function teammateModelRules(models: TeammateModels, type: string | undefined): string {
-  return models.escalate && type !== typeOf('hard') ? STUCK_RULE : ''
-}

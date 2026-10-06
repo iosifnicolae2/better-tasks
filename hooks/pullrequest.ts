@@ -1,4 +1,3 @@
-import { skillCall } from './skills'
 
 // The PR flows (gitflow.ts: worktree-prs, and dev-prs for the Finishing line): in worktree-prs each teammate
 // works in its own worktree and finishes with a GitHub pull request, its before/after video (demovideo.ts)
@@ -40,20 +39,3 @@ export function ghUpdateVerdict(output: string): { isReady: boolean; text: strin
   return { isReady: word === 'ready', text: `GitHub CLI updated (${version.split(' ')[2] ?? version}): PRs carry their video.${login}` }
 }
 
-
-/** A PR flow's last step in the teammate's prompt: the how-to is the pull-request skill (skills/pull-request). */
-export const PR_DONE_LINE = `- The PR opens at done, before the user is asked, with its video: the \`${skillCall('pull-request')}\` skill (the done skill says when); that skill again when the lead asks you to update it. Never merge it yourself.`
-
-export const PR_TEAMMATE_RULES = `## Pull request per task (on in this project)
-You work in your own git worktree, on its own branch; the project's main checkout stays as it is. This setting is the user's ask for branches and PRs.
-- Commit there as usual, small and often.
-${PR_DONE_LINE}`
-
-/** The openPrInBrowser setting's line: the PR, its video uploaded, is on screen and loaded when its question comes (never after the user approved). Its own line, so the dev-prs flow takes it too (finishingOf). */
-export const openPrLine = (bin: string) =>
-  `- A finished task with a PR: right before its question, run \`${bin}/open-pr.sh <url>\`: once the PR's video is uploaded it opens the PR in the default browser and waits a few seconds for the page to load; then ask. It says "not ready" (the video not uploaded yet): tell the teammate to finish its PR, and ask once it has. Never open it again after the user's answer.`
-
-export const prCoordinatorRules = (openPrInBrowser: boolean, bin: string) => `## Pull request per task (on)
-- A finished task's notes hold "PR: <url>"; its question links only the PR; the video's path and the PR sit above it, in Links. "Mark as resolved" merges: its description says "merge the PR and close T-004".${openPrInBrowser ? `\n${openPrLine(bin)}` : ''}
-- Mark as resolved: \`gh pr merge <url> --squash --delete-branch\` (full tests still running: once they pass), then \`git pull --ff-only\` in the project, then close the task with the merge commit. The merge fails (a conflict)? Tell the teammate to update its PR; then merge.
-- Request changes: the teammate pushes to the same PR.`

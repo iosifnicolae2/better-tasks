@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { ghProblem, ghUpdateVerdict, hasGitHub, openPrLine, prCoordinatorRules, PR_TEAMMATE_RULES } from '../hooks/pullrequest'
+import { ghProblem, ghUpdateVerdict, hasGitHub } from '../hooks/pullrequest'
 import { settingsOf } from '../hooks/settings'
 
 describe('PR per task', () => {
@@ -34,25 +34,4 @@ describe('PR per task', () => {
     expect(hasGitHub('')).toBe(false)
   })
 
-  test('the question links the PR; "Mark as resolved" merges it with no new round', () => {
-    expect(prCoordinatorRules(true, '/bin')).toContain('its question links only the PR')
-    expect(prCoordinatorRules(true, '/bin')).toContain('Mark as resolved: `gh pr merge <url> --squash --delete-branch`')
-    expect(prCoordinatorRules(true, '/bin')).toContain('Request changes: the teammate pushes to the same PR.')
-    expect(prCoordinatorRules(true, '/bin')).toContain('gh pr merge <url> --squash --delete-branch')
-  })
-
-  test('openPrInBrowser: the lead opens the PR right before its question, never after the answer; off, it does not', () => {
-    expect(prCoordinatorRules(true, '/bin')).toContain(openPrLine('/bin'))
-    expect(openPrLine('/bin')).toContain('right before its question, run `/bin/open-pr.sh <url>`')
-    expect(openPrLine('/bin')).toContain('Never open it again after the user\'s answer.')
-    expect(openPrLine('/bin')).not.toContain('merging')
-    expect(prCoordinatorRules(false, '/bin')).not.toContain('default browser')
-    expect(prCoordinatorRules(false, '/bin')).toContain('gh pr merge <url> --squash --delete-branch')
-  })
-
-  test("the teammate's prompt keeps the worktree and a pointer: the how-to is the pull-request skill", () => {
-    expect(PR_TEAMMATE_RULES).toContain('You work in your own git worktree')
-    expect(PR_TEAMMATE_RULES).toContain('The PR opens at done, before the user is asked, with its video: the `better-tasks:pull-request` skill')
-    expect(PR_TEAMMATE_RULES).not.toContain('gh pr create')
-  })
 })

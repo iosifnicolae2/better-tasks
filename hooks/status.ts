@@ -37,20 +37,3 @@ export function statusDecision(facts: StatusFacts): { fire: boolean; check: Stat
   if (facts.fingerprint === check.fingerprint) return { fire: false, check: { ...check, checkedAt: now, quiet: check.quiet + 1 } }
   return { fire: true, check: { ...check, checkedAt: now, quiet: 0, fingerprint: facts.fingerprint } }
 }
-
-/** The prompt the coordinator gets. */
-export function statusPrompt(idleMinutes: number): string {
-  return (
-    `better-tasks status check: no activity for ${idleMinutes} min. Move the work forward.\n` +
-    '1. Call team_status.\n' +
-    '2. For each task currently working on or in this sprint, act:\n' +
-    '   - the user marked it resolved but it is still open: close it now (task_update status done, summary, commits; full tests still running: once they pass), stop the teammate;\n' +
-    '   - teammate working: leave it;\n' +
-    '   - teammate reported done: read its task file notes, then ask the user to test it (the Finishing question);\n' +
-    '   - teammate idle but the task still open: check whether the work is done; if not, tell it to go on;\n' +
-    '   - stuck (an error, going in circles): unblock it with SendMessage (a line or two, a file path for the rest), or a fresh teammate by the routing rules;\n' +
-    '   - waiting for the user: one short AskUserQuestion, only if it truly blocks;\n' +
-    '   - nothing running and the user said go: start the next this-sprint task.\n' +
-    '3. Then tell the user in 3–5 short lines: what moved, what is blocked and on whom, what is next. Nothing new since the last report: one line.'
-  )
-}

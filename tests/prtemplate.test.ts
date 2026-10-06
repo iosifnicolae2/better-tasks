@@ -1,7 +1,6 @@
 import type { FsEntry } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
-import { prBodyRules } from '../hooks/gitflow'
 import { findPrTemplate, shippedTemplate, shownPath } from '../hooks/prtemplate'
 
 const file = (name: string): FsEntry => ({ name, kind: 'file', size: 1, mtimeMs: 0, isLink: false })
@@ -41,12 +40,4 @@ describe('the PR template', () => {
     expect(shownPath({ path: '/p/team/pr.md', source: 'custom' }, '/p')).toBe('team/pr.md')
   })
 
-  test("the rules: the project's template filled in, the request and why on top, then the video", () => {
-    const rules = prBodyRules({ path: '/p/.github/pull_request_template.md', source: 'project' })
-    expect(rules).toContain("fills in this project's template, `/p/.github/pull_request_template.md`")
-    const order = ['the user\'s request', 'why it was needed', 'the video', '"## Commits"'].map(part => rules.indexOf(part))
-    expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true)
-    expect(rules).toContain('Never add a template to the repo yourself')
-    expect(prBodyRules({ path: '/plugin/templates/pull_request_template.md', source: 'shipped' })).toContain("better-tasks' template (`/plugin/templates/pull_request_template.md`; this project has none of its own)")
-  })
 })

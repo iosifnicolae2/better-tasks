@@ -780,9 +780,9 @@ for (const surface of SURFACES) {
     expect(await ui.find({ type: 'Text', text: /⚠ .*colour/ })).toBeDefined()
 
     await ui.press({ key: 'file-teammate.md' })
-    expect(files.has(`${ROOT}/.claude/tasks/teammate.md`)).toBe(true)
-    expect(files.has(`${ROOT}/.claude/tasks/coordinator.md`)).toBe(false)
-    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/tasks/teammate.md`])
+    expect(files.has(`${ROOT}/.claude/better-tasks/teammate.md`)).toBe(true)
+    expect(files.has(`${ROOT}/.claude/better-tasks/lead.md`)).toBe(false)
+    expect(commands.at(-1)).toEqual(['open', `${ROOT}/.claude/better-tasks/teammate.md`])
     expect(await ui.findAll({ type: 'Text', text: 'default · create' })).toHaveLength(2)
     expect(await ui.find({ type: 'Text', text: 'custom · open' })).toBeDefined()
   })

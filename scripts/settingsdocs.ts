@@ -116,12 +116,11 @@ const TAIL = `## Per user, outside /config
 |---|---|---|---|---|
 | \`upstreamPr\` | After a change to better-tasks itself (made in the user's fork), offer a PR to the better-tasks repo. never: not asked again. | ask, never | "ask" | \`<claude config dir>/better-tasks/user.json\`; set with the \`upstream_pr\` tool (answer \`ask\` undoes never) |
 
-## Project files in .claude/tasks/
+## Project files
 Open or create them from the settings page ("This project").
-- \`config.json\`: this project's values, above.
-- \`coordinator.md\`: replaces or extends the rules the lead coordinates by.
-- \`teammate.md\`: goes into every named teammate's spawn prompt.
-- \`task-template.md\`: the body a new task file starts with.
+- \`.claude/tasks/config.json\`: this project's values, above.
+- \`.claude/better-tasks/<file>\`: extends better-tasks' instruction of the same name (lead.md, teammate.md, status-check.md, done.md, testing.md, video.md, pull-request.md, contribute.md); "replace: true" in its front matter replaces it. The shipped ones are in the plugin's .claude/better-tasks/.
+- \`.claude/tasks/task-template.md\`: the body a new task file starts with.
 `
 
 /** The whole SKILL.md. */

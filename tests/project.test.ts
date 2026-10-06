@@ -63,12 +63,12 @@ describe('text overrides', () => {
     const starters = starterFiles()
     expect(Object.keys(starters)).toEqual([
       '.claude/tasks/config.json',
-      '.claude/tasks/coordinator.md',
-      '.claude/tasks/teammate.md',
+      '.claude/better-tasks/lead.md',
+      '.claude/better-tasks/teammate.md',
       '.claude/tasks/task-template.md',
       '.claude/tasks/tips.md',
     ])
     expect(parseOverrides(starters['.claude/tasks/config.json'] ?? '')).toEqual({ values: {}, problems: [] })
-    expect(resolveText('Shipped.', starters['.claude/tasks/teammate.md'])).toBe('Shipped.')
+    expect(resolveText('Shipped.', starters['.claude/tasks/tips.md'])).toBe('Shipped.')
   })
 })

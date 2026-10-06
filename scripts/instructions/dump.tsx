@@ -5,6 +5,7 @@
 import { mock, test } from 'claude-code/testing'
 
 import { CONFIG, OPTIONS, SKILLS } from './inputs'
+import { TEMPLATES } from './templates.gen'
 
 const ROOT = '/project'
 const HOME = '/home/me'
@@ -16,7 +17,7 @@ const TASK_TEXT = '---\nid: T-004\ntitle: Fix login redirect\nsprint: 2026-10-05
 const MARK = '@@better-tasks-instructions@@'
 
 test('dump every instruction text', { options: OPTIONS }, async ($, on) => {
-  mock.clock(on, { now: MONDAY })
+  const clock = mock.clock(on, { now: MONDAY })
   mock.store(on)
   const files = new Map<string, string>([[`${ROOT}/.claude/tasks/config.json`, JSON.stringify(CONFIG)], [TASK, TASK_TEXT]])
   const env = new Map([...Object.entries(TEAMS_ON), ['HOME', HOME]])
@@ -46,7 +47,11 @@ test('dump every instruction text', { options: OPTIONS }, async ($, on) => {
   on('agent.register', ($, e) => (out.agents.push({ name: e.name, description: e.description, prompt: e.prompt, model: e.model, effort: e.effort }), { value: { agent: `better-tasks:${e.name}` } }))
   on('tool.register', ($, e) => (out.tools.push({ name: e.name, description: e.description, inputSchema: e.inputSchema }), { value: { tool: `mcp__better-tasks__${e.name}` } }))
   on('command.register', ($, e) => (out.commands.push({ name: e.name, description: e.description }), { value: { command: e.name } }))
-  on('fs.read', ($, e) => (files.has(e.path) ? { value: files.get(e.path)! } : { deny: `ENOENT ${e.path}` }))
+  const template = (path: string) => (path.startsWith(`${ROOT}/`) ? undefined : TEMPLATES[path.match(/\/\.claude\/better-tasks\/([^/]+)$/)?.[1] ?? ''])
+  on('fs.read', ($, e) => {
+    const text = files.get(e.path) ?? template(e.path)
+    return text === undefined ? { deny: `ENOENT ${e.path}` } : { value: text }
+  })
   on('fs.write', ($, e) => (files.set(e.path, e.text), { value: undefined }))
   on('fs.list', ($, e) => {
     const prefix = `${e.path}/`
@@ -74,6 +79,7 @@ test('dump every instruction text', { options: OPTIONS }, async ($, on) => {
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'T-004 Fix login redirect', prompt: 'Task file: .claude/tasks/T-004-fix-login-redirect.md', name: 'login' })
   const entered = await $.prompt.submit({ text: 'hi', origin: { kind: 'composer' }, wait: false })
   out.context = [...(entered.context ?? [])]
-  for (const [name, text] of Object.entries(SKILLS)) out.skills[name] = (await $.skill.prompt({ skill: `better-tasks:${name}`, text })).text
+  for (const name of SKILLS) out.skills[name] = (await $.skill.prompt({ skill: `better-tasks:${name}`, text: '' })).text
+  await clock.advance(11 * 60_000)
   console.log(MARK + JSON.stringify(out))
 })

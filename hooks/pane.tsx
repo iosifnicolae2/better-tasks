@@ -25,6 +25,7 @@ import { changeTask, finishTask, startPrompt } from './taskflow'
 import { isOpen, listTasks, placeOf, saveTask, today, whenOf } from './tasks'
 import { isActive } from './team'
 import { overridePath, starterFiles } from './texts'
+import { OVERRIDE_DIR } from './template'
 
 // The better-tasks pane: /better-tasks opens the board, /better-tasks config its settings page. This file holds `$`.
 // (/tasks is Claude Code's own command, so the pane cannot take that name.)
@@ -211,8 +212,8 @@ async function shiftTask(files: Files, sections: Section[], task: Task, step: -1
 /** The files the settings page offers to open, by label, relative to the project root. */
 const PROJECT_FILES: Record<string, string> = {
   'config.json': CONFIG_FILE,
-  'coordinator.md': overridePath('coordinator'),
-  'teammate.md': overridePath('teammate'),
+  'lead.md': `${OVERRIDE_DIR}/lead.md`,
+  'teammate.md': `${OVERRIDE_DIR}/teammate.md`,
   'task-template.md': overridePath('task-template'),
 }
 

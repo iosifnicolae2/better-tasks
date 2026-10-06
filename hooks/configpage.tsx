@@ -246,7 +246,7 @@ export function isChanged(field: Field, settings: Settings): boolean {
 export type ProjectFacts = {
   /** Bad keys and other problems in config.json. */
   problems: readonly string[]
-  /** The project's own files by label (config.json, coordinator.md, …) and whether each exists. */
+  /** The project's own files by label (config.json, lead.md, …) and whether each exists. */
   files: readonly { label: string; exists: boolean }[]
   /** The PR description's template (prtemplate.ts): its path as shown, and whose it is. */
   prTemplate: { shown: string; source: 'custom' | 'project' | 'shipped' }
@@ -273,8 +273,8 @@ export type ConfigPageProps = {
 
 const FILE_ABOUT: Record<string, string> = {
   'config.json': "This project's values for any setting; they win over /config.",
-  'coordinator.md': 'Replaces or extends the rules the main session coordinates by.',
-  'teammate.md': 'Goes into every named teammate’s spawn prompt.',
+  'lead.md': 'Extends (or replaces) the rules the main session leads by.',
+  'teammate.md': 'Extends (or replaces) every named teammate’s rules.',
   'task-template.md': 'The body a new task file starts with.',
 }
 

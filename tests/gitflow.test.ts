@@ -2,11 +2,10 @@ import type { FsEntry } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
 import {
-  appOf, authorsOf, devLeadRules, devTeammateRules, flowOf, flowOfAnswer, flowOptions, flowQuestion, leadRules, lookAt, megabytesOf, prBodyRules, prSkillSettings,
-  recommend, teammateRules, usesWorktree, WORKTREE_COMMAND_RULES,
+  appOf, authorsOf, flowOf, flowOfAnswer, flowOptions, flowQuestion, lookAt, megabytesOf,
+  recommend, usesWorktree,
 } from '../hooks/gitflow'
 import type { ProjectFacts, Probe } from '../hooks/gitflow'
-import { openPrLine, prCoordinatorRules } from '../hooks/pullrequest'
 
 const SOLO_LIGHT: ProjectFacts = { hasGitHub: true, cacheMb: 300, app: '', authors: 1, prChecks: false }
 
@@ -79,45 +78,6 @@ describe('git flow', () => {
     expect(flowOfAnswer('let me think')).toBeUndefined()
   })
 
-  test("each flow's teammate rules say how to commit; the PR flows point at the pull-request skill", () => {
-    expect(teammateRules('direct', '/bin', 'dev', 'PR')).toContain('`/bin/land.sh -m "<what changed> (T-004)" -- <your paths>`')
-    expect(teammateRules('direct', '/bin', 'dev', 'PR')).not.toContain('pull-request')
-    const dev = devTeammateRules('/bin', 'develop')
-    expect(dev).toContain('`/bin/land.sh -b develop -m')
-    expect(dev).toContain('The PR opens at done, before the user is asked, with its video: the `better-tasks:pull-request` skill')
-    expect(dev).not.toContain('task_pr.py open')
-    expect(teammateRules('worktree-prs', '/bin', 'dev', 'PR RULES')).toBe('PR RULES')
-    expect(teammateRules('direct', '/bin', 'dev', 'PR RULES', true)).toBe('PR RULES') // a bug fix, in its own worktree
-  })
-
-  test('straight to main, the lead merges only bug-fix PRs, with the PR flow\'s lines', () => {
-    const rules = leadRules('direct', '/bin', 'dev', '## Pull request per task (on)\n- Mark as resolved: merge')
-    expect(rules).toContain("no PR, except a bug fix's")
-    expect(rules).toContain('- Mark as resolved: merge')
-    expect(rules).not.toContain('## Pull request per task')
-  })
-
-  test("the pull-request skill reads its flow's part and the description rule, in the request-why-solution order", () => {
-    const dev = prSkillSettings('dev-prs', 'develop', prBodyRules())
-    expect(dev).toMatch(/^- Git flow: shared dev branch `develop`: follow "Shared dev branch"\.\n- The PR's description/)
-    expect(prSkillSettings('worktree-prs', 'dev', 'BODY')).toBe('- Git flow: worktree and PR per task: follow "Worktree and PR per task".\nBODY')
-    expect(prSkillSettings('direct', 'dev', 'BODY')).toBe('- Git flow: straight to main: only a bug fix, in its own worktree, has a PR: follow "Worktree and PR per task".\nBODY')
-    const order = ['## Asked for', '## Why', 'the video', '## What changed', '## To test', '## Commits'].map(part => dev.indexOf(part))
-    expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true) // the request, why, the solution, then the rest
-  })
-
-  test("the dev flow's lead rules take the PR flow's Finishing line as it is", () => {
-    const pr = '## Pull request per task (on)\n- A finished task\'s notes hold "PR: <url>". Show it.\n- Mark as resolved: merge.'
-    const lead = devLeadRules('/bin', 'dev', pr)
-    expect(lead).toContain('- A finished task\'s notes hold "PR: <url>". Show it.')
-    expect(lead).not.toContain('- Mark as resolved: merge.')
-    expect(lead).toContain('python3 /bin/task_pr.py sync')
-  })
-
-  test("the dev flow's lead opens the PR in the browser too, when the setting is on", () => {
-    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(true, '/bin'))).toContain(openPrLine('/bin'))
-    expect(devLeadRules('/bin', 'dev', prCoordinatorRules(false, '/bin'))).not.toContain('default browser')
-  })
 })
 
 const dir = (name: string): FsEntry => ({ name, kind: 'dir', size: 0, mtimeMs: 0, isLink: false })
@@ -167,18 +127,5 @@ describe('looking at a project', () => {
   test('du out of time: the cache counts as too big to measure', async () => {
     const lists: Record<string, FsEntry[]> = { '/p': [dir('target')] }
     expect((await lookAt(probeOf(lists, [], GITHUB, TWO_PEOPLE, undefined))).cacheMb).toBeUndefined()
-  })
-})
-
-describe('gh and git in a worktree (T-040: the shapes Claude Code refuses, tested for real)', () => {
-  test('names the refused shapes, the fine ones, the PR-checks watch and the script fallback', () => {
-    for (const refused of ['`( … )` subshell', '`{ …; }` group', 'a function', '`bash -c`', 'heredoc', '`[[ … ]]`', '`git -C` to another checkout']) {
-      expect(WORKTREE_COMMAND_RULES).toContain(refused)
-    }
-    expect(WORKTREE_COMMAND_RULES).toContain('pipes, jq `\\(.x)`, `$( … )`, for/while, if, case')
-    expect(WORKTREE_COMMAND_RULES).toContain('`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>`')
-    expect(WORKTREE_COMMAND_RULES).toContain('`gh run watch <id> --exit-status --compact`')
-    expect(WORKTREE_COMMAND_RULES).toContain('a gh argument (a title, a search) that starts with "git", or has a quote mark and the word git')
-    expect(WORKTREE_COMMAND_RULES).toContain('Write a script to your scratchpad and run it by its path')
   })
 })

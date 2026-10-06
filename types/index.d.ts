@@ -83,6 +83,8 @@ declare module 'claude-code' {
       turn: TurnFacts
       /** The teammate agent types as last registered (JSON of their specs); '' until they are. */
       teammateTypes: string
+      /** The lead's rules as its system prompt shows them this session, and the lead and teammate rules as last sent. */
+      rulesSent: { shown: string; lead: string; teammate: string }
       /** Where the wheel left the board's list window; it holds while that task stays selected. */
       listScroll: { start: number; selectedId: string }
       /** The board's search box: shown or not, and its text. */

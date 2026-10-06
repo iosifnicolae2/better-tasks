@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { defaultBrowserId, setupVerdict, videoPage, videoPagePath, videoPointer, videoSkillSettings, voiceDir } from '../hooks/demovideo'
+import { defaultBrowserId, setupVerdict, videoPage, videoPagePath, voiceDir } from '../hooks/demovideo'
 import { PROJECT_KEYS, settingsOf } from '../hooks/settings'
 
 describe('before/after videos', () => {
@@ -15,21 +15,10 @@ describe('before/after videos', () => {
     expect(PROJECT_KEYS).toContain('releaseVideos')
   })
 
-  test('video quality: 1080p medium unless chosen; the video skill reads it, the prompt its capture size', () => {
+  test('video quality: 1080p medium unless chosen', () => {
     expect(settingsOf({}).videoQuality).toBe('medium')
     expect(settingsOf({ videoQuality: 'low' }).videoQuality).toBe('low')
     expect(settingsOf({ videoQuality: '4k' }).videoQuality).toBe('medium')
-    expect(videoSkillSettings('medium')).toBe('- Video quality: medium: make it with `--quality medium`.')
-    expect(videoPointer('low')).toContain('at 1280x720 or more')
-  })
-
-  test("the teammate's prompt says how to capture, for every task; the video skill loads at done, before the user is asked", () => {
-    expect(videoPointer('medium')).toContain('BEFORE first: before you change anything')
-    expect(videoPointer('medium')).toContain('Every finished task gets one short narrated video, docs, rules and tooling too.')
-    expect(videoPointer('medium')).toContain('labeled BEFORE and AFTER')
-    expect(videoPointer('medium')).not.toContain('No video')
-    expect(videoPointer('medium')).toContain('made at done, before the user is asked: the `better-tasks:video` skill')
-    expect(videoPointer('medium')).not.toContain('demo-video.sh')
   })
 
   test('the voice lives outside any project: its own folder, else XDG data, else ~/.local/share', () => {

@@ -12,13 +12,15 @@ Ask Claude for the change. It forks this repo, makes the change there, runs the 
 - `sh scripts/open-pr-check.sh`: checks `bin/open-pr.sh` sends the gh token only to GitHub.
 - `sh scripts/record-display-check.sh` (macOS): checks `bin/record-display.sh`: own display per project, one recording at a time, a killed recording frees its turn, the chosen test screen and its fallback.
 - `bun scripts/settings-doc.ts`: regenerates the settings skill after a setting changes (`--check` says whether it is current).
-- `bun scripts/skills-check.ts`: checks the skills still say what the prompts rely on.
+- `bun scripts/skills-check.ts`: checks each skill has its front matter and its template.
+- `bun scripts/templates.ts`: copies the instruction templates into tests/templates.gen.ts for the tests, after one changes (`--check` says whether it is current).
 - `bun scripts/instructions-doc.ts`: regenerates [docs/instructions.md](docs/instructions.md), every instruction text better-tasks loads, after a rule or skill text changes (`--check` says whether it is current, `--open` opens it).
 
 Tools: `ffmpeg` and `uv` for videos, `gh` for pull requests, `python3` for the shared-dev-branch flow.
 
-## Skills
-Loaded only when their step comes, from [skills/](skills/): teammates load `testing` before they run the app, `video` before a change that shows on screen, `pull-request` to open the PR, `done` to report; the lead loads `contribute` for a change to better-tasks itself. The prompts keep a one-line pointer to each; a loaded skill gets the settings in force under its title.
+## Instructions
+Every text the model reads is a template in [.claude/better-tasks/](.claude/better-tasks/), one file per kind: `lead.md`, `teammate.md`, `status-check.md`, and one per skill. `{% if gitFlow == "direct" %} … {% endif %}` and `{{ devBranch }}` follow the settings (hooks/template.ts); the hooks only render and send them. A project extends one with a file of the same name in its own `.claude/better-tasks/`, or replaces it (`replace: true` in its front matter); `@/<file>` pulls in the shipped one. After editing one: `bun scripts/templates.ts`, `bun scripts/instructions-doc.ts`.
+Skills load only when their step comes: [skills/](skills/)<name>/SKILL.md holds the name and description; the template is its text.
 
 ## Releases
 See [CLAUDE.md](CLAUDE.md): `scripts/release.sh v<next>` after changes reach main; installs get releases, not main.

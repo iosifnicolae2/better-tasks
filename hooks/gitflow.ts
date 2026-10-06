@@ -1,7 +1,6 @@
 import type { FsEntry } from 'claude-code'
 
-import { hasGitHub, PR_DONE_LINE } from './pullrequest'
-import type { PrTemplate } from './prtemplate'
+import { hasGitHub } from './pullrequest'
 
 // The git flow (setting gitFlow): how a teammate's work reaches main. The first start in a project asks
 // which one (recommended from a cheap look at the project, done once) and saves the answer in its
@@ -194,83 +193,3 @@ export function flowOfAnswer(answer: string): GitFlow | undefined {
 }
 
 // ---- The rules each flow adds to the prompts ----
-
-/** A one-checkout flow commits only its own paths: bin/land.sh does it from a private index. */
-function landLine(bin: string, branch: string): string {
-  const onto = branch ? ` -b ${branch}` : ''
-  return `- Commit only your own files: \`${bin}/land.sh${onto} -m "<what changed> (T-004)" -- <your paths>\`. It commits them from a private index, so another teammate's staged files never enter your commit, runs the pre-commit hook, and refuses when the branch moved meanwhile: run it again. Small commits, the task id in the subject.
-- Never \`git add -A\`, \`git commit -a\`, \`git stash\`, \`git checkout -- <file>\`, \`git reset --hard\` or a branch switch: the other teammates work in the same files.`
-}
-
-/** What a PR's description holds, in every PR flow (the user reads it on GitHub, often on a phone): the template it fills in (prtemplate.ts). */
-export function prBodyRules(template?: Pick<PrTemplate, 'path' | 'source'>): string {
-  const ending = 'Drop its <!-- --> comments; keep its checklists, ticking what is true. Never add a template to the repo yourself: the user does it from the settings page.'
-  if (!template || template.source === 'shipped') {
-    const path = template ? ` (\`${template.path}\`; this project has none of its own)` : ''
-    return `- The PR's description fills in better-tasks' template${path}, in plain words, kept short, in this order: "## Asked for": the user's request, in their words from the task file; "## Why": why it was needed, the problem it solves or the feature it adds; the video (the solution: its two lines) when there is one; "## What changed": what was implemented, a few lines; "## To test": the steps; "## Notes": risk, follow-ups, a linked issue, or "None"; "## Commits": one line each, then the task file's path. ${ending}`
-  }
-  return `- The PR's description fills in this project's template, \`${template.path}\` (read it first): each of its sections, in plain words, kept short. At the top, the user's request (their words from the task file) and why it was needed (the problem it solves or the feature it adds): in the template's matching sections, else as "## Asked for" and "## Why" above them; the video (the solution: its two lines) right after those, when there is one. Not in the template? Add at the end: "## Commits", one line each, then the task file's path. ${ending}`
-}
-
-export function directTeammateRules(bin: string): string {
-  return `## Git flow: straight to main (this project)
-One checkout, shared with the other teammates: no branch, no worktree, no PR.
-${landLine(bin, '')}`
-}
-
-export function devTeammateRules(bin: string, dev: string): string {
-  return `## Git flow: shared ${dev} branch, a PR per task (this project)
-One checkout, on \`${dev}\`, shared with the other teammates: no worktree. Installs and tests build \`${dev}\`, so the user tries every change together.
-${landLine(bin, dev)}
-- A commit for two tasks names both ids. Never commit to main.
-${PR_DONE_LINE}`
-}
-
-/**
- * A worktree-isolated teammate's gh/git commands: Claude Code refuses (in Bash and Monitor alike) one it can't
- * prove stays in the worktree. Shapes tested for real in T-040; a script run by its path is never read, so passes.
- */
-export const WORKTREE_COMMAND_RULES = `## gh and git in your worktree
-Claude Code refuses a Bash or Monitor command running gh or git that it can't check stays in your worktree ("too complex to verify").
-- Refused: \`( … )\` subshell, \`{ …; }\` group, a function, \`bash -c\`, heredoc, \`[[ … ]]\`, \`cd\` or \`git -C\` to another checkout.
-- Refused too: a gh argument (a title, a search) that starts with "git", or has a quote mark and the word git: reword it; long text goes in a file (\`--body-file\`).
-- Fine: plain commands, \`;\`, \`&&\`, pipes, jq \`\\(.x)\`, \`$( … )\`, for/while, if, case, \`[ … ]\`.
-- Watch a PR's checks: Bash with run_in_background, one notice when they end: \`gh pr checks <n> --watch --fail-fast >/dev/null; gh pr checks <n>\`. A run: \`gh run watch <id> --exit-status --compact\`.
-- Need more logic? Write a script to your scratchpad and run it by its path; it still targets only your worktree.`
-
-/** Straight to main, a teammate spawned in a worktree is a bug fix (the lead's "New bugs" rules): it gets a PR. */
-export function teammateRules(flow: GitFlow, bin: string, dev: string, prRules: string, isInWorktree = false): string {
-  if (flow === 'dev-prs') return devTeammateRules(bin, dev)
-  return flow === 'worktree-prs' || isInWorktree ? prRules : directTeammateRules(bin)
-}
-
-/** What the pull-request skill reads under its title: which flow's part applies, and how to write the description. */
-export function prSkillSettings(flow: GitFlow, dev: string, body: string): string {
-  if (flow === 'dev-prs') return `- Git flow: shared dev branch \`${dev}\`: follow "Shared dev branch".\n${body}`
-  if (flow === 'worktree-prs') return `- Git flow: worktree and PR per task: follow "Worktree and PR per task".\n${body}`
-  return `- Git flow: straight to main: only a bug fix, in its own worktree, has a PR: follow "Worktree and PR per task".\n${body}`
-}
-
-/** The lead's Finishing line for a PR (the PR link in the question), taken from the PR flow's rules so both say the same. */
-export const finishingOf = (prLeadRules: string) => prLeadRules.split('\n').filter(line => line.startsWith('- A finished task')).join('\n')
-
-export function devLeadRules(bin: string, dev: string, prLeadRules: string): string {
-  return `## Git flow: shared ${dev} branch, a PR per task (on)
-- The project's checkout stays on \`${dev}\`; teammates land there. An install or test for the user builds \`${dev}\`.
-${finishingOf(prLeadRules)}
-- Mark as resolved: \`gh pr merge <url> --squash --delete-branch\` (full tests still running: once they pass), then \`python3 ${bin}/task_pr.py sync\` (main follows origin's main; \`${dev}\` takes it in without a file changing), then close the task with the merge commit. sync refuses: a fix was made on the task branch, not on \`${dev}\`: the owner lands it on \`${dev}\`, then sync again.
-- The merge fails (a conflict): the owner lands what the PR needs on \`${dev}\` and runs open again.`
-}
-
-/** "Straight to main" has PRs only for bug fixes: the PR flow's lines, under their own heading. */
-export function directLeadRules(prLeadRules: string): string {
-  return `## Git flow: straight to main (on)
-- Teammates land on main; no PR, except a bug fix's (its teammate in a worktree, "New bugs from testing"). Its PR:
-${prLeadRules.split('\n').slice(1).join('\n')}`
-}
-
-export function leadRules(flow: GitFlow, bin: string, dev: string, prRules: string): string {
-  if (flow === 'dev-prs') return devLeadRules(bin, dev, prRules)
-  return flow === 'worktree-prs' ? prRules : directLeadRules(prRules)
-}
-

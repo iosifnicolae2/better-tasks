@@ -47,7 +47,7 @@ This is saved in `.claude/settings.json`, pinned to that release (`"ref"`, no au
 `/better-tasks config` (or `c` on the board), Claude Code's `/config`, or per project in `.claude/tasks/config.json`.
 Git flow, teammate models, videos, your PR template, your own instructions for every task, and more. Every setting, its choices and default: [skills/settings/SKILL.md](skills/settings/SKILL.md). Or just ask Claude what you can configure.
 
-Project rules for every task: ask *"set up better-tasks for this project"*, then edit the files in `.claude/tasks/`.
+Project rules for every task: ask *"set up better-tasks for this project"*, then edit the files it makes. To change what the lead or the teammates are told, put a file of the same name as one of [better-tasks' instructions](.claude/better-tasks/) in your project's `.claude/better-tasks/`: it is added after ours, or replaces it with `replace: true` at its top. All of them in one page: [docs/instructions.md](docs/instructions.md).
 
 ## 🔄 Update / uninstall
 

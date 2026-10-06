@@ -5,7 +5,6 @@ import { realigned, rolledOver, shippedIn } from '../hooks/boundary'
 import { goalOf, withGoal, withReview } from '../hooks/sprintlog'
 import { logRow } from '../hooks/taskflow'
 import { isQuestion, openTaskLines } from '../hooks/coordinator'
-import { SHIPPED } from '../hooks/texts'
 import { spawnTask, taskIdIn, withSummary } from '../hooks/spawn'
 import { bodyOf, edgeOrder, formatTask, nextId, parseTask, placeOf, slugOf, whenOf, withGoalText, withNote } from '../hooks/tasks'
 
@@ -161,14 +160,6 @@ describe('filing messages', () => {
 
   test('a new goal replaces the Goal section only', () => {
     expect(withGoalText(bodyOf('Old goal.') + '- 2026-10-01: a note\n', 'New goal.')).toBe('## Goal\nNew goal.\n\n## Notes\n- 2026-10-01: a note\n')
-  })
-})
-
-describe('finishing', () => {
-  test('the lead asks about one finished task at a time, then the next', () => {
-    expect(SHIPPED.coordinator).toContain('**One task per question, always.**')
-    expect(SHIPPED.coordinator).toContain('act on its answer, then show the next one\'s links and ask about it')
-    expect(SHIPPED.coordinator).not.toContain('up to 4 in one call')
   })
 })
 
