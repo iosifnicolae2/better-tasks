@@ -2,6 +2,11 @@
 //   display --lock <file> --name <name> --serial <n> [--size WxH]
 //       makes the project's display once and keeps it (no screen redraws per recording), in a row below
 //       the lowest physical screen, so the real screens never move. Kept until stopped (record-display.sh remove).
+//       It looks like the main screen (see `look`); --size sets its "looks like" size instead, the scale still copied.
+//   look                   prints the look the display copies: "w=.. h=.. scale=.. from=<screen>", the main
+//                          screen's (the first real one when the main is virtual); from=fallback (1920x1080, 1x)
+//                          when no real screen answers
+//   fit <display id> [--size WxH]  sets the display's mode to that look at its scale (macOS may start it at 1x)
 //   turn --lock <file> [--label text] [--max-seconds n] [--max-wait n] [--parent pid]
 //       waits for the project's turn (flock: the kernel frees it if this process dies), then holds it
 //       until stopped, until its time is up, or until the parent process ends.
@@ -28,7 +33,7 @@ import IOKit
 
 struct Options {
   var lock = "", name = "better-tasks", label = ""
-  var serial: UInt32 = 1, width = 1920, height = 1080
+  var serial: UInt32 = 1, width = 0, height = 0 // 0: the real screen's
   var maxSeconds = 1200.0, maxWait = 1800.0
   var parent: pid_t = 0
 }
@@ -181,16 +186,48 @@ func arrangeAll() {
 func info(_ id: CGDirectDisplayID) {
   guard let index = activeDisplays().firstIndex(of: id) else { fail("display \(id) is gone") }
   let b = CGDisplayBounds(id)
-  say("x=\(Int(b.minX)) y=\(Int(b.minY)) w=\(Int(b.width)) h=\(Int(b.height)) capture=\(index + 1)")
+  let scale = CGDisplayCopyDisplayMode(id).map { $0.pixelWidth / max(1, $0.width) } ?? 1
+  say("x=\(Int(b.minX)) y=\(Int(b.minY)) w=\(Int(b.width)) h=\(Int(b.height)) scale=\(scale) capture=\(index + 1)")
+}
+
+/** How a screen looks: its size in points, pixels per point, and millimetres per pixel. */
+struct Look {
+  var width = 1920, height = 1080, scale = 1, millimetresPerPixel = 0.28, from = "fallback"
+  var text: String { "w=\(width) h=\(height) scale=\(scale) from=\(from)" }
+}
+
+/** The main screen's look, so apps, text and recordings look the same there; the first real screen's when
+ *  the main one is virtual; the fallback when no real screen answers. */
+func realLook() -> Look {
+  let screens = hardwareScreens()
+  let physical = activeDisplays().filter { isPhysical($0, screens) && CGDisplayMirrorsDisplay($0) == kCGNullDirectDisplay }
+  let main = CGMainDisplayID()
+  guard let id = physical.contains(main) ? main : physical.first,
+        let mode = CGDisplayCopyDisplayMode(id), mode.width > 0, mode.pixelWidth > 0 else { return Look() }
+  let millimetres = CGDisplayScreenSize(id).width
+  return Look(width: mode.width, height: mode.height, scale: max(1, mode.pixelWidth / mode.width),
+              millimetresPerPixel: millimetres > 0 ? millimetres / Double(mode.pixelWidth) : 0.28 / Double(mode.pixelWidth / mode.width),
+              from: screenNames()[id] ?? "Display \(id)")
+}
+
+/** The look the project's display gets: the real one, at --size when given. */
+func wantedLook(_ options: Options) -> Look {
+  var look = realLook()
+  if options.width > 0 && options.height > 0 { look.width = options.width; look.height = options.height }
+  return look
 }
 
 /** The real screens by the names System Settings shows ("Built-in Retina Display", "DELL U2720Q"). */
-func listScreens() {
-  let screens = hardwareScreens()
-  let names = Dictionary(NSScreen.screens.compactMap { screen -> (CGDirectDisplayID, String)? in
+func screenNames() -> [CGDirectDisplayID: String] {
+  Dictionary(NSScreen.screens.compactMap { screen -> (CGDirectDisplayID, String)? in
     guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
     return (number.uint32Value, screen.localizedName)
   }, uniquingKeysWith: { first, _ in first })
+}
+
+func listScreens() {
+  let screens = hardwareScreens()
+  let names = screenNames()
   for id in activeDisplays() where isPhysical(id, screens) && CGDisplayMirrorsDisplay(id) == kCGNullDirectDisplay {
     say("\(id)\t\(names[id] ?? "Display \(id)")")
   }
@@ -281,26 +318,49 @@ func listDdc() {
   }
 }
 
-func makeDisplay(_ options: Options) -> CGVirtualDisplay {
+/** A display that looks like `look`: its size in points, backed by scale times as many pixels (HiDPI). */
+func makeDisplay(_ options: Options, _ look: Look) -> CGVirtualDisplay {
+  let (pixelsWide, pixelsHigh) = (look.width * look.scale, look.height * look.scale)
   let descriptor = CGVirtualDisplayDescriptor()
   descriptor.queue = DispatchQueue.main
   descriptor.name = options.name
-  descriptor.maxPixelsWide = UInt32(options.width)
-  descriptor.maxPixelsHigh = UInt32(options.height)
-  descriptor.sizeInMillimeters = CGSize(width: Double(options.width) * 0.28, height: Double(options.height) * 0.28)
+  descriptor.maxPixelsWide = UInt32(pixelsWide)
+  descriptor.maxPixelsHigh = UInt32(pixelsHigh)
+  descriptor.sizeInMillimeters = CGSize(width: Double(pixelsWide) * look.millimetresPerPixel,
+                                        height: Double(pixelsHigh) * look.millimetresPerPixel)
   descriptor.vendorID = 0xB7A5 // the same ids each time: macOS puts the project's display back where it was
   descriptor.productID = 0x0001
   descriptor.serialNum = options.serial
   guard let display = CGVirtualDisplay(descriptor: descriptor) else { fail("macOS refused to make a virtual display") }
   let settings = CGVirtualDisplaySettings()
-  settings.hiDPI = 0
-  settings.modes = [CGVirtualDisplayMode(width: UInt(options.width), height: UInt(options.height), refreshRate: 30)]
-  if !display.apply(settings) { fail("macOS refused the display's size \(options.width)x\(options.height)") }
+  settings.hiDPI = look.scale > 1 ? 1 : 0
+  settings.modes = [CGVirtualDisplayMode(width: UInt(look.width), height: UInt(look.height), refreshRate: 30)]
+  if !display.apply(settings) { fail("macOS refused the display's look \(look.text)") }
   for _ in 0..<50 where !activeDisplays().contains(display.displayID) {
     RunLoop.main.run(until: Date().addingTimeInterval(0.1))
   }
   if !activeDisplays().contains(display.displayID) { fail("the virtual display did not come up") }
   return display
+}
+
+/** macOS offers the look's mode at 1x and at its scale, and may start at 1x: this picks the one at its scale.
+ *  Run from another process than the display's keeper, which sees no modes for its own display. */
+func fit(_ id: CGDirectDisplayID, _ look: Look) {
+  let options = [kCGDisplayShowDuplicateLowResolutionModes: kCFBooleanTrue] as CFDictionary
+  let pixelsWide = look.width * look.scale
+  for _ in 0..<25 {
+    if CGDisplayCopyDisplayMode(id)?.pixelWidth == pixelsWide { say("ready \(look.text)"); exit(0) }
+    let modes = CGDisplayCopyAllDisplayModes(id, options) as? [CGDisplayMode] ?? []
+    if let mode = modes.first(where: { $0.width == look.width && $0.height == look.height && $0.pixelWidth == pixelsWide }) {
+      var config: CGDisplayConfigRef?
+      if CGBeginDisplayConfiguration(&config) == .success {
+        CGConfigureDisplayWithDisplayMode(config, id, mode, nil)
+        CGCompleteDisplayConfiguration(config, .forSession)
+      }
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+  }
+  fail("macOS kept display \(id) at \(CGDisplayCopyDisplayMode(id).map { $0.pixelWidth / max(1, $0.width) } ?? 0)x, not \(look.scale)x")
 }
 
 // MARK: screens off: disabled, as if unplugged; macOS keeps it after we exit, so every way out turns them on
@@ -362,10 +422,11 @@ func keepDisplay(_ options: Options) -> Never {
   let lock = openLock(options.lock)
   if flock(lock, LOCK_EX | LOCK_NB) != 0 { fail("this project's display is already kept by another process") }
   let before = currentArrangement()
-  let display = makeDisplay(options)
+  let look = wantedLook(options)
+  let display = makeDisplay(options, look)
   placeInRow(display.displayID, before: before)
-  writeHolder(lock, "pid \(getpid()) display \(display.displayID)\n")
-  say("ready id=\(display.displayID) pid=\(getpid())")
+  writeHolder(lock, "pid \(getpid()) display \(display.displayID) \(look.text)\n")
+  say("ready id=\(display.displayID) pid=\(getpid()) look=\(look.width)x\(look.height)@\(look.scale)")
   onSignalsExit()
   RunLoop.main.run()
   exit(0)
@@ -400,6 +461,8 @@ let arguments = CommandLine.arguments.dropFirst()
 switch arguments.first {
 case "display": keepDisplay(parseOptions(arguments.dropFirst()))
 case "turn": holdTurn(parseOptions(arguments.dropFirst()))
+case "fit": fit(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0, wantedLook(parseOptions(arguments.dropFirst(2))))
+case "look": say(wantedLook(parseOptions(arguments.dropFirst())).text)
 case "info": info(CGDirectDisplayID(arguments.dropFirst().first ?? "") ?? 0)
 case "arrange": arrangeAll()
 case "screens": listScreens()
@@ -412,5 +475,5 @@ case "off":
   guard rest.count == 3 else { fail("usage: record_display off <file> <ids> <pid>") }
   screensOff(rest[0], rest[1].split(separator: ",").compactMap { CGDirectDisplayID($0) }, parent: pid_t(rest[2]) ?? 0)
 case "on": screensOn(arguments.dropFirst().first ?? "")
-default: fail("usage: record_display display|turn|info|arrange|screens|virtuals|dim|undim|ddc|off|on ...")
+default: fail("usage: record_display display|turn|look|fit|info|arrange|screens|virtuals|dim|undim|ddc|off|on ...")
 }
