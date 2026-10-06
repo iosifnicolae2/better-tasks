@@ -62,7 +62,7 @@ export type Settings = {
   videoQuality: VideoQuality
   /** A release comes with one video of its tasks' before/after videos (bin/release-video.sh); a project setting. */
   releaseVideos: boolean
-  /** Slow builds or device tests: unrelated tasks share one build, each behind its own feature flag (lead.md, teammate.md). */
+  /** Slow builds or device tests: an instance per task where possible, else unrelated tasks share one build, risky ones behind a feature flag (lead.md, teammate.md). */
   batchDeviceTests: boolean
   /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
   gitFlow: GitFlow

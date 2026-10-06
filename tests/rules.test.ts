@@ -91,10 +91,13 @@ describe('the shipped templates', () => {
     expect(await rule('lead.md', { escalate: false })).not.toContain('a level up')
   })
 
-  test('batched device tests: on by default, the lead batches unrelated tasks behind feature flags and the teammate flags its change; off, neither line', async () => {
+  test('batched device tests: on by default, an instance per task first, a shared build with a flag only for a risky change, flags removed once confirmed; off, neither line', async () => {
     expect(settingsOf({}).batchDeviceTests).toBe(true)
-    expect(await rule('lead.md')).toContain('each behind its own feature flag, so one build and one device run test them all. Once a task is confirmed working, its flag and the old path come out before it closes.')
-    expect(await rule('teammate.md')).toContain('Batched with other tasks for one build? Put your change behind its own feature flag')
+    const lead = await rule('lead.md')
+    expect(lead).toContain('give each task its own instance (simulator, emulator, app copy, test user) and test them in parallel')
+    expect(lead).toContain('low-risk changes as they are; one that must be tested on its own, or may clash with another, behind its own short-lived feature flag')
+    expect(lead).toContain('its flag and the old path come out before it closes')
+    expect(await rule('teammate.md')).toContain('and the lead asks for a feature flag? One for your change, off by default')
     expect(await rule('lead.md', { batchDeviceTests: false })).not.toContain('feature flag')
     expect(await rule('teammate.md', { batchDeviceTests: false })).not.toContain('feature flag')
   })

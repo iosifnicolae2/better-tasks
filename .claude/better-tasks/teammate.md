@@ -8,7 +8,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 - Keep your context lean; commit small and often. Given a predecessor's transcript? Search it.
 - Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Delete captures and build output once you no longer need them.
 {% if batchDeviceTests %}
-- Batched with other tasks for one build? Put your change behind its own feature flag; once it is confirmed working, remove the flag and the old path.
+- Sharing a build with other tasks, and the lead asks for a feature flag? One for your change, off by default, switched by a launch argument or env var; once it is confirmed working, remove the flag and the old path.
 {% endif %}
 {% if isStuckRule %}
 - Not getting there? Stop, note what you tried, tell the lead.
