@@ -48,6 +48,8 @@ export type Paths = {
 export type Settings = {
   editor: Editor
   worktree: boolean
+  /** Teammates' worktrees under Claude Code's isolation checks (isolation "worktree"); off: better-tasks makes them, unchecked (ownworktree.ts). */
+  worktreeSandbox: boolean
   /** The 1-hour prompt cache for teammates and the manager. */
   longCache: boolean
   /** Minutes of quiet before a status check; 0 = off. */
@@ -97,6 +99,7 @@ type Field = { kind: 'string' | 'number' | 'boolean'; values?: readonly string[]
 export const FIELDS: Record<string, Field> = {
   editor: { kind: 'string', values: EDITORS },
   worktree: { kind: 'boolean' },
+  worktreeSandbox: { kind: 'boolean' },
   longCache: { kind: 'boolean' },
   statusEvery: { kind: 'number' },
   maxTeammates: { kind: 'number' },
@@ -136,6 +139,7 @@ export const FIELDS: Record<string, Field> = {
 export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   editor: 'auto',
   worktree: false,
+  worktreeSandbox: false,
   longCache: true,
   statusEvery: 10,
   maxTeammates: 5,
@@ -179,6 +183,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
   return {
     editor: oneOf('editor', EDITORS) as Editor,
     worktree: value('worktree') === true,
+    worktreeSandbox: value('worktreeSandbox') === true,
     longCache: value('longCache') !== false,
     statusEvery: Math.max(0, Number(value('statusEvery')) || 0),
     maxTeammates: Math.max(0, Math.floor(Number(value('maxTeammates')) || 0)),

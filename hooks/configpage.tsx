@@ -140,6 +140,16 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'git',
+    field: 'worktreeSandbox',
+    label: 'Worktree sandbox',
+    describe: 'Off: better-tasks makes each teammate’s worktree, so Claude Code’s checks don’t refuse its git and shell commands; its rules keep it there. On: Claude Code’s isolated worktrees. Your permissions apply either way.',
+    options: ON_OFF,
+    value: settings => (settings.worktreeSandbox ? 'on' : 'off'),
+    initial: 'off',
+    stored: isOn,
+  },
+  {
+    group: 'git',
     field: 'openPrInBrowser',
     label: 'Open PRs in the browser',
     describe: 'When the manager asks you to approve a finished task, it first opens that task’s PR in your default browser.',

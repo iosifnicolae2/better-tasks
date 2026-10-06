@@ -32,7 +32,12 @@ A bug your change made is part of your task, and so is a small one in your area:
 
 ## Git
 {% if isWorktree %}
-Your own worktree and branch, and a PR that merges into main. gh and git commands must plainly stay in your worktree: no subshells, `cd` or `git -C` elsewhere; long text goes in files. Reuse the main checkout's build caches and installed dependencies where the toolchain allows (a shared cache folder, a link), rather than installing or building from scratch.
+{% if isSandboxed %}
+Your own worktree and branch, and a PR that merges into main. gh and git commands must plainly stay in your worktree: no subshells, `cd` or `git -C` elsewhere; long text goes in files.
+{% else %}
+Your own worktree{% if worktreePath %} `{{ worktreePath }}`, on branch `{{ worktreeBranch }}`{% endif %}, and a PR that merges into main. No check holds you in it, so keep to it yourself: start each command with `cd {% if worktreePath %}{{ worktreePath }}{% else %}<your worktree>{% endif %} && `, and read and edit files under it. In the main checkout, edit only your task file: never commit, reset or switch branches there. Any shell form works (subshells, loops, variables).
+{% endif %}
+Reuse the main checkout's build caches and installed dependencies where the toolchain allows (a shared cache folder, a link), rather than installing or building from scratch.
 {% else %}
 A checkout shared with other teammates{% if gitFlow == "dev-prs" %}, on `{{ devBranch }}`{% else %}, on main{% endif %}. Commit only your own files with `{{ bin }}/land.sh` (--help), the task id in the subject: your PR gathers them. Never stage, stash, reset or switch branches others share.
 {% endif %}

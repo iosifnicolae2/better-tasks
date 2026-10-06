@@ -34,6 +34,8 @@ import { ourSkill } from './skills'
 import { changedSections } from './template'
 import type { Sources, Vars } from './template'
 import { IGNORE_COMMIT, isNotIgnored, withIgnoreLine, WORKTREES_FOLDER } from './ignoreworktrees'
+import { addArgs, baseOf, includedFiles, ownWorktreeOf, worktreePaths } from './ownworktree'
+import type { OwnWorktree } from './ownworktree'
 import { spawnTask, withSummary } from './spawn'
 import { fingerprintOf, NO_CHECK, statusDecision } from './status'
 import { startupTips } from './tips'
@@ -193,15 +195,19 @@ export const register: Register = (on, options) => {
     const handover = await handoverOf($, e.name)
     const hasTypes = (await read($, typesState)) !== ''
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
-    const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
-    const teammate = await ruleNow($, 'teammate.md', { isWorktree: isWorktree || e.isolation === 'worktree', isHard: type === typeOf('hard') })
+    const wantsWorktree = (usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation) || e.isolation === 'worktree'
+    const own = wantsWorktree && !settings.worktreeSandbox ? await ownWorktree($, e.name) : undefined
+    const isIsolated = wantsWorktree && own === undefined
+    const teammate = await ruleNow($, 'teammate.md', { isWorktree: wantsWorktree, isIsolated, ownWorktree: own, isHard: type === typeOf('hard') })
     const prompt = [named.prompt, handover, teammate].filter(Boolean).join('\n\n')
+    const { isolation: asked, ...spawn } = e
+    const isolation = isIsolated ? 'worktree' : asked === 'worktree' ? undefined : asked
     return next({
-      ...e,
+      ...spawn,
       description: named.description,
       prompt,
       ...(type === undefined ? {} : { subagent_type: type }),
-      ...(isWorktree ? { isolation: 'worktree' as const } : {}),
+      ...(isolation === undefined ? {} : { isolation }),
     })
   })
 
@@ -529,6 +535,37 @@ async function selfCommit($: EngineInterface, message: string, hadEdits: boolean
   if (hadEdits || !maySelfCommit(settings.gitFlow, branch, settings.devBranch)) return 'Commit it yourself.'
   const committed = await commitShared($, message)
   return committed.exitCode === 0 ? 'Committed; push it for your teammates.' : `Committing it failed: ${committed.stderr.trim()}. Commit it yourself.`
+}
+
+/**
+ * The teammate's own worktree, made with git as Claude Code would (ownworktree.ts), or the one it left
+ * before; undefined when git can't make it (not a repository, say), which spawns it isolated instead.
+ */
+async function ownWorktree($: EngineInterface, name: string): Promise<OwnWorktree | undefined> {
+  const root = await $.session.root()
+  const git = (...args: string[]) => $.process.run(['git', '-C', root, ...args])
+  const worktree = ownWorktreeOf(root, name)
+  if (worktreePaths((await git('worktree', 'list', '--porcelain')).stdout).includes(worktree.path)) return worktree
+  const hasBranch = (await git('rev-parse', '--verify', '--quiet', `refs/heads/${worktree.branch}`)).exitCode === 0
+  const base = baseOf(((await $.settings.read()).worktree as { baseRef?: unknown } | undefined)?.baseRef, (await git('rev-parse', '--abbrev-ref', 'origin/HEAD')).stdout)
+  const added = await git(...addArgs(worktree, base, hasBranch))
+  if (added.exitCode !== 0) {
+    $.ui.log(`better-tasks: making ${name}'s worktree failed (${added.stderr.trim()}); it runs in Claude Code's isolated worktree instead.`)
+    return undefined
+  }
+  await copyIncluded($, root, worktree.path)
+  return worktree
+}
+
+/** The gitignored files .worktreeinclude names, copied into a new worktree, as Claude Code does for its own. */
+async function copyIncluded($: EngineInterface, root: string, worktree: string): Promise<void> {
+  if ((await $.fs.read(`${root}/.worktreeinclude`).catch(() => undefined)) === undefined) return
+  const listed = (...args: string[]) => $.process.run(['git', '-C', root, 'ls-files', '--others', '--ignored', ...args]).then(done => done.stdout)
+  const files = includedFiles(await listed('--exclude-standard'), await listed(`--exclude-from=${root}/.worktreeinclude`))
+  for (const file of files) {
+    await $.process.run(['mkdir', '-p', `${worktree}/${file}`.replace(/\/[^/]*$/, '')])
+    await $.process.run(['cp', '-p', `${root}/${file}`, `${worktree}/${file}`])
+  }
 }
 
 /** A git project's .gitignore gets .claude/worktrees/ once (ignoreworktrees.ts), committed alone; not from inside a worktree. */
