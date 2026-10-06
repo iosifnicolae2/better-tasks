@@ -7,7 +7,7 @@ import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { OFF_LINE } from './projectsetup'
 import { addSource, hasTeamInstall, maySelfCommit, needsPin, pinCommit, pinnedTag, repoUrl, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, updateCommit, withTeamInstall } from './teaminstall'
-import { activeInstall, DECLINED_KEY, listArgv, lsRemoteArgv, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, restartLine, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updateQuestion } from './updatecheck'
+import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArgv, MANAGED_SETTINGS, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, restartLine, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updateQuestion } from './updatecheck'
 import type { Install } from './updatecheck'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder } from './migrate'
@@ -448,10 +448,12 @@ async function updateTo($: EngineInterface, tag: string, install: Install): Prom
   const isPinnedHere = hasTeamInstall(shared) && pinnedTag(shared) !== undefined
   const hadEdits = await hasSharedEdits($)
   const run = async (argv: string[]) => $.process.run(argv, { cwd: await $.session.root(), timeoutMs: 180_000 })
-  const fetchArgv = isPinnedHere ? repinArgv(addSource(shared), tag) : refreshArgv
+  const isDeclared = await isDeclaredByUser($)
+  const fetchArgv = isPinnedHere && !isDeclared ? repinArgv(addSource(shared), tag) : refreshArgv
   if (fetchArgv === undefined) return $.ui.log(`better-tasks: the better-tasks source in ${SHARED_SETTINGS} is not an owner/repo or https URL; update it yourself`)
   const moved = await run(fetchArgv)
   if (moved.exitCode !== 0) return $.ui.log(`better-tasks: could not fetch ${tag}: ${moved.stderr.trim()}`)
+  if (isPinnedHere && isDeclared) await pinSharedTo($, shared, tag)
   const pinNote = isPinnedHere ? ` ${SHARED_SETTINGS} now pins ${tag}. ${await selfCommit($, updateCommit(tag), hadEdits)}` : ''
   const updated = await run(updateArgv(install.scope))
   const now = await installOf($)
@@ -463,6 +465,19 @@ async function updateTo($: EngineInterface, tag: string, install: Install): Prom
 
 const sharedPath = async ($: EngineInterface) => `${await $.session.root()}/${SHARED_SETTINGS}`
 const readShared = async ($: EngineInterface) => $.fs.read(await sharedPath($)).catch(() => undefined)
+
+/** Writes the project's pin itself: `marketplace add` can't, when the user's settings declare the marketplace. */
+async function pinSharedTo($: EngineInterface, shared: string | undefined, tag: string): Promise<void> {
+  const pinned = withTeamInstall(shared, tag)
+  if (pinned !== undefined) await $.fs.write(await sharedPath($), pinned)
+}
+
+/** True when the user's or managed settings declare the better-tasks marketplace (updatecheck.ts). */
+async function isDeclaredByUser($: EngineInterface): Promise<boolean> {
+  const files = [`${await claudeDirOf($)}/settings.json`, ...MANAGED_SETTINGS]
+  const texts = await Promise.all(files.map(file => $.fs.read(file).catch(() => undefined)))
+  return texts.some(declaresMarketplace)
+}
 
 /** The release to pin to: the installed one, or the repo's newest for a linked install (updatecheck.ts). */
 async function pinTagOf($: EngineInterface, shared: string | undefined): Promise<string | undefined> {
