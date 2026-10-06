@@ -21,3 +21,4 @@ The user approved: "Release now" for v0.11.17 with T-087, T-088 and T-089 (#50).
 3. Report the tag, the release URL and the check. Afterwards, remove the temporary clone (no waste on disk).
 
 ## Notes
+- 2026-10-07: released v0.11.17, https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.17; tests 347 pass; ls-tree check 0; no video (no task had one); clone removed.
