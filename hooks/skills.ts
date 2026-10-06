@@ -3,10 +3,10 @@
 // skill.prompt hook puts in its text: the template .claude/better-tasks/<name>.md, rendered with the settings in force.
 
 /** Our skills that follow settings, by folder name; the model calls them better-tasks:<name>. */
-export type SkillName = 'video' | 'testing' | 'done' | 'contribute' | 'pull-request'
+export type SkillName = 'video' | 'testing' | 'done' | 'contribute' | 'pull-request' | 'tester'
 
 const PLUGIN = 'better-tasks'
-const SKILLS: readonly SkillName[] = ['video', 'testing', 'done', 'contribute', 'pull-request']
+const SKILLS: readonly SkillName[] = ['video', 'testing', 'done', 'contribute', 'pull-request', 'tester']
 
 /** The name as the model calls it. */
 export const skillCall = (name: SkillName) => `${PLUGIN}:${name}`
