@@ -42,3 +42,4 @@ Wherever you read a task, it now carries its PR number, "T-078 (#43)": approval 
 PR: https://github.com/iosifnicolae2/better-tasks/pull/44
 T-079 (#44) Reference tasks with their PR number, like "T-078 (#43)"
 Wherever you read a task, it now carries its PR number, "T-078 (#43)": approval questions (header and text), status updates, teammates' notes, the task list, the board, release notes and the release video.
+- 2026-10-06: Accepted. Full tests: `claude plugin test .` 324 pass; yaml-check, video-branch-check, task-pr-check, open-pr-check, record-display-check, settings-doc, skills-check, templates and instructions-doc checks all ok. Review PR #44 closed.
