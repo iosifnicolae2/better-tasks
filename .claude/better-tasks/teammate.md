@@ -22,7 +22,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 5. Report done (`better-tasks:done`). Full tests come after the user's yes.
 
 ## Bugs you find
-A bug your change made is part of your task. Any other: don't fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>".
+A bug your change made is part of your task, and so is a small one in your area: fix it, and say so in your notes and PR. A bigger one, or one in another area: don't fix it; capture it and tell the lead: "New bug: <what>, <how to see it again>, BEFORE: <path>".
 
 ## Git
 {% if isWorktree %}

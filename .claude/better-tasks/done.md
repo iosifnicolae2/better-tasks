@@ -6,7 +6,7 @@ The user approves from links: the PR{% if demoVideos %}, with the video in it{% 
 - The before/after video (`better-tasks:video`).
 {% endif %}
 - The draft PR (`better-tasks:pull-request`). Your task changes a release (its notes, its video, how it's cut)? Also a draft release with your change{% if demoVideos %}, the release video in its notes{% endif %}.
-- Notes in the task file: what changed, the commits, what you couldn't check. End with a short block the lead shows the user, plain words, no jargon:
+- Notes in the task file: what changed, the commits, a small bug you fixed on the way, what you couldn't check. End with a short block the lead shows the user, plain words, no jargon:
 ```
 ### For the user
 PR: <url>
