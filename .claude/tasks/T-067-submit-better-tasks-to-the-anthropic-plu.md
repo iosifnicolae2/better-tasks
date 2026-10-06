@@ -27,6 +27,7 @@ Video: [T-067.mp4](../tasks_videos/T-067.mp4)
 - 2026-10-06: Checks: `claude plugin validate .` passes before and after (T-067/before-validate.txt, after-validate.txt), one warning left: no `version` in plugin.json, kept out per the project rule (finding 1 in submission.md). Not checked: the portal's own validation and security scan (only the portal runs them).
 - 2026-10-06: Not changed, other areas' call (submission.md "Open findings"): the README's sample .mp4 (binary, held for review), unpinned `uv pip install` in bin/kokoro-setup.sh, root CLAUDE.md warning under --strict, release.sh writing `version` / moving a release branch. The policy bans generating audio/video: the Kokoro-narrated videos may draw a question.
 - PR: https://github.com/iosifnicolae2/better-tasks/pull/37
+- 2026-10-06: Accepted. Full tests: claude plugin test . 320 pass, 0 fail; validate passes (version warning). Review PR #37 closed.
 - The submission should track the tag of the next release (v0.11.11), which carries these commits.
 
 ### For the user
