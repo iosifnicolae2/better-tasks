@@ -201,7 +201,7 @@ type Ranges = readonly (readonly [number, number])[]
 export type Hit = { task: Task; where: string; titleMatches: Ranges; snippet: string; snippetMatches: Ranges }
 
 /** The selected task: its section (none for a closed one) and the mode the keys are in. */
-export type Selected = { task: Task; when?: When; mate?: Teammate; isMoving?: boolean; isActing?: boolean; /** Its before/after video's path. */ video?: string; /** Its pull request's link. */ pr?: string }
+export type Selected = { task: Task; when?: When; mate?: Teammate; isMoving?: boolean; isActing?: boolean; /** Its before/after video's path. */ video?: string; /** Its pull request's link. */ pr?: string; /** "waits on T-071 (#39)" while a dependency is open. */ waits?: string }
 
 /** A sprint section's facts for its heading: "Week 40 · Sep 28–Oct 4 · 3 days left". */
 export type SprintFacts = { details: string; isLastDay?: boolean; done?: number; total?: number; goal?: string }
@@ -214,6 +214,8 @@ export type BoardProps = {
   isClosedOpen: boolean
   selected?: Selected
   team: Teammate[]
+  /** Per open task id that waits on others: their refs ("T-071 (#39), T-072"). */
+  blockers?: Record<string, string>
   /** Whether the pane holds the keyboard; the selection is bright only then. */
   hasKeys: boolean
   /** The pane body's height; the list gets what the bottom box leaves. Unknown: no window. */
@@ -343,7 +345,7 @@ function Lit({ ui, text, ranges, indent = '', isDim }: LitProps) {
 }
 
 /** Every line of the list, one row each: the four sections, then the closed tasks. */
-function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team, hasKeys, canSpin, actions }: BoardProps): Line[] {
+function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team, blockers = {}, hasKeys, canSpin, actions }: BoardProps): Line[] {
   const { Text } = ui
   const ids = sections.flatMap(section => section.tasks.map(task => task.id))
   const roles = selected?.isMoving ? rowRoles(ids, selected.task.id) : undefined
@@ -354,7 +356,7 @@ function listLines({ ui, sections, sprints, closed, isClosedOpen, selected, team
     node: (
       <TaskRow ui={ui} task={task} isSelected={task.id === selected?.task.id} hasKeys={hasKeys} role={role} canSpin={canSpin}
         isFirst={ids[0] === task.id} isLast={ids.at(-1) === task.id}
-        owner={team.find(one => one.name === task.owner)} actions={actions} />
+        owner={team.find(one => one.name === task.owner)} blockers={blockers[task.id]} actions={actions} />
     ),
   })
   const stillUnlessSelected = (task: Task): RowRole | undefined =>
@@ -432,6 +434,8 @@ type RowProps = {
   isFirst: boolean
   isLast: boolean
   owner?: Teammate
+  /** The open tasks it waits on, as refs. */
+  blockers?: string
   actions: BoardActions
 }
 
@@ -440,7 +444,7 @@ type RowProps = {
  * While a task moves, the title is a button only on it and its two neighbours (the slots ↑ and ↓
  * land on); the moving row with no row above or below gets a ▲ or ▼ slot of its own instead.
  */
-function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast, owner, actions }: RowProps) {
+function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast, owner, blockers, actions }: RowProps) {
   const { Box, Button, Text } = ui
   const isMoving = role === 'moving'
   const isClosed = !isOpen(task)
@@ -468,6 +472,7 @@ function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast
       {!isMoving && !isClosed && owner?.percent !== undefined && <Text color="subtle">{percentText(owner)}</Text>}
       {!isMoving && !isClosed && owner?.cache === 'cold' && <Text color="warning">cold</Text>}
       {!isMoving && !isClosed && task.rolled > 0 && <Text color="subtle">↻{task.rolled}</Text>}
+      {!isMoving && blockers && <Text color="warning">⧗ {blockers}</Text>}
     </Box>
   )
 }
@@ -531,7 +536,7 @@ function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps,
         {mate ? (
           <Text wrap="truncate-end"><Text>{mate.name}</Text><Text color="subtle"> · </Text><MateFacts ui={ui} mate={mate} /></Text>
         ) : (
-          <Text color="subtle">{statusWords(task)}</Text>
+          <Text color="subtle" wrap="truncate-end">{[statusWords(task), selected.waits].filter(Boolean).join(' · ')}</Text>
         )}
       </DetailLine>
       {selected.isMoving ? <MovingLines ui={ui} /> : when ? <ActionLines ui={ui} selected={selected} when={when} hasKeys={hasKeys} actions={actions} /> : <ClosedLines ui={ui} task={task} video={selected.video} pr={selected.pr} actions={actions} />}

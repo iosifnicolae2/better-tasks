@@ -6,7 +6,22 @@ import type { Settings } from './settings'
 import { readSprints, withGoal, writeSprints } from './sprintlog'
 import { nextSprint, sprintLabel, sprintStart } from './sprints'
 import { changeTask } from './taskflow'
-import { createTask, findTask, isOpen, listTasks, taskLine, taskRef, today, WHEN_LABELS, whenOf } from './tasks'
+import {
+  createTask,
+  dependencyProblem,
+  findTask,
+  isOpen,
+  listTasks,
+  nextId,
+  taskLine,
+  taskRef,
+  taskWithId,
+  today,
+  unblockedBy,
+  waitsText,
+  WHEN_LABELS,
+  whenOf,
+} from './tasks'
 import { cacheText, findMate, mateLine, refreshTeam } from './team'
 import { searchTasks } from './search'
 import { initProject } from './texts'
@@ -15,6 +30,11 @@ import { initProject } from './texts'
 
 const WHEN = { type: 'string', enum: ['now', 'this-sprint', 'next-sprint', 'backlog'] }
 const STATUS = { type: 'string', enum: ['todo', 'doing', 'done', 'cancelled'] }
+const DEPENDS_ON = {
+  type: 'array',
+  items: { type: 'string' },
+  description: 'Ids of the tasks it needs done first: same files or area, needs their result, or ships after them',
+}
 
 export const TOOLS: readonly ToolSpec[] = [
   {
@@ -22,17 +42,19 @@ export const TOOLS: readonly ToolSpec[] = [
     description:
       'Create a task file. By default it goes to "currently working on" (when: now) and you route it at once. ' +
       'Only when the user names a sprint or the backlog, pass when: this-sprint, next-sprint or backlog; then nothing starts. ' +
-      "Put the user's words and decisions in goal: written once here, the teammate reads them from the file.",
+      "Put the user's words and decisions in goal: written once here, the teammate reads them from the file. " +
+      'dependsOn: the open tasks it must wait for; it starts once they are done.',
     inputSchema: {
       type: 'object',
-      properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN },
+      properties: { title: { type: 'string' }, goal: { type: 'string' }, when: WHEN, dependsOn: DEPENDS_ON },
       required: ['title', 'goal'],
     },
   },
   {
     name: 'task_update',
     description:
-      'Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note. ' +
+      'Change a task: status, when (moves it between sprints), owner (teammate name), title, goal, a dated note, ' +
+      'dependsOn (replaces its list; [] clears it). ' +
       'Only the lead closes a task (status done or cancelled), once the user resolves it. ' +
       'status "done" also logs it in the finished-task log (the logFile setting; pass a summary as note, and the commits).',
     inputSchema: {
@@ -46,6 +68,7 @@ export const TOOLS: readonly ToolSpec[] = [
         goal: { type: 'string' },
         note: { type: 'string' },
         commits: { type: 'string', description: 'With status done: the commits, from the task file' },
+        dependsOn: DEPENDS_ON,
       },
       required: ['id'],
     },
@@ -113,6 +136,7 @@ type Input = {
   sprint?: string
   query?: string
   limit?: number
+  dependsOn?: string[]
 }
 
 /** The call as the hook saw it: the tool's short name, its input, and who called. */
@@ -123,17 +147,33 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
   const { input } = run
   if (run.name === 'task_create') {
     const when = input.when ?? 'now'
-    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when })
-    const next = when === 'now' ? 'Route it now: the owner of its area, or a new teammate.' : 'Not started: it waits in its sprint.'
+    const tasks = await listTasks(io)
+    const dependsOn = canonical(input.dependsOn, tasks)
+    const problem = dependencyProblem(nextId(tasks, settings.tasks), dependsOn, tasks)
+    if (problem) return { deny: problem }
+    const task = await createTask(io, { title: input.title ?? '', goal: input.goal ?? '', when, dependsOn })
+    const waits = waitsText(task, tasks)
+    const next =
+      when !== 'now' ? 'Not started: it waits in its sprint.'
+      : waits ? `Not started: it ${waits}; start it once they are done.`
+      : 'Route it now: the owner of its area, or a new teammate.'
     return { result: `Created ${task.id} (${WHEN_LABELS[when]}): ${task.file}. ${next}` }
   }
   if (run.name === 'task_update') {
-    const task = await findTask(io, input.id ?? '')
+    const tasks = await listTasks(io)
+    const task = taskWithId(tasks, input.id ?? '')
     if (!task) return { deny: `No task ${input.id}.` }
     if (isClosing(input.status) && run.agentId !== undefined) return { deny: leadCloses(task) }
-    const changed = await changeTask(io, task, input, config)
-    const line = taskLine(changed, await today(io), config)
-    return { result: input.note ? `${line}\n${await ownerHint(io, changed)}` : line }
+    const dependsOn = input.dependsOn && canonical(input.dependsOn, tasks)
+    const problem = dependsOn && dependencyProblem(task.id, dependsOn, tasks)
+    if (problem) return { deny: problem }
+    const changed = await changeTask(io, task, { ...input, dependsOn }, config)
+    const day = await today(io)
+    const after = await listTasks(io)
+    const lines = [taskLine(changed, day, config, after)]
+    if (input.note) lines.push(await ownerHint(io, changed))
+    if (isClosing(input.status) && isOpen(task)) lines.push(unblockedLine(changed, after, day, config))
+    return { result: lines.filter(Boolean).join('\n') }
   }
   if (run.name === 'task_note') {
     const task = await findTask(io, input.id ?? '')
@@ -150,6 +190,23 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
 }
 
 const isClosing = (status: TaskStatus | undefined) => status === 'done' || status === 'cancelled'
+
+/** The ids as their tasks spell them ("t-71" is T-071's); an unknown one stays as given, for the error to name. */
+const canonical = (ids: readonly string[] = [], tasks: readonly Task[]) => [
+  ...new Set(ids.map(id => taskWithId(tasks, id)?.id ?? id.trim()).filter(Boolean)),
+]
+
+const withWaits = (text: string, task: Task, tasks: readonly Task[]) => {
+  const waits = waitsText(task, tasks)
+  return waits ? `${text} (${waits})` : text
+}
+
+/** After a task closes: the tasks it held that may start now (currently working on or this sprint); later ones wait in their sprint. */
+function unblockedLine(closed: Task, tasks: readonly Task[], day: string, config: Settings['sprint']): string {
+  const due = unblockedBy(closed, tasks).filter(task => ['now', 'this-sprint'].includes(whenOf(task, day, config)))
+  if (due.length === 0) return ''
+  return `Unblocked: ${due.map(task => `${taskRef(task)} ${task.title}`).join('; ')}. Start each now: its owner or a new teammate.`
+}
 
 /** Why a teammate may not close a task, and what it does instead. */
 function leadCloses(task: Task): string {
@@ -169,8 +226,9 @@ async function taskList(io: Io, which: string, settings: Settings): Promise<stri
     backlog: sprint => sprint === 'backlog',
   }
   const pick = picks[which] ?? (() => true)
-  const tasks = (await listTasks(io)).filter(task => pick(task.sprint) && (which === 'all' || isOpen(task)))
-  return tasks.length === 0 ? 'No tasks.' : tasks.map(task => taskLine(task, day, config)).join('\n')
+  const all = await listTasks(io)
+  const tasks = all.filter(task => pick(task.sprint) && (which === 'all' || isOpen(task)))
+  return tasks.length === 0 ? 'No tasks.' : tasks.map(task => taskLine(task, day, config, all)).join('\n')
 }
 
 async function setGoal(io: Io, goal: string, settings: Settings): Promise<string> {
@@ -182,9 +240,10 @@ async function setGoal(io: Io, goal: string, settings: Settings): Promise<string
 
 async function teamStatus(io: Io): Promise<string> {
   const team = await refreshTeam(io)
-  const tasks = (await listTasks(io)).filter(isOpen)
+  const all = await listTasks(io)
+  const tasks = all.filter(isOpen)
   const lines = team.map(mate => {
-    const owned = tasks.filter(task => task.owner === mate.name).map(task => `${taskRef(task)} ${task.title}`)
+    const owned = tasks.filter(task => task.owner === mate.name).map(task => withWaits(`${taskRef(task)} ${task.title}`, task, all))
     return `${mateLine(mate)}${owned.length ? ` · ${owned.join(', ')}` : ''}`
   })
   return lines.length ? lines.join('\n') : 'No teammates.'

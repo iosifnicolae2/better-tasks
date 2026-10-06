@@ -192,6 +192,36 @@ test('a named sprint or the backlog plans the task: placed, not started', async 
   expect(host.files.get(`${TASKS}/T-002-rate-limit.md`)).toContain('sprint: 2026-10-12\nurgent: false')
 })
 
+test('a task that depends on another waits for it: shown blocked, checked on write, and started when its dependency closes', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('then the login emails, once the login works'))
+  const made = await $.tool.call({ ...create, title: 'Login emails', dependsOn: ['t-001'] } as never)
+  expect(String(made.result)).toContain('Created T-002 (currently working on)')
+  expect(String(made.result)).toContain('Not started: it waits on T-001; start it once they are done.')
+  expect(host.files.get(`${TASKS}/T-002-login-emails.md`)).toContain('created: 2026-10-05\ndependsOn: [T-001]\n---')
+
+  const context = (await $.prompt.submit(prompt('what is next?'))).context?.at(-1)
+  expect(context).toContain('Blocked, not started: T-002 Login emails (waits on T-001). Start each once its dependencies are done.')
+  expect(context).not.toContain('Route each now')
+  const listed = await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1' } as never)
+  expect(String(listed.result)).toContain('T-002 [todo] Login emails · currently working on · waits on T-001')
+
+  const unknown = await $.tool.call({ ...create, tool_use_id: 't2', title: 'Other', dependsOn: ['T-009'] } as never)
+  expect(unknown.deny).toBe('No task T-009: dependsOn takes the ids of existing tasks.')
+  const cycle = await $.tool.call({ ...updateT1, dependsOn: ['T-002'] } as never)
+  expect(cycle.deny).toBe('That makes a cycle, T-001 → T-002 → T-001: drop one of these dependencies.')
+  expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).not.toContain('dependsOn')
+
+  const closed = await $.tool.call({ ...updateT1, status: 'done', note: 'Works', commits: 'abc123' } as never)
+  expect(String(closed.result)).toContain('Unblocked: T-002 Login emails. Start each now: its owner or a new teammate.')
+  expect((await $.prompt.submit(prompt('go on'))).context?.at(-1)).toContain('Currently working on, not started yet: T-002 Login emails. Route each now')
+  await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u2', id: 'T-002', dependsOn: [] } as never)
+  expect(host.files.get(`${TASKS}/T-002-login-emails.md`)).not.toContain('dependsOn')
+})
+
 test('each user prompt carries the sprint context', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)

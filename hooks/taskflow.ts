@@ -3,7 +3,7 @@ import type { Files } from './io'
 import { settingsFrom } from './settings'
 import { sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
-import { edgeOrder, listTasks, placeOf, saveTask, taskRef, today, withGoalText, withNote } from './tasks'
+import { edgeOrder, listTasks, placeOf, saveTask, taskRef, today, waitsText, withGoalText, withNote } from './tasks'
 import { oneLine } from './yaml'
 
 // What happens to a task: changed, started, finished (finished ones are logged in docs/tasks.md).
@@ -23,6 +23,8 @@ export type TaskChange = {
   goal?: string
   note?: string
   commits?: string
+  /** The ids it depends on, replacing its list; [] clears it. */
+  dependsOn?: string[]
 }
 
 const cell = (text: string) => text.replace(/\s*\n\s*/g, ' ').replace(/\|/g, '/').trim()
@@ -53,6 +55,7 @@ export async function changeTask(
   if (change.owner !== undefined) next.owner = oneLine(change.owner)
   if (change.status) next.status = change.status
   if (change.title?.trim()) next.title = oneLine(change.title)
+  if (change.dependsOn) next.dependsOn = change.dependsOn
   if (change.goal?.trim()) next.body = withGoalText(next.body, change.goal)
   if (change.note) next.body = withNote(next.body, day, change.note)
   if (change.status === 'done') next = { ...next, urgent: false, sprint: sprintStart(day, config) }
@@ -81,10 +84,11 @@ export function finishTask(files: Files, task: Task, change: TaskChange, config:
   return changeTask(files, task, { ...change, status: 'done' }, config)
 }
 
-/** What to tell the coordinator to start a task now. */
-export function startPrompt(task: Task): string {
+/** What to tell the coordinator to start a task now; one that still waits on others is started as the user asked, with them named. */
+export function startPrompt(task: Task, tasks: readonly Task[] = []): string {
+  const waits = waitsText(task, tasks)
   return (
-    `Start ${task.id} "${task.title}" now. Route it to the teammate that owns this area ` +
+    `Start ${task.id} "${task.title}" now${waits ? ` (it ${waits}; the user starts it anyway)` : ''}. Route it to the teammate that owns this area ` +
     `(check team_status) or spawn one, and give it the task file ${task.file}.`
   )
 }

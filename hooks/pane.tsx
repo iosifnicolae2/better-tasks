@@ -21,7 +21,7 @@ import { goalOf, readSprints } from './sprintlog'
 import { daysLeft, daysLeftLabel, nextSprint, sprintEnd, sprintLabel, sprintStart, weekLabel } from './sprints'
 import type { SprintConfig } from './sprints'
 import { changeTask, finishTask, startPrompt } from './taskflow'
-import { isOpen, listTasks, placeOf, prIn, saveTask, today, whenOf } from './tasks'
+import { blockersOf, isOpen, listTasks, placeOf, prIn, saveTask, taskRef, today, waitsText, whenOf } from './tasks'
 import { isActive } from './team'
 import { overridePath, starterFiles } from './texts'
 import { OVERRIDE_DIR } from './template'
@@ -569,7 +569,11 @@ export function registerPane(on: On, options: PluginOptions): void {
       isActing: selectedTask.id === actingId,
       video: await videoOf($, selectedTask.id),
       pr: prIn(selectedTask.body),
+      waits: isOpen(selectedTask) ? waitsText(selectedTask, tasks) : '',
     }
+    const blockers = Object.fromEntries(
+      open.map(task => [task.id, blockersOf(task, tasks).map(taskRef).join(', ')]).filter(([, refs]) => refs !== ''),
+    )
     const sprints: Partial<Record<When, SprintFacts>> = {
       'this-sprint': { details: sprintDetails(current, settings.sprint, day), isLastDay: daysLeft(day, current, settings.sprint) <= 1, done: doneCount, total: inSprint.length, goal },
       'next-sprint': { details: sprintDetails(nextSprint(current, settings.sprint), settings.sprint) },
@@ -590,7 +594,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       open: task => void leave().then(() => openFile($, settings.editor, task.file)).then(keepFocus(task.id)),
       playVideo: path => void playVideo($, path),
       openPr: url => void openLink($, url),
-      start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task) })).then(keepFocus(task.id)),
+      start: task => void leave().then(() => $.prompt.submit({ text: startPrompt(task, tasks) })).then(keepFocus(task.id)),
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
       toggleClosed: () => void toggleClosed($),
@@ -619,7 +623,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       <Box flexDirection="column" paddingX={1}>
         {header}
         <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
-          team={team} hasKeys={e.props.isFocused} bodyRows={bodyRowsUnder(e.props.scroll.bodyRows)}
+          team={team} blockers={blockers} hasKeys={e.props.isFocused} bodyRows={bodyRowsUnder(e.props.scroll.bodyRows)}
           scrollStart={listScroll.selectedId === selectedTask?.id ? listScroll.start : undefined} onDrawn={list => { drawnList = list }}
           canSpin={e.surface === 'terminal' || e.surface === 'desktop'} search={search} hits={hits} actions={actions} />
       </Box>
