@@ -23,3 +23,4 @@ The user approved: "Release tonight", once T-085 (#49)'s full tests pass. Waits 
 3. Report the tag, the release URL and the ls-tree check.
 
 ## Notes
+2026-10-07: rebased on 9b64dfa (clean), 346 tests pass, pushed; released v0.11.16 (cf51f51) with video; ls-tree .claude/tasks count 0. https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.16
