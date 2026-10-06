@@ -57,7 +57,7 @@ const movingState = atom({ plugin: 'better-tasks', key: 'moving' } as const, '')
 const actingState = atom({ plugin: 'better-tasks', key: 'acting' } as const, '')
 const searchState = atom({ plugin: 'better-tasks', key: 'search' } as const, { isOpen: false, query: '' } as SearchState)
 const listScrollState = atom({ plugin: 'better-tasks', key: 'listScroll' } as const, { start: 0, selectedId: '' })
-/** The settings page turned a setting on: register.tsx sets it up (our own $.config.set reaches no hook of ours). */
+/** The settings page turned a setting on: register.tsx sets it up (our own config writes reach no hook of ours). */
 const turnedOnState = atom({ plugin: 'better-tasks', key: 'turnedOn' } as const, { field: '', count: 0 })
 
 /** The board's list as last drawn; the wheel moves its window from there. */
@@ -418,22 +418,22 @@ export function registerPane(on: On, options: PluginOptions): void {
     const value = field.stored(nextOption(field.options, field.value(await projectSettings(filesOf($, options), options))))
     let written: { deny?: string }
     switch (field.field) {
-      case 'editor': written = await $.config.set({ key: 'better-tasks.editor', value }); break
-      case 'longCache': written = await $.config.set({ key: 'better-tasks.longCache', value }); break
-      case 'statusEvery': written = await $.config.set({ key: 'better-tasks.statusEvery', value }); break
-      case 'keepAwake': written = await $.config.set({ key: 'better-tasks.keepAwake', value }); break
-      case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value }); break
-      case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value }); break
-      case 'videoQuality': written = await $.config.set({ key: 'better-tasks.videoQuality', value }); break
-      case 'easyModel': written = await $.config.set({ key: 'better-tasks.easyModel', value }); break
-      case 'easyEffort': written = await $.config.set({ key: 'better-tasks.easyEffort', value }); break
-      case 'normalModel': written = await $.config.set({ key: 'better-tasks.normalModel', value }); break
-      case 'normalEffort': written = await $.config.set({ key: 'better-tasks.normalEffort', value }); break
-      case 'hardModel': written = await $.config.set({ key: 'better-tasks.hardModel', value }); break
-      case 'hardEffort': written = await $.config.set({ key: 'better-tasks.hardEffort', value }); break
-      case 'escalate': written = await $.config.set({ key: 'better-tasks.escalate', value }); break
-      case 'sprintWeeks': written = await $.config.set({ key: 'better-tasks.sprintWeeks', value }); break
-      case 'sprintStart': written = await $.config.set({ key: 'better-tasks.sprintStart', value }); break
+      case 'editor': written = await $.config.set({ key: 'better-tasks.editor', value: value }); break
+      case 'longCache': written = await $.config.set({ key: 'better-tasks.longCache', value: value }); break
+      case 'statusEvery': written = await $.config.set({ key: 'better-tasks.statusEvery', value: value }); break
+      case 'keepAwake': written = await $.config.set({ key: 'better-tasks.keepAwake', value: value }); break
+      case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value: value }); break
+      case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value: value }); break
+      case 'videoQuality': written = await $.config.set({ key: 'better-tasks.videoQuality', value: value }); break
+      case 'easyModel': written = await $.config.set({ key: 'better-tasks.easyModel', value: value }); break
+      case 'easyEffort': written = await $.config.set({ key: 'better-tasks.easyEffort', value: value }); break
+      case 'normalModel': written = await $.config.set({ key: 'better-tasks.normalModel', value: value }); break
+      case 'normalEffort': written = await $.config.set({ key: 'better-tasks.normalEffort', value: value }); break
+      case 'hardModel': written = await $.config.set({ key: 'better-tasks.hardModel', value: value }); break
+      case 'hardEffort': written = await $.config.set({ key: 'better-tasks.hardEffort', value: value }); break
+      case 'escalate': written = await $.config.set({ key: 'better-tasks.escalate', value: value }); break
+      case 'sprintWeeks': written = await $.config.set({ key: 'better-tasks.sprintWeeks', value: value }); break
+      case 'sprintStart': written = await $.config.set({ key: 'better-tasks.sprintStart', value: value }); break
       default: return next(e)
     }
     if (!written.deny && value === true) await update($, turnedOnState, last => ({ field: field.field, count: last.count + 1 }))
