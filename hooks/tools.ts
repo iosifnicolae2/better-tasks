@@ -139,7 +139,7 @@ export async function runTool(io: Io, run: ToolRun, settings: Settings): Promise
     const task = await findTask(io, input.id ?? '')
     if (!task) return { deny: `No task ${input.id}. Create it with task_create, or check the id with task_list.` }
     const noted = await changeTask(io, task, { note: input.note ?? '' }, config)
-    return { result: `Noted on ${noted.id} ${noted.title}.\n${await ownerHint(io, noted)}` }
+    return { result: `Noted on ${taskRef(noted)} ${noted.title}.\n${await ownerHint(io, noted)}` }
   }
   if (run.name === 'task_search') return { result: await taskSearch(io, input.query ?? '', input.limit, settings) }
   if (run.name === 'task_list') return { result: await taskList(io, input.sprint ?? 'current', settings) }
@@ -214,7 +214,7 @@ async function taskSearch(io: Io, query: string, limit: number | undefined, sett
     .map(({ task, snippet }) => {
       const place = isOpen(task) ? WHEN_LABELS[whenOf(task, day, settings.sprint)] : task.status
       const owner = task.owner ? ` · ${task.owner}` : ''
-      return `${task.id} ${task.title} · ${place}${owner}${snippet ? `: ${snippet}` : ''}`
+      return `${taskRef(task)} ${task.title} · ${place}${owner}${snippet ? `: ${snippet}` : ''}`
     })
     .join('\n')
 }

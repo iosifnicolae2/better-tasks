@@ -3,7 +3,7 @@ import type { Files } from './io'
 import { settingsFrom } from './settings'
 import { sprintStart } from './sprints'
 import type { SprintConfig } from './sprints'
-import { edgeOrder, listTasks, placeOf, saveTask, today, withGoalText, withNote } from './tasks'
+import { edgeOrder, listTasks, placeOf, saveTask, taskRef, today, withGoalText, withNote } from './tasks'
 import { oneLine } from './yaml'
 
 // What happens to a task: changed, started, finished (finished ones are logged in docs/tasks.md).
@@ -32,7 +32,7 @@ export function logRow(task: Task, day: string, session: string, change: TaskCha
   const cells = [
     day,
     owner,
-    `${task.id} ${task.title}`,
+    `${taskRef(task)} ${task.title}`,
     change.note ?? task.title,
     change.commits ?? '',
     `session ${session} teammate ${owner}`,

@@ -1,6 +1,7 @@
 import type { Task } from '../types'
 import type { Files } from './io'
 import { settingsFrom } from './settings'
+import { taskRef } from './tasks'
 
 // sprints.md (path: settings.paths.sprints): one "## <start> · <label>" section per sprint, its goal and review.
 
@@ -40,7 +41,7 @@ export type Review = { shipped: readonly Task[]; rolled: readonly Task[] }
 
 export function withReview(text: string, start: string, label: string, review: Review): string {
   const list = (tasks: readonly Task[]) =>
-    tasks.length === 0 ? '- none\n' : tasks.map(task => `- ${task.id} ${task.title}\n`).join('')
+    tasks.length === 0 ? '- none\n' : tasks.map(task => `- ${taskRef(task)} ${task.title}\n`).join('')
   const block = `\n### Review\nShipped:\n${list(review.shipped)}Rolled over:\n${list(review.rolled)}`
   return withSection(text, start, label, section => `${section.trimEnd()}\n${block}`)
 }
