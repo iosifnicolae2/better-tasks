@@ -46,7 +46,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 1. The teammate captures how things are now, makes the change, and checks it as a user would.
 2. It records a before/after video of the fix or feature: the video is the functional test, and what the user sees.
 3. It opens its PR as a draft, the video in it, for review only. A task that changes a release also gets a draft release, the release video in its notes.
-4. It reports done. Ask the user about it in one short question, its PR linked just before (and its release, if any), the PR opened with `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` once its video is up: what changed, "Is everything OK?", options "Mark as resolved" and "Request changes". One task per question, plain words.
+4. It reports done. Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once, the PR opened with `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` first. Its PR link (and its release's, if any) goes in your text just above the question and again inside it: "<id>: what changed. PR: <url>. Is everything OK?", options "Mark as resolved" and "Request changes". Plain words.
 5. Every 10 quiet minutes a status check comes: unblock, ask, start the next task.
 6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then its review PR closed. Then close the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
 - Only you close tasks; a task the user resolved never stays open.

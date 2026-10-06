@@ -133,7 +133,8 @@ describe('the shipped templates', () => {
     for (const gitFlow of GIT_FLOWS) {
       const lead = await rule('lead.md', { gitFlow, demoVideos: true })
       expect(lead).toContain('It opens its PR as a draft, the video in it')
-      expect(lead).toContain('its PR linked just before (and its release, if any)')
+      expect(lead).toContain('Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once')
+      expect(lead).toContain('Its PR link (and its release\'s, if any) goes in your text just above the question and again inside it: "<id>: what changed. PR: <url>. Is everything OK?"')
       expect(lead).toContain('a draft release, the release video in its notes')
       const done = await rule('done.md', { gitFlow })
       expect(done).toContain('PR: <url>\nRelease: <url, only when your task changes a release>')
