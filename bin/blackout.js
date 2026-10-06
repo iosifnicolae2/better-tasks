@@ -1,7 +1,8 @@
 // Turns the physical screens off until the first mouse move or key press: macOS disables them as if
-// unplugged, so each monitor gets no signal and goes to its own standby (record-display.sh off). A screen
-// macOS won't turn off gets a black window and brightness 0 instead (built-in and Apple screens through
-// DisplayServices, other external screens over DDC/CI). Never DDC standby or power off (see
+// unplugged, so each monitor gets no signal and goes to its own standby (record-display.sh off). One
+// screen stays on to hold the windows and the Dock (the built-in, else the main one), and it and any
+// screen macOS won't turn off get a black window and brightness 0 instead (built-in and Apple screens
+// through DisplayServices, other external screens over DDC/CI). Never DDC standby or power off (see
 // bin/record_display.swift). Virtual displays (the projects' test and recording displays) stay on.
 // Run:     osascript -l JavaScript bin/blackout.js <statusFile> <physicalIds> <displayHelper> [safetySeconds]
 //          physicalIds: the real screens' display ids, "1,2"; empty: guessed (not our virtual vendor id).
@@ -22,7 +23,7 @@ const DISPLAY_SERVICES = '/System/Library/PrivateFrameworks/DisplayServices.fram
 
 function run(argv) {
   if (argv[0] === '--restore') return restore(argv[1], argv[2])
-  if (argv[0] === '--plan') return physicalScreens(argv[1]).map(describe).join('\n')
+  if (argv[0] === '--plan') return plan(physicalScreens(argv[1]).map(displayId)).join('\n')
   const [statusFile, physicalIds, displayHelper, safety] = argv
   const safetySeconds = Number(safety) || Infinity
   const app = $.NSApplication.sharedApplication
@@ -30,24 +31,26 @@ function run(argv) {
 
   const physical = physicalScreens(physicalIds).map(displayId)
   if (physical.length === 0) return writeFile(statusFile, 'failed: no physical screens')
-  const { holder, off } = screensOff(statusFile, physical, displayHelper)
-  const lit = $.NSScreen.screens.js.filter(screen => physical.includes(displayId(screen)) && !off.includes(displayId(screen)))
-  const windows = lit.map(blackWindow)
+  const kept = screenToKeep(physical)
+  const { holder, off } = screensOff(statusFile, physical.filter(id => id !== kept), displayHelper)
+  const lit = physical.filter(id => !off.includes(id))
+  const windows = lit.map(id => [id, blackWindow(id)])
   if (windows.length > 0) {
     app.activateIgnoringOtherApps(true)
     $.NSCursor.hide
   }
-  dimDisplays(statusFile, lit.map(displayId))
+  dimDisplays(statusFile, lit)
   if (off.length === 0) runHelper(displayHelper, 'dim', `${statusFile}.ddc`)
   writeFile(statusFile, 'black')
 
   const shownAt = Date.now()
   while (!userIsBack(shownAt) && secondsSince(shownAt) < safetySeconds) {
+    windows.forEach(([id, window]) => fit(window, id)) // the layout changes as the other screens go off
     $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.25))
   }
 
   // Quickest first: the windows and the Mac's own brightness go at once, then the screens come back on.
-  windows.forEach(window => window.orderOut(null))
+  windows.forEach(([, window]) => window.orderOut(null))
   if (windows.length > 0) $.NSCursor.unhide
   $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.01)) // shows it now
   if (holder && holder.running) { holder.terminate; holder.waitUntilExit }
@@ -82,20 +85,39 @@ function displayId(screen) {
   return screen.deviceDescription.objectForKey('NSScreenNumber').unsignedIntValue
 }
 
-function describe(screen) {
-  return `${displayId(screen)}\t${screen.localizedName.js}`
+/** The screen that stays on, so the windows and the Dock move there and not to a virtual display. */
+function screenToKeep(physical) {
+  return physical.find(id => $.CGDisplayIsBuiltin(id)) ?? physical.find(id => id === $.CGMainDisplayID())
 }
 
-function blackWindow(screen) {
+function plan(physical) {
+  const name = id => $.NSScreen.screens.js.find(screen => displayId(screen) === id)?.localizedName.js
+  return physical.map(id => `${id}\t${name(id)}\t${id === screenToKeep(physical) ? 'stays on, black and dimmed' : 'off'}`)
+}
+
+/** A display's frame in AppKit's coordinates, from CoreGraphics (current even while the layout changes). */
+function frameOf(id) {
+  const bounds = $.CGDisplayBounds(id)
+  const mainHeight = $.CGDisplayBounds($.CGMainDisplayID()).size.height
+  return $.NSMakeRect(bounds.origin.x, mainHeight - bounds.origin.y - bounds.size.height, bounds.size.width, bounds.size.height)
+}
+
+function fit(window, id) {
+  const want = frameOf(id), have = window.frame
+  if (want.origin.x !== have.origin.x || want.origin.y !== have.origin.y
+    || want.size.width !== have.size.width || want.size.height !== have.size.height) window.setFrameDisplay(want, true)
+}
+
+function blackWindow(id) {
   const window = $.NSWindow.alloc.initWithContentRectStyleMaskBackingDefer(
-    screen.frame, $.NSWindowStyleMaskBorderless, $.NSBackingStoreBuffered, false)
+    frameOf(id), $.NSWindowStyleMaskBorderless, $.NSBackingStoreBuffered, false)
   window.backgroundColor = $.NSColor.blackColor
   window.level = $.CGShieldingWindowLevel()
   window.collectionBehavior = $.NSWindowCollectionBehaviorCanJoinAllSpaces
     | $.NSWindowCollectionBehaviorStationary
     | $.NSWindowCollectionBehaviorFullScreenAuxiliary
   window.releasedWhenClosed = false
-  window.setFrameDisplay(screen.frame, true)
+  window.setFrameDisplay(frameOf(id), true)
   window.orderFrontRegardless
   return window
 }
