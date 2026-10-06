@@ -2,8 +2,8 @@
 id: T-072
 title: Release v0.11.12 (plugin directory validation fixes)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-2
 rolled: 0
 order: -4
@@ -24,3 +24,4 @@ The user approved this plan: release v0.11.12 once the portal shows 0 blocking i
 
 ## Notes
 - 2026-10-06: v0.11.12 published: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.12. Local main matched c1cd830's plugin content; pushed. Run from a temporary clean clone (config.json left untouched). No video: no task since v0.11.11 had one.
+- 2026-10-06: v0.11.12 published: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.12. Local main matched the plugin content of the portal-validated task/T-071 @ c1cd830. No release video: release.sh found no task with a video since v0.11.11, probably because T-071 is still open by the user's choice.

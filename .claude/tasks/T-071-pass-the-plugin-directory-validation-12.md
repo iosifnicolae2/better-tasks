@@ -2,11 +2,11 @@
 id: T-071
 title: Pass the plugin directory validation (12 blocking issues + icon)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: todo
 owner: validation
 rolled: 0
-order: -3
+order: 2
 created: 2026-10-06
 ---
 ## Goal
@@ -39,3 +39,5 @@ Fixed the 12 issues that blocked the directory submission, added a listing icon 
 - 2026-10-06: 2026-10-06 pane.tsx:152 fix: commit ac35f28 on local main (not pushed), pushed as task/T-071 @ 53d804a (f8af5ba + this commit). The /config writes are now in a `ui.press` hook on the settings page's rows (registerPane): `$.config.set({ key: 'better-tasks.<field>', value })` with each key as fixed text, on that hook's own `$`, and the hook takes the press. The render closure (setConfig) now only saves project-only settings to config.json. Tried first: a state.set hook fed by the closure. It doesn't work because the plugin's own state writes don't reach its own state.set hooks (checked in the test kit), so I dropped it. Checks: claude plugin test . 322 pass (the settings page press test still records every better-tasks.* write); tsc clean; validate passes. Not checked live: pressing a settings row in a real terminal (I couldn't give the pane the keys in tmux). The user sees no change, so no new video.
 - 2026-10-06: Portal re-check of task/T-071 @ 53d804a (by directory-2): still 1 blocking issue, and it moved to hooks/pane.tsx:421, the first config.set in the new ui.press hook (case 'editor'). The portal's code is MOD_CONFIG_SET_UNREAD: "the argument is not one object written in the call with plain key and value members, or the key is not fixed text". The keys are already fixed text, so the shorthand `{ key: '...', value }` is the likely cause. Suggestion: write `value: value` (a plain member) in all 14 calls. If the value is computed, check it's a plain expression. The portal names only the first call, so make all 14 match. Other counts are unchanged.
 - 2026-10-06: 2026-10-06 pane.tsx:421 fix: commit b409494 on local main (not pushed), pushed as task/T-071 @ c1cd830. All 16 config.set calls in the ui.press hook (14 in the portal's count, plus openPrInBrowser and demoVideos) now read `$.config.set({ key: 'better-tasks.<field>', value: value })`, with no shorthand. `value` is a plain local, computed before the switch. I also reworded a comment that named $.config.set. Checks: 322 pass, tsc clean, validate passes. The user sees no change.
+- 2026-10-06: Shipped in v0.11.12, and the portal shows 0 blocking issues. It stays open by the user's wish until the submission is done, and the submission is paused (T-070).
+- 2026-10-06: Moved out of "currently working on": waits on the paused submission (T-070). It stays open by the user's wish.

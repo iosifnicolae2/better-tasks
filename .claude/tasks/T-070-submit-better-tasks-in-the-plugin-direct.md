@@ -2,11 +2,11 @@
 id: T-070
 title: Submit better-tasks in the plugin directory portal (Chrome)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: todo
 owner: directory-2
 rolled: 0
-order: -2
+order: 1
 created: 2026-10-06
 ---
 ## Goal
@@ -33,3 +33,5 @@ How:
 3. "The plugin does not exfiltrate credentials or execute code outside its declared MCP servers."
 4. "Anthropic may contact iosif@bringes.io about this submission and future policy changes."
 Portal note: the submission will be held for policy review (it lists the 13 hold kinds); you can still submit. Stopped before ticking: #3 looks untrue as worded (no MCP servers are declared, yet hooks and bin/ scripts run programs: git, gh, brew, uv, ffmpeg, kokoro), and the scan found "Uses a credential from the user's machine" (3). Accepting terms needs the user's own yes.
+- 2026-10-06: The user chose "Skip" on ticking the four acknowledgements and submitting. The draft stays saved, unsubmitted, in the portal at Step 4 (v0.11.12, 0 blocking). Paused until the user picks it up again.
+- 2026-10-06: Moved out of "currently working on": paused by the user (they skipped submitting). It stays open.

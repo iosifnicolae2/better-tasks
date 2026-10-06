@@ -2,8 +2,8 @@
 id: T-073
 title: "Lead rule: ask about one task at a time, with its video and its PR link above and inside the question"
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: lead-rules
 rolled: 0
 order: -4
@@ -33,3 +33,4 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/40
 PR: https://github.com/iosifnicolae2/better-tasks/pull/40
 T-073 Lead rule: ask about one task at a time, with its video and its PR link above and inside the question
 The lead now asks about one finished task at a time, only once its video is in its PR. The question says briefly what was implemented or fixed, with the PR link both above it and inside it.
+- 2026-10-06: Lead rule, step 4: ask about one task at a time, once its video is in its PR. The question says in a few words what was implemented or fixed, with the PR link above it and inside it. Short and lean. 322 tests pass; review PR #40 closed. Not released yet.
