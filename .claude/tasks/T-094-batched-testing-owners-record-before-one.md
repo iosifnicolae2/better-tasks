@@ -27,8 +27,9 @@ Video: [T-094.mp4](../tasks_videos/T-094.mp4)
 - 2026-10-07: before: the rendered lead, teammate and video rules (no tester; each owner records its own after).
 - 2026-10-07: done in 7bf285b. New skill `better-tasks:tester` (skills/tester/SKILL.md, template .claude/better-tasks/tester.md): a skill, like the other step how-tos, that the lead tells the "batch-testing" teammate to load; the lead names it only when batchDeviceTests is on. Gated lines: the lead's hand-off (Routing), the teammate's (owner captures before, writes what to check, fixes the tester's bugs, combines videos), the video skill's (the tester's AFTER goes into the owner's spec). Tests: rules.test (text and gating), skills.test, core.test (the skill loads). 352 pass.
 - 2026-10-07: PR: https://github.com/iosifnicolae2/better-tasks/pull/54 (review-only draft). No release change. Not checked: a real batch run with a live tester teammate (text-only change; checked by rendering the texts and the skill load in tests).
+- 2026-10-07: tester sets up its own optimized environment once, reused for the batch (edaf692); test added, 352 pass; new video; PR updated.
 
 ### For the user
 PR: https://github.com/iosifnicolae2/better-tasks/pull/54
 T-094 (#54) Batched testing: owners record "before", one tester records "after" for all, finds bugs, owners combine and finish
-When tasks share one build, each owner records its "before"; one tester then tests them all in one go, records each "after" and writes bugs into each task, and the owners fix them and finish. Shown only with Batch device tests on.
+When tasks share one build, each owner records its "before"; one tester then tests them all in one go, first sets up its own fast test environment, then records each "after" and writes bugs into each task, and the owners fix them and finish. Shown only with Batch device tests on.
