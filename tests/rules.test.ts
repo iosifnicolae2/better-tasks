@@ -132,6 +132,18 @@ describe('the shipped templates', () => {
     expect(overLimit([], 'cart', 0, [])).toBeUndefined()
   })
 
+  test('efficient tooling and event-driven waiting for teammates; the lead waits on events too and spawns only when a teammate pays its start-up cost', async () => {
+    const teammate = await rule('teammate.md')
+    expect(teammate).toContain('the full suite at the finish. Doing something more than once? Make it a small script or CLI of your own and reuse it.')
+    expect(teammate).toContain('- Wait for an event, not a clock: run long jobs in the background and act on their notice, give each command a fitting timeout, and send independent calls together in one message.')
+    expect(teammate.match(/Keep the loop fast/g)).toHaveLength(1)
+    const lead = await rule('lead.md')
+    expect(lead).toContain("- Wait for an event, not a clock: a teammate's message or a background job's notice wakes you.")
+    expect(lead).toContain('- A new teammate costs about 50k tokens to start, so route work to the ones you have')
+    expect(lead).toContain('only when that pays: a new area, or a worn-out owner')
+    expect(lead.match(/Group similar/g)).toHaveLength(1)
+  })
+
   test('caches: the lead acts on an idle teammate before its cache runs out, or keeps a waiting one warm with a short note; a finished one is stopped; the teammate does not sit idle', async () => {
     expect(await rule('lead.md')).toContain('answer, route or unblock it promptly. One waiting on the user, for an approval say, gets a one-line note shortly before, to keep it warm; one whose task is closed is stopped instead.')
     expect(await rule('teammate.md')).toContain("Don't sit idle mid-task: keep going, and report promptly")
