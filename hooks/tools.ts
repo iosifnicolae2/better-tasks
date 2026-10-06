@@ -27,7 +27,7 @@ import {
   whenOf,
 } from './tasks'
 import type { Links } from './tasks'
-import { cacheText, findMate, mateLine, refreshTeam } from './team'
+import { cacheText, doingFirst, findMate, mateLine, refreshTeam } from './team'
 import { searchTasks } from './search'
 import { initProject } from './texts'
 
@@ -266,7 +266,7 @@ async function teamStatus(io: Io): Promise<string> {
   const all = await listTasks(io)
   const tasks = all.filter(isOpen)
   const lines = team.map(mate => {
-    const owned = tasks.filter(task => task.owner === mate.name).map(task => withWaits(`${taskRef(task)} ${task.title}`, task, all))
+    const owned = tasks.filter(task => task.owner === mate.name).sort(doingFirst).map(task => withWaits(`${taskRef(task)} ${task.title}`, task, all))
     return `${mateLine(mate)}${owned.length ? ` · ${owned.join(', ')}` : ''}`
   })
   return lines.length ? lines.join('\n') : 'No teammates.'

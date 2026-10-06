@@ -1,6 +1,6 @@
 import type { AgentInfo, ModelUsage } from 'claude-code'
 
-import type { Activity, CacheStep, Teammate } from '../types'
+import type { Activity, CacheStep, Task, Teammate } from '../types'
 import { stateWord } from './activity'
 import { warmthOf } from './cache'
 import type { CacheTtl } from './cache'
@@ -92,6 +92,19 @@ export function stateOf(mate: Teammate): string {
 export function cacheText(mate: Teammate): string | undefined {
   if (mate.cache === 'warm') return `cache warm ${mate.cacheMinutesLeft}m`
   return mate.cache === 'cold' ? 'cache cold' : undefined
+}
+
+/** A teammate's current task before the ones queued for it. */
+export const doingFirst = (a: Task, b: Task) => Number(b.status === 'doing') - Number(a.status === 'doing')
+
+/** Why a spawn named `name` would pass the team's limit, naming who is there and what each owns; undefined if it may go. */
+export function overLimit(team: readonly Teammate[], name: string, max: number, tasks: readonly Task[]): string | undefined {
+  const alive = team.filter(isActive)
+  if (max <= 0 || alive.length < max || alive.some(mate => mate.name === name)) return undefined
+  const owned = (mate: Teammate) => tasks.filter(task => task.owner === mate.name).sort(doingFirst).map(task => task.id)
+  const list = alive.map(mate => [mate.name, ...owned(mate)].join(' ')).join(', ')
+  return `The team is at its limit of ${max} teammates (${list}). Give the task to the owner of similar work, ` +
+    'queued after its current one (task_update owner, then SendMessage), or wait until one finishes.'
 }
 
 export function mateLine(mate: Teammate): string {
