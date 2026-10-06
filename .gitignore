@@ -8,3 +8,5 @@
 __pycache__/
 # Teammates' git worktrees
 .claude/worktrees/
+# The rules as code for the tests, written by scripts/test.sh
+tests/templates.gen.ts

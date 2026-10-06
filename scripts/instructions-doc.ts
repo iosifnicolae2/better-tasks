@@ -1,13 +1,15 @@
-// Writes docs/instructions.md: every instruction text better-tasks puts in front of the model, each headed
-// with where it comes from and when it loads. The hook texts come from running the hooks on a fake engine
-// (scripts/instructions/dump.tsx, run by `claude plugin test` in a scratch copy), the rest from the files.
-// Run: `bun scripts/instructions-doc.ts` writes it; `--check` exits 1 when it is stale; `--open` opens it after.
+// Renders every instruction text better-tasks puts in front of the model into one Markdown file, each headed
+// with where it comes from and when it loads, straight from the current sources. The hook texts come from running
+// the hooks on a fake engine (scripts/instructions/dump.tsx, run by `claude plugin test` in a scratch copy).
+// Run: `bun scripts/instructions-doc.ts` writes it to a temp file and prints its path; `--open` opens it after.
 import { spawnSync } from 'node:child_process'
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 
+import { writeTemplates } from './templates'
+
 const root = new URL('..', import.meta.url).pathname
-const docPath = `${root}docs/instructions.md`
+const docPath = `${tmpdir()}/better-tasks-instructions.md`
 const MARK = '@@better-tasks-instructions@@'
 
 /** The settings the hooks run with: the defaults, before/after videos on, this repo's own config.json. */
@@ -41,7 +43,7 @@ function runHooks(skills: Skill[]): Dump {
   try {
     for (const dir of ['hooks', '.claude-plugin', 'templates']) cpSync(`${root}${dir}`, `${scratch}/${dir}`, { recursive: true })
     cpSync(`${root}scripts/instructions/dump.tsx`, `${scratch}/tests/dump.test.tsx`)
-    cpSync(`${root}tests/templates.gen.ts`, `${scratch}/tests/templates.gen.ts`)
+    writeTemplates(`${scratch}/tests/templates.gen.ts`)
     const names = skills.map(skill => skill.name).filter(name => name !== 'settings')
     writeFileSync(`${scratch}/tests/inputs.ts`, `export const OPTIONS = ${JSON.stringify(OPTIONS)}\nexport const CONFIG = ${JSON.stringify(CONFIG)}\nexport const SKILLS: string[] = ${JSON.stringify(names)}\n`)
     const run = spawnSync('claude', ['plugin', 'test', scratch], { encoding: 'utf8' })
@@ -93,11 +95,6 @@ ${parts.join('\n\n')}
 
 const skills = readSkills()
 const text = render(runHooks(skills), skills)
-if (process.argv.includes('--check')) {
-  const isCurrent = readFileSync(docPath, 'utf8') === text
-  console.log(isCurrent ? 'instructions-doc: docs/instructions.md is current' : 'instructions-doc: docs/instructions.md is stale; run `bun scripts/instructions-doc.ts`')
-  process.exit(isCurrent ? 0 : 1)
-}
 writeFileSync(docPath, text)
 console.log(`instructions-doc: wrote ${docPath}`)
 if (process.argv.includes('--open')) spawnSync('open', [docPath])
