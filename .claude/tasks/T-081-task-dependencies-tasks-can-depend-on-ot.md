@@ -43,4 +43,7 @@ A task can now wait on other tasks. The lead sets this when it files a task, and
 ### For the user
 PR: https://github.com/iosifnicolae2/better-tasks/pull/46
 T-081 (#46) Task dependencies: tasks can depend on others, and the lead plans and starts work by them
-Tasks can now have labels, and wait on other tasks: on one or several tasks, or on every task with a label. The lead sets both when it files a task, and starts a task only once what it waits on is done. The task list and the board (key g) group tasks by label and show "waits on T-001".
+Tasks can have labels, like "checkout". The task list and the board (key g) group tasks by them.
+A task can wait on one task, on several, or on every task with a label. The board shows what it waits on.
+The lead sets labels and what a task waits on when it files it, and starts a task only when those are done.
+- 2026-10-06: PR #46 had no "Or play it here" block (a re-run of task_pr.py with an unchanged video keeps the old one). Added it with gh pr edit, in player()'s format, with the same jsdelivr link. Signed out (curl, no cookies): the PR page shows the block; the video and poster links answer 200/206 video/mp4 and image/png. GitHub shows that link as a link, not an inline player (no <video> on the page): it embeds only its own uploads.
