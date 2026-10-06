@@ -58,7 +58,7 @@ def main() -> None:
 
         voice = demo.Voice('af_heart')
         opening = draw_opening(work / 'opening.png', canvas, args.version, args.since, tasks)
-        parts = [card_clip(work, 'opening', opening, args.version, opening_words(args.version, args.since, shown), canvas, voice, True)]
+        parts = [card_clip(work, 'opening', opening, args.version, opening_words(args.version, args.since, tasks, shown), canvas, voice, True)]
         for number, task in enumerate(shown, 1):
             card = draw_task_card(work / f'{task["id"]}.png', canvas, task, number, len(shown))
             parts.append(card_clip(work, task['id'], card, task['id'], f'{task["id"]}: {task["title"]}', canvas, voice, False))
@@ -110,13 +110,18 @@ def task_video(task_id: str, work: Path) -> Path | None:
 
 # ---- Cards ----
 
-def opening_words(version: str, since: str, shown: list) -> str:
-    count = f'{len(shown)} change{"s" if len(shown) != 1 else ""}'
-    return f'{project_name()} {version}: {count}{f" since {since}" if since else ""}, each before and after.'
+def opening_words(version: str, since: str, tasks: list, shown: list) -> str:
+    count = f'{len(tasks)} change{"s" if len(tasks) != 1 else ""}{f" since {since}" if since else ""}'
+    if len(shown) == len(tasks):
+        return f'{project_name()} {version}: {count}, each before and after.'
+    return f'{project_name()} {version}: {count}. Here are the {len(shown)} with a video, each before and after.'
 
 
 def project_name() -> str:
-    return demo.project_root().name
+    """The repo's name on its remote, else its folder's."""
+    remote = subprocess.run(['git', 'remote', 'get-url', 'origin'], capture_output=True, text=True).stdout.strip()
+    name = remote.rstrip('/').split('/')[-1].split(':')[-1].removesuffix('.git')
+    return name or demo.project_root().name
 
 
 def draw_opening(path: Path, canvas: tuple, version: str, since: str, tasks: list) -> Path:
