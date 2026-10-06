@@ -1,6 +1,6 @@
 // The startup update check: the newest better-tasks release (a vX.Y.Z tag of its repo) against the one this
 // project pins and the one installed. Newer: asked once per version; Yes moves the pin, updates the plugin,
-// then asks the user to restart Claude Code (Done / I'll restart / Skip). Only for an install from the marketplace
+// then asks the user to restart Claude Code (I'll restart / Skip). Only for an install from the marketplace
 // (a linked install is the user's own).
 
 export const PLUGIN_ID = 'better-tasks@better-tasks'
@@ -14,8 +14,7 @@ export const DECLINED_KEY = 'updateDeclined'
 export const updateQuestion = (tag: string) => `better-tasks ${tag} is out. Update?`
 export const updatedLine = (tag: string) => `better-tasks: updated to ${tag}.`
 
-/** After the update, the restart is a question: done, later on their own, or skipped. */
-export const RESTART_DONE = 'Done'
+/** After the update, the restart is a question: the user restarts on their own, or skips it. */
 export const RESTART_LATER = "I'll restart"
 export const RESTART_SKIP = 'Skip'
 export const RESTART_HEADER = 'Restart'

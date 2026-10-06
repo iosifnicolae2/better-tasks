@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { activeInstall, declaredTag, declaresMarketplace, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, RESTART_DONE, RESTART_LATER, RESTART_SKIP, restartQuestion, updateArgv, updateQuestion, versionAt, withDeclaredTag } from '../hooks/updatecheck'
+import { activeInstall, declaredTag, declaresMarketplace, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, RESTART_LATER, RESTART_SKIP, restartQuestion, updateArgv, updateQuestion, versionAt, withDeclaredTag } from '../hooks/updatecheck'
 
 const LS_REMOTE = ['aaa\trefs/tags/v0.9.0', 'bbb\trefs/tags/v0.10.7', 'ccc\trefs/tags/v0.10.10', 'ddd\trefs/tags/nightly', 'eee\trefs/tags/v1.0.0-rc1'].join('\n')
 const ROOT = '/work/app'
@@ -96,6 +96,6 @@ describe('the startup update check', () => {
   test('the questions are short and plain', () => {
     expect(updateQuestion('v0.10.8')).toBe('better-tasks v0.10.8 is out. Update?')
     expect(restartQuestion('v0.10.8')).toBe('better-tasks v0.10.8 is installed. Restart Claude Code to use it: quit, then run claude --continue.')
-    expect([RESTART_DONE, RESTART_LATER, RESTART_SKIP]).toEqual(['Done', "I'll restart", 'Skip'])
+    expect([RESTART_LATER, RESTART_SKIP]).toEqual(["I'll restart", 'Skip'])
   })
 })

@@ -18,7 +18,7 @@ export const SETUP_PROMPT =
   `Add "${TEAMS_FLAG}": "1" to the "env" block of ~/.claude/settings.json with the Edit tool ` +
   '(create the block if it is missing; keep everything else in the file as it is). ' +
   'Then ask the user with AskUserQuestion to restart the session (exit, then start `claude` again with the same flags), ' +
-  'options "Done", "I\'ll restart" and "Skip". ' +
+  'options "I\'ll restart" and "Skip". ' +
   'Do nothing else until then.'
 
 /** The one line the coordinator reads beside a prompt while teams are off. */

@@ -7,7 +7,7 @@ import { realigned, rollOver } from './boundary'
 import { subagentTtl } from './cache'
 import { OFF_LINE } from './projectsetup'
 import { addSource, hasTeamInstall, maySelfCommit, needsPin, pinCommit, pinnedTag, repoUrl, SHARED_SETTINGS, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_SETTING, TEAM_YES, TEAMMATE_INSTALL, updateCommit, withTeamInstall } from './teaminstall'
-import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArgv, MANAGED_SETTINGS, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, RESTART_DONE, RESTART_HEADER, RESTART_LATER, RESTART_SKIP, restartLaterLine, restartQuestion, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updatedLine, updateQuestion, versionAt, withDeclaredTag } from './updatecheck'
+import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArgv, MANAGED_SETTINGS, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, RESTART_HEADER, RESTART_LATER, RESTART_SKIP, restartLaterLine, restartQuestion, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updatedLine, updateQuestion, versionAt, withDeclaredTag } from './updatecheck'
 import type { Install } from './updatecheck'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
 import { migrateFolder, migrateRules } from './migrate'
@@ -450,7 +450,7 @@ async function updateTo($: EngineInterface, tag: string, install: Install): Prom
     return $.ui.log(`better-tasks: could not update to ${tag}: ${(updated.stderr || updated.stdout).trim()}. Try: ${updateArgv(install.scope).join(' ')}`)
   }
   $.ui.log(`${updatedLine(tag)}${pinNote}`)
-  const answer = await askSetup($, restartQuestion(tag), [RESTART_DONE, RESTART_LATER, RESTART_SKIP], RESTART_HEADER)
+  const answer = await askSetup($, restartQuestion(tag), [RESTART_LATER, RESTART_SKIP], RESTART_HEADER)
   if (answer === RESTART_LATER) $.ui.log(restartLaterLine(tag))
 }
 
