@@ -55,7 +55,7 @@ Shared `{{ devBranch }}` branch: teammates commit there; each task's PR is built
 {% else %}
 A worktree and a PR per task.
 {% endif %}
-Merge with `gh pr merge --squash`; a conflict goes back to the teammate.
+Merge with `gh pr merge --squash`; a conflict goes back to the teammate. Once a task is closed, remove its worktree and merged branch, so no waste stays on disk.
 
 ## Changes to better-tasks itself
 The user wants this plugin changed: load the `better-tasks:contribute` skill first.

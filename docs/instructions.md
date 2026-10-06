@@ -60,7 +60,7 @@ Teammates test off the user's screen; one that needs it waits until the user say
 
 ## Git flow
 Straight to main: teammates commit to main; a task's PR is a draft for review that never merges. A bug fix's PR merges.
-Merge with `gh pr merge --squash`; a conflict goes back to the teammate.
+Merge with `gh pr merge --squash`; a conflict goes back to the teammate. Once a task is closed, remove its worktree and merged branch, so no waste stays on disk.
 
 ## Changes to better-tasks itself
 The user wants this plugin changed: load the `better-tasks:contribute` skill first.
@@ -81,6 +81,7 @@ Task file: .claude/tasks/T-004-fix-login-redirect.md
 - You own one area: stay in its files. Need another area or the user? Ask its owner, or the lead.
 - Your task file is your memory: short dated notes. Long things go in files; messages carry paths.
 - Keep your context lean; commit small and often. Given a predecessor's transcript? Search it.
+- Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Delete captures and build output once you no longer need them.
 - Not getting there? Stop, note what you tried, tell the lead.
 
 ## How your task goes
@@ -203,6 +204,7 @@ Any other task you name there, the ones a release ships too, goes the same way: 
 Every task has one, opened as a draft with the video before you report done: the user checks the task from it. Never merge it yourself.
 - Straight to main: it is for review only, a draft into the commit before your task's, that never merges.
 - The description is short and plain, read on a phone: the user's request and why, then what changed and how to test it. Write it to a file.
+- No secrets or personal data in it (tokens, keys, passwords, emails, private paths, customer data): mask them, as in `<token>`.
 - `python3 ${CLAUDE_PLUGIN_ROOT}/bin/task_pr.py open <id> --body-file <file>` pushes your commits and opens the PR with the video in it; its last line is the PR's URL (--help).
 - A change later: land it, then open again: it pushes it, and a new video takes the old one's place.
 - After the user's yes and the full tests: `task_pr.py close <id>`.
@@ -328,6 +330,7 @@ The video shows the fix or feature working: your functional test, and what the u
 - Narrate as a colleague explaining the fix or feature: short, plain sentences.
 - Screenshots are fine; record the screen when movement or something advanced needs showing. Nothing on screen? Show the old and the new text.
 - `${CLAUDE_PLUGIN_ROOT}/bin/demo-video.sh spec.json --quality medium` makes it, with its poster, from a small spec: `--help` shows the format; marks, arrows and sizes have defaults.
+- Never show secrets or personal data (tokens, keys, passwords, emails, private paths, customer data): use test values, or cover them in the image before it goes in the spec.
 - Look at the result before you share it. First line under "## Notes": `Video: [<id>.mp4](../tasks_videos/<id>.mp4)`. It goes in your PR (`better-tasks:pull-request`).
 ```
 

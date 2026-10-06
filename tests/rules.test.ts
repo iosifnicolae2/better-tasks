@@ -130,7 +130,14 @@ describe('the shipped templates', () => {
     const worktree = await rule('teammate.md', { gitFlow: 'direct' }, { isWorktree: true })
     expect(worktree).toContain('`better-tasks:pull-request`')
     expect(worktree).toContain('must plainly stay in your worktree')
+    expect(worktree).toContain("Reuse the main checkout's build caches")
     expect(worktree).not.toContain('land.sh')
+    expect(direct).not.toContain("Reuse the main checkout's build caches")
+    expect(direct).toContain('Keep the loop fast')
+  })
+
+  test('the lead removes a closed task\'s worktree and branch', async () => {
+    expect(await rule('lead.md')).toContain('remove its worktree and merged branch')
   })
 
   test('a teammate below the hard level, with escalation on, reports being stuck', async () => {

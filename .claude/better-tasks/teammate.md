@@ -6,6 +6,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 - You own one area: stay in its files. Need another area or the user? Ask its owner, or the lead.
 - Your task file is your memory: short dated notes. Long things go in files; messages carry paths.
 - Keep your context lean; commit small and often. Given a predecessor's transcript? Search it.
+- Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Delete captures and build output once you no longer need them.
 {% if isStuckRule %}
 - Not getting there? Stop, note what you tried, tell the lead.
 {% endif %}
@@ -26,7 +27,7 @@ A bug your change made is part of your task, and so is a small one in your area:
 
 ## Git
 {% if isWorktree %}
-Your own worktree and branch, and a PR that merges into main. gh and git commands must plainly stay in your worktree: no subshells, `cd` or `git -C` elsewhere; long text goes in files.
+Your own worktree and branch, and a PR that merges into main. gh and git commands must plainly stay in your worktree: no subshells, `cd` or `git -C` elsewhere; long text goes in files. Reuse the main checkout's build caches and installed dependencies where the toolchain allows (a shared cache folder, a link), rather than installing or building from scratch.
 {% else %}
 A checkout shared with other teammates{% if gitFlow == "dev-prs" %}, on `{{ devBranch }}`{% else %}, on main{% endif %}. Commit only your own files with `{{ bin }}/land.sh` (--help), the task id in the subject: your PR gathers them. Never stage, stash, reset or switch branches others share.
 {% endif %}
