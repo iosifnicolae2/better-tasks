@@ -210,9 +210,9 @@ test('a task that depends on another waits for it: shown blocked, checked on wri
   expect(String(listed.result)).toContain('T-002 [todo] Login emails · currently working on · waits on T-001')
 
   const unknown = await $.tool.call({ ...create, tool_use_id: 't2', title: 'Other', dependsOn: ['T-009'] } as never)
-  expect(unknown.deny).toBe('No task T-009: dependsOn takes the ids of existing tasks.')
+  expect(unknown.deny).toBe('No task or label T-009: dependsOn takes task ids, or labels other tasks have.')
   const cycle = await $.tool.call({ ...updateT1, dependsOn: ['T-002'] } as never)
-  expect(cycle.deny).toBe('That makes a cycle, T-001 → T-002 → T-001: drop one of these dependencies.')
+  expect(cycle.deny).toBe('That makes a cycle, T-001 → T-002 → T-001: drop one of these dependencies or labels.')
   expect(host.files.get(`${TASKS}/T-001-fix-login.md`)).not.toContain('dependsOn')
 
   const closed = await $.tool.call({ ...updateT1, status: 'done', note: 'Works', commits: 'abc123' } as never)
@@ -220,6 +220,35 @@ test('a task that depends on another waits for it: shown blocked, checked on wri
   expect((await $.prompt.submit(prompt('go on'))).context?.at(-1)).toContain('Currently working on, not started yet: T-002 Login emails. Route each now')
   await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u2', id: 'T-002', dependsOn: [] } as never)
   expect(host.files.get(`${TASKS}/T-002-login-emails.md`)).not.toContain('dependsOn')
+})
+
+test('labels: set on tasks, listed in groups, and a label as a dependency waits on all its open tasks', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${TASKS}/T-001-fix-login.md`]: ACTIVE })
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('two auth tasks, then the release notes after all of auth'))
+  await $.tool.call({ ...updateT1, labels: ['Auth'] } as never)
+  await $.tool.call({ ...create, title: 'Login emails', labels: ['auth', 'email'] } as never)
+  const notes = await $.tool.call({ ...create, tool_use_id: 't2', title: 'Release notes', dependsOn: ['auth'] } as never)
+  expect(String(notes.result)).toContain('Not started: it waits on label auth (T-001, T-002); start it once they are done.')
+  expect(host.files.get(`${TASKS}/T-002-login-emails.md`)).toContain('labels: [auth, email]\n---')
+  expect(host.files.get(`${TASKS}/T-003-release-notes.md`)).toContain('dependsOn: [auth]\n---')
+
+  const grouped = await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1', group: 'label' } as never)
+  expect(String(grouped.result)).toBe(
+    'auth:\nT-001 [doing] Fix login · this sprint · owner login · labels auth\nT-002 [todo] Login emails · currently working on · labels auth, email\n\n' +
+      'email:\nT-002 [todo] Login emails · currently working on · labels auth, email\n\n' +
+      'no label:\nT-003 [todo] Release notes · currently working on · waits on label auth (T-001, T-002)',
+  )
+  const idLike = await $.tool.call({ ...updateT1, labels: ['t-7'] } as never)
+  expect(idLike.deny).toBe('t-7 reads as a task id: pick another label.')
+  const cycle = await $.tool.call({ ...updateT1, dependsOn: ['T-003'] } as never)
+  expect(cycle.deny).toBe('That makes a cycle, T-001 → T-003 → T-001: drop one of these dependencies or labels.')
+
+  await $.tool.call({ ...updateT1, status: 'done', note: 'Works', commits: 'abc123' } as never)
+  const last = await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u2', id: 'T-002', status: 'done', note: 'Sent' } as never)
+  expect(String(last.result)).toContain('Unblocked: T-003 Release notes. Start each now')
 })
 
 test('each user prompt carries the sprint context', async ($, on) => {

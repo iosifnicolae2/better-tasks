@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { CommandPresentation, CommandSpec, EngineInterface, On, PluginOptions } from 'claude-code'
 
 import type { Task, Teammate, When } from '../types'
-import { Board, ICONS, ProjectHeader, TITLES, projectTitle, sectionsOf, shortDates, shifted, wheeled } from './board'
+import { Board, groupedByLabel, ICONS, ProjectHeader, TITLES, projectTitle, sectionsOf, shortDates, shifted, wheeled } from './board'
 import type { BoardActions, DrawnList, Hit, SearchState, Section, SprintFacts } from './board'
 import { searchTasks } from './search'
 import { taskIdIn } from './spawn'
@@ -37,6 +37,7 @@ const PANE_OPEN = { id: PANE, title: 'Sprint', focus: true, columns: 76 } as con
 const OPEN_KEY = 'pane.open'
 /** $.store key: the Closed section is expanded. */
 const CLOSED_KEY = 'pane.closedOpen'
+const BY_LABEL_KEY = 'pane.byLabel'
 /** $.store key: the settings row the focus ring is on, for its description line. */
 const CONFIG_ROW_KEY = 'pane.configRow'
 const NATIVE_PREFIX = 'Better Tasks: '
@@ -174,7 +175,7 @@ async function carry($: EngineInterface, options: PluginOptions, movingId: strin
   if (step === undefined) return
   const files = filesOf($, options)
   const settings = await settingsFrom(files)
-  const sections = sectionsOf(await read($, tasksState), await today(files), settings.sprint)
+  const sections = await shownSections($, await read($, tasksState), await today(files), settings.sprint)
   const task = sections.flatMap(section => section.tasks).find(one => one.id === movingId)
   if (task !== undefined) await shiftTask(files, sections, task, step, settings.sprint)
 }
@@ -295,6 +296,21 @@ function sprintDetails(start: string, config: SprintConfig, day?: string): strin
 
 async function isClosedOpen($: EngineInterface): Promise<boolean> {
   return (await $.store.get(CLOSED_KEY)) === true
+}
+
+async function isByLabel($: EngineInterface): Promise<boolean> {
+  return (await $.store.get(BY_LABEL_KEY)) === true
+}
+
+/** The sections as the board shows them: grouped by label while g is on, so a move goes by what is on screen. */
+async function shownSections($: EngineInterface, tasks: readonly Task[], day: string, config: SprintConfig): Promise<Section[]> {
+  const sections = sectionsOf(tasks, day, config)
+  return (await isByLabel($)) ? sections.map(groupedByLabel) : sections
+}
+
+async function toggleByLabel($: EngineInterface): Promise<void> {
+  await $.store.set(BY_LABEL_KEY, !(await isByLabel($)))
+  $.ui.invalidate('ui.render')
 }
 
 async function toggleClosed($: EngineInterface): Promise<void> {
@@ -534,7 +550,8 @@ export function registerPane(on: On, options: PluginOptions): void {
     const sprintsFile = `${root}/${settings.paths.sprints}`
     const header = <ProjectHeader ui={ui} title={projectTitle(root)} />
 
-    const sections = sectionsOf(tasks, day, settings.sprint)
+    const byLabel = await isByLabel($)
+    const sections = await shownSections($, tasks, day, settings.sprint)
     const closedOpen = await isClosedOpen($)
     const closed = closedOf(tasks)
     const inSprint = tasks.filter(task => task.sprint === current && task.status !== 'cancelled')
@@ -598,6 +615,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       done: task => void leave().then(() => finishTask(files, task, {}, settings.sprint)).then(keepFocus(nextAfter(task.id))),
       reopen: task => void leave().then(() => changeTask(files, task, { status: 'todo', when: 'this-sprint' }, settings.sprint)).then(keepFocus(task.id)),
       toggleClosed: () => void toggleClosed($),
+      toggleByLabel: () => void toggleByLabel($),
       openSearch: () => void openSearch($),
       setQuery: query => void update($, searchState, now => ({ isOpen: true, query: query ?? now.query })),
       closeSearch: () => void closeSearch($).then(keepFocus(selectedTask?.id)),
@@ -623,7 +641,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       <Box flexDirection="column" paddingX={1}>
         {header}
         <Board ui={ui} sections={sections} sprints={sprints} closed={closed} isClosedOpen={closedOpen} selected={selected}
-          team={team} blockers={blockers} hasKeys={e.props.isFocused} bodyRows={bodyRowsUnder(e.props.scroll.bodyRows)}
+          team={team} blockers={blockers} isByLabel={byLabel} hasKeys={e.props.isFocused} bodyRows={bodyRowsUnder(e.props.scroll.bodyRows)}
           scrollStart={listScroll.selectedId === selectedTask?.id ? listScroll.start : undefined} onDrawn={list => { drawnList = list }}
           canSpin={e.surface === 'terminal' || e.surface === 'desktop'} search={search} hits={hits} actions={actions} />
       </Box>

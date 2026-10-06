@@ -1,7 +1,7 @@
 import type { Task } from '../types'
-import { isOpen } from './tasks'
+import { isOpen, labelsOf } from './tasks'
 
-// Full-text search over every task, closed ones too. A title match outranks a body match.
+// Full-text search over every task, closed ones too: id, title, labels and body. A title or label match outranks a body match.
 
 export type SearchField = 'id' | 'title' | 'body'
 
@@ -88,6 +88,7 @@ function scoreOf(task: Task, query: string, words: readonly string[]): SearchHit
   const id = fold(task.id)
   const title = fold(task.title)
   const body = fold(bodyText(task))
+  const labels = fold(labelsOf(task).join(' '))
   const isId = fold(query.trim()) === id
   const fields = new Set<SearchField>()
   let score = isId ? SCORE.id : 0
@@ -97,8 +98,10 @@ function scoreOf(task: Task, query: string, words: readonly string[]): SearchHit
     const inId = id.includes(word)
     const inTitle = title.includes(word)
     const inBody = body.includes(word)
-    if (!inId && !inTitle && !inBody && !isId) return undefined
+    const inLabels = labels.includes(word)
+    if (!inId && !inTitle && !inBody && !inLabels && !isId) return undefined
     if (inId) fields.add('id')
+    if (inLabels) score += SCORE.word
     if (inTitle) {
       fields.add('title')
       score += hasWord(title, word) ? SCORE.word : hasPrefix(title, word) ? SCORE.prefix : SCORE.body
