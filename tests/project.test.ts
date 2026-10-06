@@ -39,6 +39,13 @@ describe('config.json', () => {
     expect(problems[0]).toContain('is not valid JSON')
   })
 
+  test('a /config value outside its choices (typed in, the menu has no picker) counts as unset', () => {
+    const settings = settingsOf({ editor: 'vim', videoQuality: 'ultra', sprintWeeks: '9', sprintStart: 'someday' })
+    expect([settings.editor, settings.videoQuality, settings.sprint.weeks, settings.sprint.startDay]).toEqual(['auto', 'medium', 1, 1])
+    const chosen = settingsOf({ editor: 'zed', sprintWeeks: '3', sprintStart: 'sunday' })
+    expect([chosen.editor, chosen.sprint.weeks, chosen.sprint.startDay]).toEqual(['zed', 3, 0])
+  })
+
   test('the project wins over the plugin options, which win over the defaults', () => {
     const settings = settingsOf({ ...{ editor: 'code', statusEvery: 30 }, ...{ statusEvery: 15 } })
     expect([settings.editor, settings.statusEvery, settings.tasks.prefix]).toEqual(['code', 15, 'T-'])

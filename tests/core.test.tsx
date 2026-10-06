@@ -34,6 +34,8 @@ type Host = {
   subagentTypes: (string | undefined)[]
   /** The agent types the plugin registered, in order. */
   agentTypes: { name: string; model?: string; effort?: string | number }[]
+  /** The permissionMode of each agent type registered, in order. */
+  agentModes: (string | undefined)[]
   /** Set it and every agent.register is refused with this reason. */
   agentDeny?: string
   /** Each process.spawn's argv; spawnOutput is what each one prints. */
@@ -64,7 +66,7 @@ function fakeHost(
   teams: Teams = { env: TEAMS_ON, settingsEnv: TEAMS_ON },
   takenNames: string[] = [],
 ): Host {
-  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, ran: [], env: new Map(), composer: '' }
+  const host: Host = { files: new Map(Object.entries(seed)), status: [], toasts: [], pluginPrompts: [], notices: [], registered: [], spawned: [], descriptions: [], subagentTypes: [], agentTypes: [], agentModes: [], spawnedArgv: [], spawnOutput: '', runOutput: {}, ran: [], env: new Map(), composer: '' }
   const env = new Map(Object.entries(teams.env))
   host.env = env
   on('env.get', ($, e) => ({ value: env.get(e.name) }))
@@ -87,6 +89,7 @@ function fakeHost(
   on('agent.register', ($, e) => {
     if (host.agentDeny) return { deny: host.agentDeny }
     host.agentTypes.push({ name: e.name, model: e.model, effort: e.effort })
+    host.agentModes.push(e.permissionMode)
     return { value: { agent: `better-tasks:${e.name}` } }
   })
   on('tool.register', ($, e) => {
@@ -1439,6 +1442,14 @@ test('at start the three teammate agent types are registered with the settings, 
   const host = fakeHost(on)
   await $.session.start(SESSION)
   expect(host.agentTypes).toEqual(DEFAULT_TYPES)
+})
+
+test('the teammate types leave permission asks with the user: permissionMode default, no hooks', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  await $.session.start(SESSION)
+  expect(host.agentModes).toEqual(['default', 'default', 'default'])
 })
 
 test('the plugin options and the project config.json choose the models and efforts', { options: { easyModel: 'haiku', hardEffort: 'max' } }, async ($, on) => {

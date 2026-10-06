@@ -257,7 +257,10 @@ async function syncTeammateTypes($: EngineInterface, settings: Settings): Promis
   const types = teammateTypes(settings.models)
   const key = JSON.stringify(types)
   if (key === (await read($, typesState))) return
-  for (const type of types) await $.agent.register(type)
+  // permissionMode 'default' asks the user; a lead in bypass, acceptEdits or auto mode still hands its teammates its own mode.
+  for (const type of types) {
+    await $.agent.register({ name: type.name, description: type.description, prompt: type.prompt, model: type.model, effort: type.effort, permissionMode: 'default' })
+  }
   await update($, typesState, () => key)
 }
 
