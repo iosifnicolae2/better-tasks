@@ -1,6 +1,7 @@
 #!/bin/sh
-# Cut a release: pin the marketplace entry to the new tag in a "Release" commit, tag it,
-# push the tag and main, create the GitHub release. Installs and updates get only tagged releases.
+# Cut a release: pin the marketplace entry to the new tag in a "Release" commit on main, tag the plugin package
+# (that commit without the dev-only files, a child of it off main), push the tag and main, create the GitHub release.
+# Installs, updates and the directory get only tagged packages.
 # Usage: scripts/release.sh [--dry-run | --draft] v0.3.0 [notes.md]
 # Without notes.md, the notes are the commit subjects since the last tag.
 # With the project setting releaseVideos (on unless .claude/tasks/config.json says false), the notes open with
@@ -38,8 +39,9 @@ git rev-parse -q --verify "refs/tags/$version" >/dev/null && fail "$version alre
 bun scripts/settings-doc.ts --check || fail "the settings skill is stale: run bun scripts/settings-doc.ts and commit"
 bun scripts/skills-check.ts || fail "a skill lacks what its readers rely on: see above"
 
-previous=$(git describe --tags --abbrev=0 main 2>/dev/null || true)
-[ -z "$previous" ] || [ "$(git rev-parse "$previous^{commit}")" != "$(git rev-parse main)" ] || fail "nothing new since $previous"
+# The last release's tag: a package off main (its parent is that release's commit), or, before v0.11.15, on main.
+previous=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+[ -z "$previous" ] || [ -n "$(git log -1 --format=%H "$previous..main")" ] || fail "nothing new since $previous"
 
 commit_notes() {
   echo "## Changes"
@@ -127,8 +129,23 @@ pin_marketplace() {
   git commit -q -m "Release $version"
 }
 
+# Dev-only paths of this repo that installs and the directory don't get: the task board, its screenshots and videos.
+DEV_ONLY=".claude/tasks .claude/tasks_videos"
+
+# The plugin as installs get it: main's tree without DEV_ONLY, committed off main; prints the commit.
+# A temporary index, so the shared checkout's index and files stay as they are.
+package_commit() {
+  index=$(mktemp)
+  GIT_INDEX_FILE=$index git read-tree main
+  # shellcheck disable=SC2086
+  GIT_INDEX_FILE=$index git rm -r -q --cached --ignore-unmatch -- $DEV_ONLY
+  tree=$(GIT_INDEX_FILE=$index git write-tree)
+  rm -f "$index"
+  git commit-tree "$tree" -p main -m "Release $version: the plugin, without the task board"
+}
+
 pin_marketplace
-git tag -a "$version" -m "$version" main
+git tag -a "$version" -m "$version" "$(package_commit)"
 git push -q origin "$version"
 git push -q origin main
 if has_draft; then
