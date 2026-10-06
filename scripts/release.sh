@@ -43,9 +43,24 @@ bun scripts/skills-check.ts || fail "a skill lacks what its readers rely on: see
 previous=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
 [ -z "$previous" ] || [ -n "$(git log -1 --format=%H "$previous..main")" ] || fail "nothing new since $previous"
 
+# Each task id with its PR's number, one "T-079 44" a line: the last "PR: .../pull/<n>" note in its task file.
+pr_numbers() {
+  find .claude/tasks -name '*.md' 2>/dev/null | while read -r file; do
+    number=$(grep 'PR:' "$file" | grep -o '/pull/[0-9]*' | tail -n 1 | cut -d/ -f3)
+    id=$(sed -n 's/^id: *//p' "$file" | head -n 1)
+    [ -n "$number" ] && [ -n "$id" ] && echo "$id $number"
+  done
+}
+
+# "T-079" becomes "T-079 (#44)" in each line, unless the line already names that PR.
+with_pr_numbers() {
+  NUMBERS=$(pr_numbers) perl -pe 'BEGIN { %pr = map { split / / } split /\n/, $ENV{NUMBERS} }
+    s{\b([A-Za-z]+-\d+)\b(?! \(#)}{my ($id, $n) = ($1, $pr{$1}); $n && !m{\(#$n\)} ? "$id (#$n)" : $id}ge'
+}
+
 commit_notes() {
   echo "## Changes"
-  git log --reverse --format='- %s' "${previous:+$previous..}main" | grep -v '^- Task log:' || true
+  git log --reverse --format='- %s' "${previous:+$previous..}main" | grep -v '^- Task log:' | with_pr_numbers || true
   cat <<'EOF'
 
 ## Install / update
