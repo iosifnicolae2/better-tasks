@@ -2,8 +2,9 @@
 
 Run through bin/release-video.sh (it picks Kokoro's Python).
 Usage: release-video.sh --version v0.12.0 [--since v0.11.3] [--until main] [--quality low|medium|high]
-The tasks are the commits in since..until whose subject starts with a task id ("T-052 ..."; the prefix
-is the project's taskPrefix). The video: an opening card (the version, what it ships, the tasks without
+The tasks are those the commits in since..until name: a subject that starts with a task id ("T-052 ...",
+a PR merge) or ends with it in parentheses ("... (T-058)", straight to main); the prefix is the project's
+taskPrefix. The video: an opening card (the version, what it ships, the tasks without
 a video), then per task a card with its id and title and its own before/after video, as the video skill
 made it. The video and its poster (the opening card with a play button) go next to the task videos,
 release-<version>.mp4 and .png; prints the poster's path, then the video's.
@@ -81,17 +82,41 @@ def task_prefix() -> str:
 
 
 def shipped_tasks(since: str, until: str, prefix: str) -> list:
-    """Each task id the commits since..until start their subject with, in order, with its first subject as title."""
+    """Each task the commits since..until name, in order, titled from its task file, else from its first commit.
+
+    A commit names a task at the start of its subject (a PR merge: "T-052 Title (#33)") or in parentheses at
+    its end (straight to main: "What changed (T-058)", or "(T-058, T-059)"). Bookkeeping like "Tasks: T-058 done"
+    names none: the task shipped with its own commits.
+    """
     span = f'{since}..{until}' if since else until
     subjects = demo.run(['git', 'log', '--reverse', '--format=%s', span]).splitlines()
-    pattern = re.compile(rf'^({re.escape(prefix)}\d+)\b[\s:]*(.*?)(\s*\(#\d+\))?$')
+    task_id = rf'{re.escape(prefix)}\d+'
+    at_start = re.compile(rf'^({task_id})\b[\s:]*(.*?)(\s*\(#\d+\))?$')
+    at_end = re.compile(rf'^(.*?)\s*\(((?:{task_id})(?:,\s*{task_id})*)\)$')
     tasks, seen = [], set()
     for subject in subjects:
-        match = pattern.match(subject)
-        if match and match.group(1) not in seen:
-            seen.add(match.group(1))
-            tasks.append({'id': match.group(1), 'title': match.group(2) or match.group(1)})
+        if match := at_start.match(subject):
+            named, title = [match.group(1)], match.group(2)
+        elif match := at_end.match(subject):
+            named, title = re.split(r',\s*', match.group(2)), match.group(1)
+        else:
+            continue
+        for found in named:
+            if found not in seen:
+                seen.add(found)
+                tasks.append({'id': found, 'title': task_title(found) or title or found})
     return tasks
+
+
+def task_title(task_id: str) -> str:
+    """The title in the task file's front matter (.claude/tasks/<id>-*.md), or '' when there is none."""
+    for path in sorted((demo.project_root() / '.claude' / 'tasks').glob(f'**/{task_id}-*.md')):
+        for line in path.read_text(errors='replace').splitlines()[1:20]:
+            if line == '---':
+                break
+            if line.startswith('title:'):
+                return line.removeprefix('title:').strip().strip('"\'')
+    return ''
 
 
 def task_video(task_id: str, work: Path) -> Path | None:
@@ -133,11 +158,12 @@ def draw_opening(path: Path, canvas: tuple, version: str, since: str, tasks: lis
     compared = f'Before: {since}   After: {version}' if since else f'Everything up to {version}'
     draw.text((left, top + 180 * unit), compared, font=demo.font(round(30 * unit)), fill=ACCENT)
     line_font = demo.font(round(26 * unit))
+    line_width = canvas[0] * 0.7 - left  # stops short of the poster's play button, at 3/4 of the width
     y = top + 250 * unit
     for task in tasks[:MAX_LISTED]:
         mark = '' if task['video'] else '   (no video)'
         line = f'{task["id"]}  {task["title"]}{mark}'
-        draw.text((left, y), clipped(draw, line, line_font, canvas[0] - 2 * left), font=line_font,
+        draw.text((left, y), clipped(draw, line, line_font, line_width), font=line_font,
                   fill=demo.WHITE if task['video'] else MUTED)
         y += 38 * unit
     if len(tasks) > MAX_LISTED:
