@@ -3,7 +3,7 @@ id: T-099
 title: "Rules from the session report: efficient tooling, event-driven waiting, teammates only when they pay"
 sprint: 2026-10-05
 urgent: true
-status: todo
+status: doing
 owner: worktree-sandbox
 rolled: 0
 order: -5
@@ -33,3 +33,4 @@ Waits on T-096: same files (teammate.md, lead.md), so worktree-sandbox takes it 
 PR: https://github.com/iosifnicolae2/better-tasks/pull/57
 T-099 (#57) Rules from the session report
 Three short rules added. Teammates make their own small tools instead of repeating long scripts, and wait for a job's notice instead of a timer. The lead does the same, and reuses the teammates it has, starting a new one only when it's worth about 50k tokens.
+- 2026-10-07: Accepted. Full tests: `sh scripts/test.sh` 358 pass, tsc clean, skills-check ok, settings-doc current. Review PR #57 closed. Not released yet.
