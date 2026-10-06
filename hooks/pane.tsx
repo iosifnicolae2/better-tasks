@@ -439,6 +439,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       case 'statusEvery': written = await $.config.set({ key: 'better-tasks.statusEvery', value: value }); break
       case 'maxTeammates': written = await $.config.set({ key: 'better-tasks.maxTeammates', value: value }); break
       case 'keepAwake': written = await $.config.set({ key: 'better-tasks.keepAwake', value: value }); break
+      case 'worktreeSandbox': written = await $.config.set({ key: 'better-tasks.worktreeSandbox', value: value }); break
       case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value: value }); break
       case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value: value }); break
       case 'batchDeviceTests': written = await $.config.set({ key: 'better-tasks.batchDeviceTests', value: value }); break

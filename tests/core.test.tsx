@@ -45,6 +45,8 @@ type Host = {
   runOutput: Record<string, string>
   /** When set, what process.run prints for an argv, ahead of runOutput (undefined: not its command). */
   answerRun?: (argv: readonly string[]) => string | undefined
+  /** When set, the stderr of an argv that fails (exit code 1); undefined: it succeeds. */
+  failRun?: (argv: readonly string[]) => string | undefined
   /** Each process.run's argv, joined with spaces. */
   ran: string[]
   env: Map<string, string>
@@ -139,7 +141,8 @@ function fakeHost(
       }
     }
     const stdout = host.answerRun?.(e.argv) ?? host.runOutput[e.argv.join(' ')] ?? ''
-    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    const stderr = host.failRun?.(e.argv)
+    return { value: { exitCode: stderr === undefined ? 0 : 1, stdout, stderr: stderr ?? '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', { tool: 'AskUserQuestion' }, () => ({ result: { answers: { When: 'Now' } } }))
   on('tool.call', { tool: 'SendMessage' }, () => ({ result: 'sent' }))
@@ -351,7 +354,7 @@ test("a project's file of the same name extends a skill, or replaces it", async 
   expect(host.notices.some(line => line.includes('.claude/better-tasks/done.md failed'))).toBe(true)
 })
 
-test('with worktree on, a named teammate is spawned in a worktree', { options: { worktree: true } }, async ($, on) => {
+test('with worktree on, a named teammate is spawned in a worktree', { options: { worktree: true, worktreeSandbox: true } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   fakeHost(on)
@@ -371,13 +374,71 @@ test('a teammate in the shared checkout gets no worktree command rules', async (
   expect(host.spawned[0]).not.toContain('stay in your worktree')
 })
 
-test('a teammate the lead spawns in a worktree itself gets the worktree command rules', async ($, on) => {
+test('a teammate the lead spawns in a worktree itself gets the worktree command rules', { options: { worktreeSandbox: true } }, async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
   expect(host.spawned[0]).toContain('must plainly stay in your worktree')
+})
+
+const AUTH_WORKTREE = `${ROOT}/.claude/worktrees/auth`
+
+test('worktrees without the sandbox, the default: better-tasks makes the worktree with git and spawns the teammate unisolated, told its path', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  host.failRun = argv => (argv.includes('--verify') || argv.join(' ').endsWith('origin/HEAD') ? 'no such ref' : undefined)
+  await $.session.start(SESSION)
+  const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'Auth', isolation: 'worktree' })
+  expect(named.result).toEqual({ isolation: 'none' })
+  expect(host.ran).toContain(`git -C ${ROOT} worktree add -b worktree-auth ${AUTH_WORKTREE} HEAD`)
+  expect(host.spawned[0]).toContain(`Your own worktree \`${AUTH_WORKTREE}\`, on branch \`worktree-auth\``)
+  expect(host.spawned[0]).toContain(`start each command with \`cd ${AUTH_WORKTREE} && \``)
+  expect(host.spawned[0]).toContain('In the main checkout, edit only your task file')
+  expect(host.spawned[0]).not.toContain('must plainly stay')
+})
+
+test('without the sandbox, a respawn reuses its worktree, or its branch; the remote default branch is the base, as Claude Code does', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  host.answerRun = argv => (argv.includes('--porcelain') ? `worktree ${ROOT}\nHEAD abc\n\nworktree ${AUTH_WORKTREE}\nbranch refs/heads/worktree-auth\n` : argv.at(-1) === 'origin/HEAD' ? 'origin/main\n' : undefined)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
+  expect(host.ran.some(line => line.includes('worktree add'))).toBe(false)
+  host.failRun = argv => (argv.includes('--verify') ? 'no such ref' : undefined)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'login', isolation: 'worktree' })
+  expect(host.ran).toContain(`git -C ${ROOT} worktree add -b worktree-login ${ROOT}/.claude/worktrees/login origin/main`)
+  host.failRun = undefined
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'cart', isolation: 'worktree' })
+  expect(host.ran).toContain(`git -C ${ROOT} worktree add ${ROOT}/.claude/worktrees/cart worktree-cart`)
+})
+
+test('without the sandbox, git failing to make the worktree falls back to an isolated one with its rules, said in one line', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on)
+  host.failRun = argv => (argv.includes('add') ? 'fatal: not a git repository' : undefined)
+  await $.session.start(SESSION)
+  const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
+  expect(named.result).toEqual({ isolation: 'worktree' })
+  expect(host.spawned[0]).toContain('must plainly stay in your worktree')
+  expect(host.notices).toContain("better-tasks: making auth's worktree failed (fatal: not a git repository); it runs in Claude Code's isolated worktree instead.")
+})
+
+test('without the sandbox, the gitignored files .worktreeinclude names are copied into a new worktree', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  const host = fakeHost(on, [], { [`${ROOT}/.worktreeinclude`]: '.env\n' })
+  host.answerRun = argv => (argv.includes('--exclude-standard') ? '.env\nconfig/local.json\nnode_modules/x.js\n' : argv.some(arg => arg.startsWith('--exclude-from=')) ? '.env\nconfig/local.json\nREADME.md\n' : undefined)
+  await $.session.start(SESSION)
+  await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
+  expect(host.ran).toContain(`cp -p ${ROOT}/.env ${AUTH_WORKTREE}/.env`)
+  expect(host.ran).toContain(`cp -p ${ROOT}/config/local.json ${AUTH_WORKTREE}/config/local.json`)
+  expect(host.ran).toContain(`mkdir -p ${AUTH_WORKTREE}/config`)
+  expect(host.ran.some(line => line.includes('README.md') || line.includes('node_modules'))).toBe(false)
 })
 
 const EXCLUDED = '<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />'
@@ -1138,9 +1199,8 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(named.result).toEqual({ isolation: 'worktree' })
-  expect(host.spawned[0]).toContain("Your own worktree and branch, and a PR that merges into main")
-  expect(host.spawned[0]).toContain('must plainly stay in your worktree')
+  expect(named.result).toEqual({ isolation: 'none' })
+  expect(host.spawned[0]).toContain("Your own worktree `/project/.claude/worktrees/auth`, on branch `worktree-auth`, and a PR that merges into main")
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('Merge with `gh pr merge --squash`')
   expect(composed.sections.at(-1)?.text).toContain('the full tests, then its PR')
@@ -1479,7 +1539,8 @@ test('a worktree and a PR per task, the default with a GitHub remote: a named te
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(named.result).toEqual({ isolation: 'worktree' })
+  expect(named.result).toEqual({ isolation: 'none' })
+  expect(host.ran).toContain(`git -C ${ROOT} worktree add ${ROOT}/.claude/worktrees/auth worktree-auth`)
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain('## Git flow\nA worktree and a PR per task.')
 })
@@ -1496,7 +1557,7 @@ test('straight to main, the default without a GitHub remote: one checkout, and t
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   expect(composed.sections.at(-1)?.text).toContain("a task's PR is a draft for review that never merges")
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'bug', isolation: 'worktree' })
-  expect(host.spawned[1]).toContain('Your own worktree and branch')
+  expect(host.spawned[1]).toContain('Your own worktree `/project/.claude/worktrees/bug`')
 })
 
 test('the shared dev branch flow: no worktree, land on dev, the PR from the pull-request skill; the lead merges and syncs dev', async ($, on) => {
