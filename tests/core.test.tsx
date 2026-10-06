@@ -506,6 +506,26 @@ test('sprint progress goes in the footer; no teammate count anywhere the user se
   expect(host.toasts.join('\n')).not.toMatch(/teammate/i)
 })
 
+test('the footer recounts as soon as a task closes, before the next prompt', async ($, on) => {
+  mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  fakeHost(on, [])
+  const drawn: string[][] = []
+  on('ui.render', { component: 'SessionMode' }, ($, e) => {
+    drawn.push([...e.props.modes])
+    const { Text } = $.ui.resolve(e)
+    return <Text>{e.props.modes.join(' & ')}</Text>
+  })
+  await $.session.start(SESSION)
+  await $.prompt.submit(prompt('add this now: fix the login loop'))
+  await $.tool.call(create)
+  await $.tool.call({ tool: 'mcp__better-tasks__task_update', tool_use_id: 'u1', id: 'T-001', status: 'done', note: 'Works', commits: 'abc123' })
+
+  const footer = await $.ui.mount({ plugin: 'better-tasks', surface: 'terminal', component: 'SessionMode', props: { modes: [] } })
+  expect(drawn.at(-1)).toEqual(['Sprint 41 · 1/1 done'])
+  await footer.unmount()
+})
+
 test('a refused command name is logged; the other commands, the tools and the tips still come', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)

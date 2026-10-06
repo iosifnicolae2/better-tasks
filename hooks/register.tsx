@@ -144,6 +144,13 @@ export const register: Register = (on, options) => {
     return written
   })
 
+  // The footer follows the tasks as the board does: any write of them (a tool, a file edit, the board) recounts it.
+  on('state.set', { plugin: 'better-tasks', key: 'tasks' }, async ($, e, next) => {
+    const written = await next(e)
+    await showStatus($, await settingsNow($)).catch(error => logFailure($, 'the footer', error))
+    return written
+  })
+
   on('prompt.submit', async ($, e, next) => {
     const isOwnCheck = e.origin.kind === 'plugin' && e.origin.name === 'better-tasks'
     if (isOwnCheck) {
