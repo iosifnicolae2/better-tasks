@@ -5,7 +5,7 @@ Usage: release-video.sh --version v0.12.0 [--since v0.11.3] [--until main] [--qu
 The tasks are those the commits in since..until name: a subject that starts with a task id ("T-052 ...",
 a PR merge) or ends with it in parentheses ("... (T-058)", straight to main); the prefix is the project's
 taskPrefix. The video: an opening card (the version, what it ships, the tasks without
-a video), then per task a card with its id and title and its own before/after video, as the video skill
+a video), then per task a card with its id, its PR number ("T-058 (#33)") and its title and its own before/after video, as the video skill
 made it. The video and its poster (the opening card with a play button) go next to the task videos,
 release-<version>.mp4 and .png; prints the poster's path, then the video's.
 Exits 3 when no shipped task has a video: there is nothing to show.
@@ -63,7 +63,7 @@ def main() -> None:
         parts = [card_clip(work, 'opening', opening, args.version, opening_words(args.version, args.since, tasks, shown), canvas, voice, True)]
         for number, task in enumerate(shown, 1):
             card = draw_task_card(work / f'{task["id"]}.png', canvas, task, number, len(shown))
-            parts.append(card_clip(work, task['id'], card, args.version, f'{task["id"]}: {task["title"]}', canvas, voice, False))
+            parts.append(card_clip(work, task['id'], card, args.version, f'{task["ref"]}: {task["title"]}', canvas, voice, False))
             parts.append(fitted_video(task['video'], canvas, work / f'{task["id"]}-fitted.mp4'))
         output = demo.videos_dir() / f'release-{args.version}.mp4'
         demo.join(work, parts, output)
@@ -102,22 +102,50 @@ def shipped_tasks(since: str, until: str, prefix: str) -> list:
             named, title = re.split(r',\s*', match.group(2)), match.group(1)
         else:
             continue
+        merged = match.group(3) if match.re is at_start else None
         for found in named:
             if found not in seen:
                 seen.add(found)
-                tasks.append({'id': found, 'title': task_title(found) or title or found})
+                number = pr_number(found) or (merged and merged.strip(' (#)'))
+                ref = f'{found} (#{number})' if number else found
+                tasks.append({'id': found, 'ref': ref, 'title': task_title(found) or title or found})
     return tasks
 
 
-def task_title(task_id: str) -> str:
-    """The title in the task file's front matter (.claude/tasks/<id>-*.md), or '' when there is none."""
+def task_text(task_id: str) -> str:
+    """The task file (.claude/tasks/<id>-*.md), or '' when there is none."""
     for path in sorted((demo.project_root() / '.claude' / 'tasks').glob(f'**/{task_id}-*.md')):
-        for line in path.read_text(errors='replace').splitlines()[1:20]:
-            if line == '---':
-                break
-            if line.startswith('title:'):
-                return line.removeprefix('title:').strip().strip('"\'')
+        return path.read_text(errors='replace')
     return ''
+
+
+def task_title(task_id: str) -> str:
+    """The title in the task file's front matter, or '' when there is none."""
+    for line in task_text(task_id).splitlines()[1:20]:
+        if line == '---':
+            break
+        if line.startswith('title:'):
+            return unquoted(line.removeprefix('title:').strip())
+    return ''
+
+
+def unquoted(value: str) -> str:
+    """A YAML scalar as written: a double-quoted one has JSON's escapes, a single-quoted one doubles its quotes."""
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value[1:-1]
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    return value
+
+
+def pr_number(task_id: str) -> str:
+    """The number of the task's PR: on its last "PR: <url>" note line, or '' before it has one."""
+    lines = [line for line in task_text(task_id).splitlines() if 'PR:' in line]
+    numbers = [found.group(1) for line in lines if (found := re.search(r'/pull/(\d+)', line.split('PR:', 1)[1]))]
+    return numbers[-1] if numbers else ''
 
 
 def task_video(task_id: str, work: Path) -> Path | None:
@@ -164,7 +192,7 @@ def draw_opening(path: Path, canvas: tuple, version: str, since: str, tasks: lis
     y = top + 250 * unit
     for task in tasks[:MAX_LISTED]:
         mark = '' if task['video'] else '   (no video)'
-        line = f'{task["id"]}  {task["title"]}{mark}'
+        line = f'{task["ref"]}  {task["title"]}{mark}'
         draw.text((left, y), clipped(draw, line, line_font, line_width(canvas, left)), font=line_font,
                   fill=demo.WHITE if task['video'] else MUTED)
         y += 38 * unit
@@ -179,7 +207,7 @@ def draw_task_card(path: Path, canvas: tuple, task: dict, number: int, total: in
     image, draw, unit = blank(canvas)
     left = 90 * unit
     draw.text((left, 260 * unit), f'{number} of {total}', font=demo.font(round(30 * unit)), fill=MUTED)
-    draw.text((left, 300 * unit), task['id'], font=demo.font(round(110 * unit)), fill=ACCENT)
+    draw.text((left, 300 * unit), task['ref'], font=demo.font(round(110 * unit)), fill=ACCENT)
     title_font = demo.font(round(54 * unit))
     for row, line in enumerate(wrapped(draw, task['title'], title_font, line_width(canvas, left), TITLE_LINES)):
         draw.text((left, (460 + row * 72) * unit), line, font=title_font, fill=demo.WHITE)
