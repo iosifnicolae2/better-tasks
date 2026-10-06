@@ -39,3 +39,5 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/38
 PR: https://github.com/iosifnicolae2/better-tasks/pull/38
 T-068 Default git flow: a worktree and a PR per task
 A project that never picked a git flow now gives each task its own worktree and PR, merged after you approve it (straight to main only when there's no GitHub remote). The setup question recommends it too; projects that already picked a flow keep theirs.
+
+2026-10-06: Accepted. Full tests pass (320 tests, tsc, task-pr/open-pr/video-branch/skills/yaml checks, docs current). Review PR #38 closed.
