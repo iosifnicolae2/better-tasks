@@ -28,3 +28,11 @@ Video: [T-079.mp4](../tasks_videos/T-079.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/44
 T-079 (#44) Reference tasks with their PR number, like "T-078 (#43)"
 Tasks with a PR are now named with its number, "T-078 (#43)", in what the lead writes to you, in the teammates' notes, in the task list and on the board.
+- 2026-10-06: Changes requested. User: "also everywhere where the user is reading, display the task number, for example in the question..". Everywhere the user reads, show the task id, with "(#NN)" when it has a PR. In AskUserQuestion: the question text and the header chip, e.g. header "T-079 (#44)", which fits in the 12-character limit. Also option descriptions when they name a task, release-related questions (each task they ship), status lines, release notes, PR titles and video titles. Check every user-facing template and rule for places that name a task without its id.
+- 2026-10-06: Changes made. lead.md: the bullet now lists where (text, questions, headers and options, status lines, release notes); the approval question gets header "<id> (#<PR number>)" and text "<id> (#<PR number>): ...". status-check.md: each task by its id and PR number. done.md: any task the "For the user" block names, the ones a release ships too, the same way. Code: the open tasks the lead gets with each message, task_note, task_search, the sprint review and docs/tasks.md rows use taskRef. Commits 75d1052 (rules, tests, docs), 42e71d8 (code). `claude plugin test .`: 324 pass. New video; PR #44 updated.
+- 2026-10-06: Left for the lead to route (release area, asked): release notes (scripts/release.sh commit subjects) and the release video's task cards (bin/release_video.py). PR titles stay "T-079 <title>": GitHub shows the number beside it, and a PR can't name its own number before it exists.
+
+### For the user
+PR: https://github.com/iosifnicolae2/better-tasks/pull/44
+T-079 (#44) Reference tasks with their PR number, like "T-078 (#43)"
+Wherever you read a task, it now carries its PR number, "T-078 (#43)": approval questions (header and text), status updates, teammates' notes, the task list and the board. Release notes and the release video still show bare ids; those are with the lead to route.
