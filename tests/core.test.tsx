@@ -309,6 +309,7 @@ test("our skills load as their template, rendered with the settings in force; ot
   expect((await $.skill.prompt({ skill: 'better-tasks:testing', text: 'T' })).text).toContain("the project's own virtual display")
   expect((await $.skill.prompt({ skill: 'better-tasks:contribute', text: 'C' })).text).toContain('header "PR upstream"')
   expect((await $.skill.prompt({ skill: 'better-tasks:done', text: 'D' })).text).toMatch(/^# Reporting done\n/)
+  expect((await $.skill.prompt({ skill: 'better-tasks:tester', text: 'Q' })).text).toMatch(/^# You are the tester of a batch\n/)
   expect((await $.skill.prompt({ skill: 'commit', text: 'X ${CLAUDE_PLUGIN_ROOT}' })).text).toBe('X ${CLAUDE_PLUGIN_ROOT}')
 })
 

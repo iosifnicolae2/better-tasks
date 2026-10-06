@@ -10,6 +10,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 - Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Delete captures and build output once you no longer need them.
 {% if batchDeviceTests %}
 - Sharing a build with other tasks, and the lead asks for a feature flag? One for your change, off by default, switched at runtime (a launch argument, env var or toggle); once it is confirmed working, remove the flag and the old path.
+- Your task in a batch with a tester? Capture your "before", make your change, and write in your task file what to check; the tester {% if demoVideos %}records your "after" and {% endif %}notes any bugs there. When it reports, fix them (ask it to re-test){% if demoVideos %}, make your video from your "before" and its "after"{% endif %}, and go on with your PR.
 {% endif %}
 {% if isStuckRule %}
 - Not getting there? Stop, note what you tried, tell the lead.

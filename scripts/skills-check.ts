@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 
 const root = new URL('..', import.meta.url).pathname
-const SKILLS = ['video', 'testing', 'done', 'contribute', 'pull-request']
+const SKILLS = ['video', 'testing', 'done', 'contribute', 'pull-request', 'tester']
 
 const problems: string[] = []
 for (const name of SKILLS) {

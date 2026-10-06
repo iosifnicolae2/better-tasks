@@ -7,6 +7,7 @@ describe('the plugin skills', () => {
     expect(skillCall('video')).toBe('better-tasks:video')
     expect(ourSkill('better-tasks:video')).toBe('video')
     expect(ourSkill('testing')).toBe('testing')
+    expect(ourSkill('better-tasks:tester')).toBe('tester')
     expect(ourSkill('other-plugin:video')).toBeUndefined()
     expect(ourSkill('commit')).toBeUndefined()
   })
