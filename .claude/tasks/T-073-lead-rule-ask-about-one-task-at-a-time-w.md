@@ -25,9 +25,10 @@ This is the user's own repo (iosifnicolae2/better-tasks): work in it directly, w
 Video: [T-073.mp4](../tasks_videos/T-073.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/40
 - 2026-10-06: step 4 of the lead rules (`.claude/better-tasks/lead.md`) now says: one task at a time, once its video is in its PR, never two tasks in a question or two questions at once; the PR link (and release's) in the text above and inside the question. Regenerated docs/instructions.md and tests/templates.gen.ts; tests/rules.test.ts and tests/core.test.tsx check it. 322 tests pass. done.md, pull-request.md and README already agree, left as they are. Commit abfe06c.
+- 2026-10-06: the user's note: the question now says in a few words what was implemented or fixed ("<id>: <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"), short and lean. New video. 322 tests pass. Commit ceb2b4a.
 - Not checked: a live lead session following the new rule.
 
 ### For the user
 PR: https://github.com/iosifnicolae2/better-tasks/pull/40
 T-073 Lead rule: ask about one task at a time, with its video and its PR link above and inside the question
-The lead now asks about one finished task at a time, only once its video is in its PR, with the PR link both above the question and inside it.
+The lead now asks about one finished task at a time, only once its video is in its PR. The question says briefly what was implemented or fixed, with the PR link both above it and inside it.
