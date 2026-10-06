@@ -17,4 +17,5 @@ Every task gets one, docs, rules and tooling too. Nothing changes on screen? Sho
 ## Report it
 - First line under "## Notes" in the task file (task_note when it's outside your worktree): `Video: [T-004.mp4](../tasks_videos/T-004.mp4)`. A newer video replaces the file, not the line.
 - Its path and file:// link (the one the script printed) go under "Links:" in your "For the user" block, never in its question (the done skill).
+- A release's video is made from these task videos (`${CLAUDE_PLUGIN_ROOT}/bin/release-video.sh`, setting releaseVideos): keep the task id as the video's name.
 - With a PR, the video goes in it (the `better-tasks:pull-request` skill). gh can't upload it: `${CLAUDE_PLUGIN_ROOT}/bin/video-branch.sh <video> <poster>` commits both to the branch better-tasks-videos (never merged), pushes it and prints their web links (video first), then the caption.

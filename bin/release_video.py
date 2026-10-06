@@ -53,7 +53,7 @@ def main() -> None:
             task['video'] = task_video(task['id'], work)
         shown = [task for task in tasks if task['video']]
         if not shown:
-            print(f'release-video: none of the {len(tasks)} tasks since {args.since or "the start"} has a video', file=sys.stderr)
+            print(f'release-video: no task since {args.since or "the start"} has a video ({len(tasks)} shipped)', file=sys.stderr)
             sys.exit(NO_VIDEO)
 
         voice = demo.Voice('af_heart')
