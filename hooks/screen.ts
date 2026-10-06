@@ -4,13 +4,13 @@ import type { Teammate } from '../types'
 import { settingsOf } from './settings'
 import { isActive } from './team'
 
-// Screen off, Mac awake: /away and the screen_off tool black out the physical screens
+// Screen off, Mac awake: /away and the screen_off tool turn the physical screens off
 // until the user is back; virtual displays stay on for teammates' tests and recordings.
 // keepAwake holds the Mac awake while teammates run.
 
-const BACK_TEXT = 'Screens are black and the Mac stays awake. Move the mouse or press a key to come back.'
-const FALLBACK_TEXT = 'Could not black out the screens, so they went to sleep instead. The Mac may lock.'
-const KEPT_ON_TEXT = 'Could not black out the screens. They stay on, since display sleep would stop the virtual displays teammates test on.'
+const BACK_TEXT = 'Screens are off and the Mac stays awake. Move the mouse or press a key to turn them back on.'
+const FALLBACK_TEXT = 'Could not turn the screens off, so they went to sleep instead. The Mac may lock.'
+const KEPT_ON_TEXT = 'Could not turn the screens off. They stay on, since display sleep would stop the virtual displays teammates test on.'
 const HOLD_SECONDS = 120 // outlasts the team's one-minute refresh, then lapses on its own
 const RENEW_AFTER_MS = 30_000
 
@@ -20,11 +20,11 @@ export const SCREEN_COMMANDS: CommandSpec[] = [
 
 export const SCREEN_TOOLS: ToolSpec[] = [{
   name: 'screen_off',
-  description: 'Blacks out the physical screens while the Mac stays awake, until the user moves the mouse or '
+  description: 'Turns the physical screens off while the Mac stays awake, until the user moves the mouse or '
     + 'presses a key; virtual displays stay on. Call it when the user says they are leaving and wants the screen off.',
 }]
 
-/** Starts the blackout detached (a reload can't cut it off) and prints "black" once it shows,
+/** Starts the blackout detached (a reload can't cut it off) and prints "black" once the screens are dark,
  *  else "failed: why", plus "virtual displays on" when display sleep would stop them. */
 export const awayArgv = (root: string) => ['/bin/sh', `${root}/bin/away.sh`]
 

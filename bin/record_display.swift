@@ -13,6 +13,11 @@
 //                          the old levels to <file> first; virtual displays have no such link, so they stay on
 //   undim <file>           puts the levels saved in <file> back, then removes it
 //   ddc                    reads each external screen's power and brightness over DDC/CI, to see which answer
+//   off <file> <ids> <pid> turns the given screens off as macOS does for an unplugged one (no signal, so each
+//                          monitor goes to its own standby; virtual displays stay on), saving the ids to <file>
+//                          first; prints "ready off <ids it turned off>", then holds until <pid> ends or a
+//                          signal, and turns them back on
+//   on <file>              turns the screens saved in <file> back on, then removes it (the fallback if off dies)
 // Never DDC power or standby: on 2026-10-06 standby (VCP 0xD6=4) left an LG and a Philips dark, their
 // own buttons dead and the LG still off after a replug. Brightness is safe: the monitor's buttons undo it.
 // Each prints "ready ..." once it holds what it asked for, or "failed: why".
@@ -298,6 +303,48 @@ func makeDisplay(_ options: Options) -> CGVirtualDisplay {
   return display
 }
 
+// MARK: screens off: disabled, as if unplugged; macOS keeps it after we exit, so every way out turns them on
+
+typealias SetDisplayEnabled = @convention(c) (CGDisplayConfigRef?, CGDirectDisplayID, Bool) -> CGError
+let setDisplayEnabled = dlsym(dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW),
+                              "SLSConfigureDisplayEnabled").map { unsafeBitCast($0, to: SetDisplayEnabled.self) }
+
+/** Turns each display on or off, one by one (macOS may refuse one, e.g. the last); returns those it took. */
+func setEnabled(_ ids: [CGDirectDisplayID], _ enabled: Bool) -> [CGDirectDisplayID] {
+  guard let setDisplayEnabled else { return [] }
+  return ids.filter { id in
+    var config: CGDisplayConfigRef?
+    guard CGBeginDisplayConfiguration(&config) == .success else { return false }
+    guard setDisplayEnabled(config, id, enabled) == .success else { CGCancelDisplayConfiguration(config); return false }
+    return CGCompleteDisplayConfiguration(config, .forSession) == .success
+  }
+}
+
+func screensOff(_ file: String, _ ids: [CGDirectDisplayID], parent: pid_t) -> Never {
+  guard parent > 0 else { fail("off needs the pid it holds for") }
+  guard (try? ids.map { "\($0)\n" }.joined().write(toFile: file, atomically: true, encoding: .utf8)) != nil else { fail("cannot write \(file)") }
+  let done = setEnabled(ids, false)
+  say("ready off \(done.map(String.init).joined(separator: ","))")
+  for signalNumber in [SIGTERM, SIGINT, SIGHUP] {
+    signal(signalNumber, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
+    source.setEventHandler { screensOn(file) }
+    source.resume()
+    signalSources.append(source)
+  }
+  while isAlive(parent) { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
+  screensOn(file)
+}
+
+func screensOn(_ file: String) -> Never {
+  guard let saved = try? String(contentsOfFile: file, encoding: .utf8) else { say("ready nothing to turn on"); exit(0) }
+  let ids = saved.split(separator: "\n").compactMap { CGDirectDisplayID($0) }
+  let done = setEnabled(ids, true)
+  try? FileManager.default.removeItem(atPath: file)
+  say("ready on \(done.count) screen(s)")
+  exit(0)
+}
+
 // MARK: modes
 
 func onSignalsExit() {
@@ -360,5 +407,10 @@ case "virtuals": listVirtuals()
 case "dim": dim(arguments.dropFirst().first ?? "")
 case "undim": undim(arguments.dropFirst().first ?? "")
 case "ddc": listDdc()
-default: fail("usage: record_display display|turn|info|arrange|screens|virtuals|dim|undim|ddc ...")
+case "off":
+  let rest = Array(arguments.dropFirst())
+  guard rest.count == 3 else { fail("usage: record_display off <file> <ids> <pid>") }
+  screensOff(rest[0], rest[1].split(separator: ",").compactMap { CGDirectDisplayID($0) }, parent: pid_t(rest[2]) ?? 0)
+case "on": screensOn(arguments.dropFirst().first ?? "")
+default: fail("usage: record_display display|turn|info|arrange|screens|virtuals|dim|undim|ddc|off|on ...")
 }

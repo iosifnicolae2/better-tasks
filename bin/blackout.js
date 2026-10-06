@@ -1,15 +1,16 @@
-// Darkens the physical screens until the first mouse move or key press: black windows, brightness 0
-// (built-in and Apple screens through DisplayServices, other external screens over DDC/CI). Never
-// DDC standby or power off (see bin/record_display.swift). Virtual displays (the projects' test and
-// recording displays) stay on, so teammates keep working.
+// Turns the physical screens off until the first mouse move or key press: macOS disables them as if
+// unplugged, so each monitor gets no signal and goes to its own standby (record-display.sh off). A screen
+// macOS won't turn off gets a black window and brightness 0 instead (built-in and Apple screens through
+// DisplayServices, other external screens over DDC/CI). Never DDC standby or power off (see
+// bin/record_display.swift). Virtual displays (the projects' test and recording displays) stay on.
 // Run:     osascript -l JavaScript bin/blackout.js <statusFile> <physicalIds> <displayHelper> [safetySeconds]
 //          physicalIds: the real screens' display ids, "1,2"; empty: guessed (not our virtual vendor id).
-//          displayHelper: bin/record-display.sh, for "dim|undim"; empty: no DDC dimming.
+//          displayHelper: bin/record-display.sh, for "off|on|dim|undim"; empty: black windows only.
 // Plan:    osascript -l JavaScript bin/blackout.js --plan <physicalIds>  prints the screens it would cover
 // Restore: osascript -l JavaScript bin/blackout.js --restore <statusFile> <displayHelper>
-// Writes "black" (or "failed: why") to <statusFile> once the windows are up. What it changes it notes
-// first (<statusFile>.brightness, <statusFile>.ddc), so --restore can undo it even if this
-// process is killed (JXA cannot catch signals). bin/away.sh runs both.
+// Writes "black" (or "failed: why") to <statusFile> once the screens are dark. What it changes it notes
+// first (<statusFile>.off, .brightness, .ddc), so --restore can undo it even if this process is
+// killed (JXA cannot catch signals). bin/away.sh runs both.
 ObjC.import('Cocoa')
 ObjC.import('CoreGraphics')
 
@@ -27,13 +28,17 @@ function run(argv) {
   const app = $.NSApplication.sharedApplication
   app.setActivationPolicy($.NSApplicationActivationPolicyAccessory)
 
-  const screens = physicalScreens(physicalIds)
-  if (screens.length === 0) return writeFile(statusFile, 'failed: no physical screens')
-  const windows = screens.map(blackWindow)
-  app.activateIgnoringOtherApps(true)
-  $.NSCursor.hide
-  dimDisplays(statusFile, screens.map(displayId))
-  runHelper(displayHelper, 'dim', statusFile)
+  const physical = physicalScreens(physicalIds).map(displayId)
+  if (physical.length === 0) return writeFile(statusFile, 'failed: no physical screens')
+  const { holder, off } = screensOff(statusFile, physical, displayHelper)
+  const lit = $.NSScreen.screens.js.filter(screen => physical.includes(displayId(screen)) && !off.includes(displayId(screen)))
+  const windows = lit.map(blackWindow)
+  if (windows.length > 0) {
+    app.activateIgnoringOtherApps(true)
+    $.NSCursor.hide
+  }
+  dimDisplays(statusFile, lit.map(displayId))
+  if (off.length === 0) runHelper(displayHelper, 'dim', `${statusFile}.ddc`)
   writeFile(statusFile, 'black')
 
   const shownAt = Date.now()
@@ -41,11 +46,28 @@ function run(argv) {
     $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.25))
   }
 
-  // Quickest first: the windows and the Mac's own brightness go at once, then the DDC screens.
+  // Quickest first: the windows and the Mac's own brightness go at once, then the screens come back on.
   windows.forEach(window => window.orderOut(null))
-  $.NSCursor.unhide
+  if (windows.length > 0) $.NSCursor.unhide
   $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.01)) // shows it now
+  if (holder && holder.running) { holder.terminate; holder.waitUntilExit }
   restore(statusFile, displayHelper)
+}
+
+/** Starts the helper that holds the screens off while this process lives; returns it and the ids it turned off. */
+function screensOff(statusFile, ids, displayHelper) {
+  if (!displayHelper) return { holder: undefined, off: [] }
+  const holder = $.NSTask.alloc.init
+  const output = $.NSPipe.pipe
+  holder.launchPath = '/bin/sh'
+  holder.arguments = [displayHelper, 'off', `${statusFile}.off`, ids.join(','),
+    String($.NSProcessInfo.processInfo.processIdentifier)]
+  holder.standardOutput = output
+  holder.launch
+  const said = $.NSString.alloc.initWithDataEncoding(output.fileHandleForReading.availableData, $.NSUTF8StringEncoding).js
+  const off = (said.match(/^ready off ([\d,]*)/) || ['', ''])[1].split(',').filter(Boolean).map(Number)
+  $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.5)) // the screens' new layout
+  return { holder, off }
 }
 
 function physicalScreens(physicalIds) {
@@ -112,17 +134,18 @@ function dimDisplays(statusFile, displays) {
 }
 
 function restore(statusFile, displayHelper) {
+  runHelper(displayHelper, 'on', `${statusFile}.off`)
   restoreBrightness(statusFile)
-  runHelper(displayHelper, 'undim', statusFile)
+  runHelper(displayHelper, 'undim', `${statusFile}.ddc`)
 }
 
-// External screens' backlight over DDC/CI (a black window alone keeps an LCD lit); the helper saves
-// the levels to <statusFile>.ddc, and undim does nothing when that file is gone.
-function runHelper(displayHelper, command, statusFile) {
+// on: the screens noted in <file>; dim|undim: external screens' backlight over DDC/CI, a lit screen's
+// fallback (a black window alone keeps an LCD lit). Each does nothing when its file is gone.
+function runHelper(displayHelper, command, file) {
   if (!displayHelper) return
   const task = $.NSTask.alloc.init
   task.launchPath = '/bin/sh'
-  task.arguments = [displayHelper, command, `${statusFile}.ddc`]
+  task.arguments = [displayHelper, command, file]
   task.launch
   task.waitUntilExit
 }

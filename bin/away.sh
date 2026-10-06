@@ -1,5 +1,5 @@
 #!/bin/sh
-# Darkens the physical screens (bin/blackout.js) detached, so a plugin reload can't cut it off,
+# Turns the physical screens off (bin/blackout.js) detached, so a plugin reload can't cut it off,
 # and prints its first status line ("black" or "failed: why"). Used by hooks/screen.ts for /away.
 # Virtual displays (the projects' test and recording displays, other apps' too) stay on.
 # A failure while virtual displays are on adds the line "virtual displays on": then no display sleep.

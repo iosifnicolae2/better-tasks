@@ -11,6 +11,7 @@
 #   record-display.sh stop <pid> | status | remove (the project's display) | arrange (every virtual display below the screens)
 #   record-display.sh screens: the real screens, "<id><tab><name>" each; virtuals: the virtual displays' ids
 #   record-display.sh dim|undim <file>: external screens' brightness to 0 over DDC/CI, or back; ddc: what each answers
+#   record-display.sh off <file> <ids> <pid>: those screens off (no signal) while <pid> lives; on <file>: back on
 # The project may test on a real screen instead: "testScreen" in .claude/tasks/config.json (a name from `screens`;
 # "virtual", the default, is the project's own display); --screen <name> or BT_TEST_SCREEN wins over it.
 # A chosen screen that is not connected: the virtual display, with one line on stderr saying so.
@@ -205,5 +206,7 @@ case "$command" in
   dim) "$exe" dim "$@" ;;
   undim) "$exe" undim "$@" ;;
   ddc) "$exe" ddc ;;
-  *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  off) exec "$exe" off "$@" ;;
+  on) "$exe" on "$@" ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

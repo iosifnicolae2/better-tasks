@@ -38,7 +38,7 @@ const isAway = (argv: string[]) => argv[0] === '/bin/sh' && /\/bin\/away\.sh$/.t
 test('/away starts the detached blackout', async ($, on) => {
   const spawned = fakeHost(on)
   const { text } = await $.command.run(AWAY)
-  expect(text).toContain('Screens are black')
+  expect(text).toContain('Screens are off')
   expect(spawned.filter(isAway)).toHaveLength(1)
 })
 
