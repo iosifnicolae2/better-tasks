@@ -4,6 +4,10 @@
 # Virtual displays (the projects' test and recording displays, other apps' too) stay on.
 # A failure while virtual displays are on adds the line "virtual displays on": then no display sleep.
 # Usage: away.sh [safetySeconds]
+case "${1:-}" in
+  -h|--help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  ''|*[!0-9]*) [ -z "${1:-}" ] || { echo "away.sh: safetySeconds must be a number, got \"$1\" (see --help)" >&2; exit 2; } ;;
+esac
 here="$(cd "$(dirname "$0")" && pwd)"
 helper="$here/record-display.sh"
 script="$here/blackout.js"

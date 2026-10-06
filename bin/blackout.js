@@ -22,6 +22,7 @@ const GRACE_SECONDS = 1 // ignores the key-up of the command that started us
 const DISPLAY_SERVICES = '/System/Library/PrivateFrameworks/DisplayServices.framework'
 
 function run(argv) {
+  if (argv[0] === '--help' || argv[0] === '-h') return usage()
   if (argv[0] === '--restore') return restore(argv[1], argv[2])
   if (argv[0] === '--plan') return plan(physicalScreens(argv[1]).map(displayId)).join('\n')
   const [statusFile, physicalIds, displayHelper, safety] = argv
@@ -71,6 +72,13 @@ function screensOff(statusFile, ids, displayHelper) {
   const off = (said.match(/^ready off ([\d,]*)/) || ['', ''])[1].split(',').filter(Boolean).map(Number)
   $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.5)) // the screens' new layout
   return { holder, off }
+}
+
+/** The comment at the top of this file, which says how to run it. */
+function usage() {
+  const path = $.NSProcessInfo.processInfo.arguments.js.map(arg => arg.js).find(arg => arg.endsWith('blackout.js'))
+  const lines = readFile(path).split('\n')
+  return lines.slice(0, lines.findIndex(line => !line.startsWith('//'))).map(line => line.replace(/^\/\/ ?/, '')).join('\n')
 }
 
 function physicalScreens(physicalIds) {
