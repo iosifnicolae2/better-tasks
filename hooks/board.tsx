@@ -3,7 +3,7 @@ import type { ElementTable } from 'claude-code'
 import type { Task, Teammate, When } from '../types'
 import type { SprintConfig } from './sprints'
 import { cacheText, stateOf } from './team'
-import { isOpen, whenOf } from './tasks'
+import { isOpen, taskRef, whenOf } from './tasks'
 
 // The board page of the Sprint pane: the task list (sections, then the collapsed closed tasks) in a
 // window of fixed height, and under it, pinned to the bottom, the selected task's box and the key line
@@ -140,12 +140,6 @@ export function partsOf(text: string, ranges: readonly (readonly [number, number
 }
 
 /** How many of the bar's cells are filled for `done` of `total`. */
-/** The task's pull request: the link on its last "PR: <url>" note line (a bare url or a markdown link). */
-export function prIn(body: string): string | undefined {
-  const lines = body.split('\n').filter(line => /\bPR:/.test(line))
-  return lines.map(line => line.slice(line.search(/\bPR:/)).match(/https?:\/\/[^\s)\]>]+/)?.[0]).filter(Boolean).pop()
-}
-
 export function filledCells(done: number, total: number, cells = BAR_CELLS): number {
   return total === 0 ? 0 : Math.round((done / total) * cells)
 }
@@ -450,7 +444,7 @@ function TaskRow({ ui, task, isSelected, hasKeys, canSpin, role, isFirst, isLast
   const { Box, Button, Text } = ui
   const isMoving = role === 'moving'
   const isClosed = !isOpen(task)
-  const label = `${task.id}  ${task.title}`
+  const label = `${taskRef(task)}  ${task.title}`
   const title =
     role === 'still' ? (
       <Text color="subtle" wrap="truncate-end">{label}</Text>
@@ -529,7 +523,7 @@ function DetailOf({ ui, selected, hasKeys, actions }: Required<Pick<DetailProps,
   return (
     <>
       <DetailLine ui={ui}>
-        <Text bold wrap="truncate-end">{task.id}  {task.title}</Text>
+        <Text bold wrap="truncate-end">{taskRef(task)}  {task.title}</Text>
         <Text color="subtle">{place}</Text>
       </DetailLine>
       <DetailLine ui={ui}>

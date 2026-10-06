@@ -64,6 +64,18 @@ export function isOpen(task: Task): boolean {
   return task.status === 'todo' || task.status === 'doing'
 }
 
+/** The task's pull request: the link on its last "PR: <url>" note line (a bare url or a markdown link). */
+export function prIn(body: string): string | undefined {
+  const lines = body.split('\n').filter(line => /\bPR:/.test(line))
+  return lines.map(line => line.slice(line.search(/\bPR:/)).match(/https?:\/\/[^\s)\]>]+/)?.[0]).filter(Boolean).pop()
+}
+
+/** How the task is named to the user: its id, and its PR's number once it has one ("T-078 (#43)"). */
+export function taskRef(task: Task): string {
+  const number = prIn(task.body)?.match(/\/pull\/(\d+)/)?.[1]
+  return number ? `${task.id} (#${number})` : task.id
+}
+
 /** Where a "when" puts a task: its sprint and whether it is urgent. */
 export function placeOf(when: When, today: string, config: SprintConfig): Pick<Task, 'sprint' | 'urgent'> {
   const current = sprintStart(today, config)
@@ -126,7 +138,7 @@ export const WHEN_LABELS: Record<When, string> = {
 
 /** One line per task, for the model. */
 export function taskLine(task: Task, today: string, config: SprintConfig): string {
-  const parts = [`${task.id} [${task.status}] ${task.title}`, WHEN_LABELS[whenOf(task, today, config)]]
+  const parts = [`${taskRef(task)} [${task.status}] ${task.title}`, WHEN_LABELS[whenOf(task, today, config)]]
   if (task.owner) parts.push(`owner ${task.owner}`)
   if (task.rolled > 0) parts.push(`rolled ${task.rolled}x`)
   return parts.join(' · ')
