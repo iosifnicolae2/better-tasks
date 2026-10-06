@@ -10,7 +10,7 @@ A Claude Code plugin. Your tasks are Markdown files in your project; a team of C
 
 ## ✨ Features
 
-- 📝 **Tasks as Markdown**: plain files in `.claude/tasks/`, committed with your code.
+- 📝 **Tasks as Markdown**: plain files in `.claude/tasks/`, committed with your code. A task can wait on others (`dependsOn`); the lead starts it once they are done.
 - 🤖 **A team of agents**: a lead routes each task to a teammate; teammates work in parallel.
 - 🎥 **Before/after video**: after each task you get a short narrated video to review it ([see an example](https://cdn.jsdelivr.net/gh/iosifnicolae2/better-tasks@main/docs/videos/sample-before-after.mp4)). Turn it on with the `demoVideos` setting. A release can come with one video of all its tasks' videos: `bin/release-video.sh` (setting `releaseVideos`).
 - ✅ **You approve**: no task closes without your yes.

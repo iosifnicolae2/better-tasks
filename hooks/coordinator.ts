@@ -7,7 +7,7 @@ import { taskIdIn } from './spawn'
 import { goalOf, readSprints } from './sprintlog'
 import { sprintNumber, sprintStart, sprintTitle } from './sprints'
 import type { SprintConfig } from './sprints'
-import { isOpen, listTasks, taskRef, today, WHEN_LABELS, whenOf } from './tasks'
+import { isBlocked, isOpen, listTasks, taskRef, today, waitsText, WHEN_LABELS, whenOf } from './tasks'
 import { isActive, mateLine, refreshTeam } from './team'
 
 // The main session as coordinator: its rules and a small context block per prompt.
@@ -47,7 +47,7 @@ export async function contextBlock(io: Io, settings: Settings, notice: string): 
   const done = tasks.filter(task => task.status === 'done').length
   const lines = [
     `[better-tasks] ${sprintTitle(start, config, day)} · goal: ${goal || 'not set'} · ${done}/${tasks.length} done`,
-    ...waitingLines(tasks),
+    ...waitingLines(tasks, all),
     ...openTaskLines(all, day, config),
     notice,
     ...team.map(mate => `Teammate ${mateLine(mate)}`),
@@ -64,7 +64,8 @@ export function openTaskLines(tasks: readonly Task[], day: string, config: Sprin
   const newest = (a: Task, b: Task) => b.created.localeCompare(a.created) || b.id.localeCompare(a.id, undefined, { numeric: true })
   const shown = [...open.filter(isNear), ...open.filter(task => !isNear(task)).sort(newest).slice(0, OTHERS_SHOWN)]
   if (shown.length === 0) return []
-  const line = (task: Task) => `- ${taskRef(task)} ${task.title} · ${WHEN_LABELS[whenOf(task, day, config)]}${task.owner ? ` · ${task.owner}` : ''}`
+  const line = (task: Task) =>
+    [`- ${taskRef(task)} ${task.title}`, WHEN_LABELS[whenOf(task, day, config)], task.owner, waitsText(task, tasks)].filter(Boolean).join(' · ')
   const hidden = open.length - shown.length
   return ['Open tasks (match the message against these):', ...shown.map(line), ...(hidden > 0 ? [`- … ${hidden} more: task_list`] : [])]
 }
@@ -101,11 +102,16 @@ export function unclosedLine(ids: readonly string[]): string {
   )
 }
 
-function waitingLines(tasks: readonly Task[]): string[] {
+/** The currently-working-on tasks not started yet: route the ones free to start; the blocked ones wait for their dependencies. */
+function waitingLines(tasks: readonly Task[], all: readonly Task[]): string[] {
   const waiting = tasks.filter(task => task.urgent && task.status === 'todo')
-  if (waiting.length === 0) return []
-  const list = waiting.map(task => `${taskRef(task)} ${task.title}`).join('; ')
-  return [`Currently working on, not started yet: ${list}. Route each now: its owner or a new teammate.`]
+  const named = (task: Task) => `${taskRef(task)} ${task.title}`
+  const ready = waiting.filter(task => !isBlocked(task, all)).map(named)
+  const held = waiting.filter(task => isBlocked(task, all)).map(task => `${named(task)} (${waitsText(task, all)})`)
+  return [
+    ready.length > 0 ? `Currently working on, not started yet: ${ready.join('; ')}. Route each now: its owner or a new teammate.` : '',
+    held.length > 0 ? `Blocked, not started: ${held.join('; ')}. Start each once its dependencies are done.` : '',
+  ].filter(Boolean)
 }
 
 /** The footer label: "Sprint 41 · 1/4 done", plus " · 1 due" when a currently-working-on task waits. Teammates are Claude Code's to show. */
