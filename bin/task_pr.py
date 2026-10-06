@@ -16,9 +16,10 @@ those commits, each picked with `git merge-tree`, so no file in any checkout cha
 shared dev branch (git flow "dev-prs"), or from local main under "straight to main" (the project's
 .claude/tasks/config.json says which). A commit already on the branch (its "(cherry picked from commit ...)" line)
 or already in main is skipped. The task's before/after video (.claude/tasks_videos/T-004.mp4 and its .png poster)
-goes right after the request and why: on the videos branch (video-branch.sh, next to this script), which plays
-for everyone through jsDelivr when the repo is public. A private repo's video is attached by gh 2.99+ instead: GitHub
-serves an attached video only to someone signed in, which a private repo's viewers are.
+goes right after the request and why: attached by gh 2.99+, as github.com does when you drop a file in, with the
+video also shown as a player under its picture. GitHub opens an attachment to whoever can see a page that shows it
+(a picture or a player): anyone in a public repo, members in a private one. A video that is only a link stays
+signed-in only. Without gh 2.99+: the videos branch (video-branch.sh, next to this script).
 
 Straight to main: the PR is for review only, a draft that never merges (the commits reach main with the lead's push).
 It goes into `task/T-004-base`, the commit before the task's first, so it shows the task's changes alone.
@@ -154,11 +155,6 @@ def gh_attaches() -> bool:
     return bool(match) and tuple(map(int, match.groups())) >= ATTACH_SINCE
 
 
-def repo_is_private() -> bool:
-    """Only GitHub says "PRIVATE"; a public repo, or one gh can't see, gets the videos branch."""
-    return run("gh", "repo", "view", "--json", "visibility", "-q", ".visibility").stdout.strip() in ("PRIVATE", "INTERNAL")
-
-
 def video_file(task: str) -> Path:
     return MAIN_CHECKOUT / ".claude/tasks_videos" / f"{task}.mp4"
 
@@ -168,17 +164,23 @@ def video_id(task: str) -> str:
     return hashlib.sha1(video_file(task).read_bytes()).hexdigest()[:12] if video_file(task).exists() else "none"
 
 
-def video_lines(task: str, can_attach: bool = True) -> tuple[list[str], list[str]]:
-    """The two lines that show the video in the PR, and gh's --attach arguments for them."""
+def player(video: str) -> list[str]:
+    """GitHub turns a video link on its own line into a player; that is what lets visitors open it."""
+    return ["<details><summary>Or play it here</summary>", "", video, "", "</details>", ""]
+
+
+def video_lines(task: str) -> tuple[list[str], list[str]]:
+    """The lines that show the video in the PR, and gh's --attach arguments for them (the local paths in the
+    lines become the uploads' links, except the player's: show_player fills that in)."""
     video = video_file(task)
     poster = video.with_suffix(".png")
     if not (video.exists() and poster.exists()):
         return [], []
     marker = f"<!-- video {video_id(task)} -->"
-    if can_attach and gh_attaches() and repo_is_private():
+    if gh_attaches():
         return ([marker, f"[![Before/after video: click to play it with sound]({poster})]({video})",
-                 "Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).", ""],
-                ["--attach", str(poster), "--attach", str(video)])
+                 "Click the picture to play the video with sound (Cmd-click or Ctrl-click: in a new tab).", ""]
+                + player(str(video)), ["--attach", str(poster), "--attach", str(video)])
     branch = run("sh", str(HERE / "video-branch.sh"), str(video), str(poster))
     printed = branch.stdout.strip().splitlines()
     if branch.returncode != 0 or len(printed) < 3:
@@ -186,6 +188,15 @@ def video_lines(task: str, can_attach: bool = True) -> tuple[list[str], list[str
         return [], []
     video_url, poster_url, caption = printed[0], printed[1], printed[-1]
     return [marker, f"[![Before/after video: click to play it with sound]({poster_url})]({video_url})", caption, ""], []
+
+
+def show_player(task: str, branch: str) -> None:
+    """gh rewrote the picture's link to the uploaded video; the player gets the same link."""
+    body = json.loads(run("gh", "pr", "view", branch, "--json", "body").stdout)["body"]
+    linked = re.search(r"^\[!\[Before/after video[^\n]*\]\((https://[^)\s]+)\)$", body, re.M)
+    local = f"\n{video_file(task)}\n"
+    if linked and local in body:
+        run("gh", "pr", "edit", branch, "--body", body.rstrip("\n").replace(local, f"\n{linked.group(1)}\n"))
 
 
 def default_body(task: str, path: Path | None, commits: list[str]) -> str:
@@ -231,7 +242,8 @@ def with_video(body: str, shown: list[str]) -> str:
 
 REVIEW_NOTE = ("> For review only: these commits go straight to main. "
                "This draft never merges; it closes with the task.\n\n")
-VIDEO_BLOCK = re.compile(r"^(<!-- video \w+ -->\n)?\[!\[Before/after video[^\n]*\n[^\n]*\n\n?", re.M)
+VIDEO_BLOCK = re.compile(r"^(<!-- video \w+ -->\n)?\[!\[Before/after video[^\n]*\n[^\n]*\n\n?"
+                         r"(<details><summary>Or play it here</summary>\n\n[^\n]*\n\n</details>\n\n?)?", re.M)
 
 
 def open_pr(task: str, options: argparse.Namespace) -> int:
@@ -311,6 +323,8 @@ def create_pr(task: str, branch: str, base: str, commits: list[str], options: ar
     if created.returncode != 0:
         print(created.stderr.strip(), file=sys.stderr)
         return created.returncode
+    if attach:
+        show_player(task, branch)
     print(created.stdout.strip().splitlines()[-1])
     return 0
 
@@ -323,15 +337,14 @@ def update_pr(task: str, branch: str, options: argparse.Namespace) -> int:
         body = REVIEW_NOTE + body
     old = VIDEO_BLOCK.search(view["body"])
     is_new_video = video_file(task).exists() and not (old and f"<!-- video {video_id(task)} -->" in old.group(0))
-    if is_new_video:
-        shown = video_lines(task, can_attach=False)[0]
-    else:
-        shown = old.group(0).rstrip("\n").splitlines() + [""] if old else []
+    shown, attach = video_lines(task) if is_new_video else (old.group(0).rstrip("\n").splitlines() + [""] if old else [], [])
     body = with_video(VIDEO_BLOCK.sub("", body), shown)
     if body != view["body"]:
-        edited = run("gh", "pr", "edit", branch, "--body", body)
+        edited = run("gh", "pr", "edit", branch, "--body", body, *attach)
         if edited.returncode != 0:
             sys.exit(f"task_pr: gh pr edit: {edited.stderr.strip()}")
+        if attach:
+            show_player(task, branch)
         say("description updated" + (", with the new video" if is_new_video else ""))
     if options.ready and view["isDraft"]:
         run("gh", "pr", "ready", branch)
