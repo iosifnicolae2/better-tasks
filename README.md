@@ -81,6 +81,18 @@ claude plugin marketplace remove better-tasks
 Installed per project? Add `--scope project` to `update` and `uninstall`.
 </details>
 
+## 🔒 What it runs, reads and sends
+
+better-tasks has no server and collects no data: nothing is sent to its author or to any analytics.
+
+- **Files it writes**: your tasks in `.claude/tasks/` and its settings in `.claude/tasks/config.json`, in your project. Once per machine it asks Claude to add a line to your `~/.claude/CLAUDE.md` pointing at its team rules; you approve that edit.
+- **Files it reads**: your project, Claude Code's settings (to pin and update the plugin), and a finished teammate's transcript in `~/.claude/projects/`, which only its successor is pointed at.
+- **Programs it runs, on your machine**: `git`; `gh` for pull requests, with your own GitHub login; your editor, to open a task; on macOS `caffeinate` (setting `keepAwake`), and for `/away` `pmset` and a small virtual-display helper compiled from [bin/](bin/).
+- **Network**: `git ls-remote` on this GitHub repo at startup, to see if a release is out. With "PR per task", `gh` talks to GitHub for your repo, and better-tasks installs or updates `gh` with Homebrew if it is missing or too old. With before/after videos on, a one-time setup installs the Kokoro voice (`uv` fetches packages from PyPI and the voice model from Hugging Face) into `~/.local/share/better-tasks/kokoro`, and each video goes to its PR on GitHub (attached by `gh`, or on a `videos` branch of your repo). Nothing else.
+- **Environment**: it sets Claude Code's prompt-cache TTL to 1 hour (setting `longCache`) unless you set one.
+
+Questions, bugs or a security report: [open an issue](https://github.com/iosifnicolae2/better-tasks/issues) or write to iosif@bringes.io.
+
 ## 🛠️ Contributing
 
 Ask Claude for the change: it forks this repo, tries it as a linked install, then offers to open a PR here. Details and dev commands: [CONTRIBUTING.md](CONTRIBUTING.md).
