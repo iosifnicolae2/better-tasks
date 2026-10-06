@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { activeInstall, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, updateArgv, updateQuestion } from '../hooks/updatecheck'
+import { activeInstall, declaresMarketplace, isNewer, lsRemoteArgv, newestTag, offeredRelease, pinTarget, releaseTags, repinArgv, updateArgv, updateQuestion } from '../hooks/updatecheck'
 
 const LS_REMOTE = ['aaa\trefs/tags/v0.9.0', 'bbb\trefs/tags/v0.10.7', 'ccc\trefs/tags/v0.10.10', 'ddd\trefs/tags/nightly', 'eee\trefs/tags/v1.0.0-rc1'].join('\n')
 const ROOT = '/work/app'
@@ -55,6 +55,16 @@ describe('the startup update check', () => {
     expect(repinArgv('https://git.example.com/bt.git', 'v1.0.0')?.at(-1)).toBe('https://git.example.com/bt.git#v1.0.0')
     expect(updateArgv('--evil')).toEqual(['claude', 'plugin', 'update', '--scope', 'user', '--', 'better-tasks@better-tasks'])
     expect(updateArgv('project')).toEqual(['claude', 'plugin', 'update', '--scope', 'project', '--', 'better-tasks@better-tasks'])
+  })
+
+  test('user or managed settings that declare the marketplace: Claude Code takes its source from there alone', () => {
+    const declared = { extraKnownMarketplaces: { 'better-tasks': { source: { source: 'github', repo: 'iosifnicolae2/better-tasks' }, autoUpdate: true } } }
+    expect(declaresMarketplace(JSON.stringify(declared))).toBe(true)
+    expect(declaresMarketplace(JSON.stringify({ extraKnownMarketplaces: { other: {} } }))).toBe(false)
+    expect(declaresMarketplace('{}')).toBe(false)
+    expect(declaresMarketplace(undefined)).toBe(false)
+    expect(declaresMarketplace('not json')).toBe(false)
+    expect(declaresMarketplace('null')).toBe(false)
   })
 
   test('the question is short and plain', () => {

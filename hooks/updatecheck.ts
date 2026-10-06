@@ -89,6 +89,22 @@ export function repinArgv(source: string, tag: string): string[] | undefined {
   return ['claude', 'plugin', 'marketplace', 'add', '--scope', 'project', '--', `${source}#${tag}`]
 }
 export const refreshArgv = ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE_NAME]
+
+/** Managed settings, per OS; a file that isn't there is skipped. */
+export const MANAGED_SETTINGS = ['/Library/Application Support/ClaudeCode/managed-settings.json', '/etc/claude-code/managed-settings.json']
+
+/**
+ * True when user or managed settings declare the better-tasks marketplace (extraKnownMarketplaces). Claude Code
+ * then takes its source from there alone and refuses `marketplace add` from any other, a project's pin included.
+ */
+export function declaresMarketplace(settingsText: string | undefined): boolean {
+  try {
+    const declared = JSON.parse(settingsText ?? '{}')?.extraKnownMarketplaces
+    return typeof declared === 'object' && declared !== null && Object.hasOwn(declared, MARKETPLACE_NAME)
+  } catch {
+    return false
+  }
+}
 export const updateArgv = (scope: string) => ['claude', 'plugin', 'update', '--scope', SCOPES.includes(scope) ? scope : 'user', '--', PLUGIN_ID]
 
 type ListEntry = { id?: unknown; version?: unknown; scope?: string; installPath?: unknown; projectPath?: unknown }
