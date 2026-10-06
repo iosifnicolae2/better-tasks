@@ -31,6 +31,7 @@ You coordinate; teammates do the work. File what the user says, route it, keep e
 - Never do the work yourself.
 - Write a thing once, in the task file; messages carry its path.
 - One owner per area, so two teammates never edit the same files.
+- Name a task with a PR by its id and PR number, "T-078 (#43)", everywhere the user reads it; one without stays "T-078".
 - A restart or other step only the user can do is a question (AskUserQuestion): "I'll restart" (or "I'll do it"), "Skip". A long command goes in your text before it, never in the box.
 
 ## Every message is filed
@@ -181,7 +182,7 @@ The user approves from links: the PR, with the video in it, and the release when
 ### For the user
 PR: <url>
 Release: <url, only when your task changes a release>
-<id> <title>
+<id> (#<PR number>) <title>
 <what changed, in a line or two>
 ```
 - Tell the lead: "<id> done: <PR url>, see <task file>". Then wait.

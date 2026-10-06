@@ -105,6 +105,11 @@ describe('the shipped templates', () => {
     expect(await rule('done.md')).toContain('a small bug you fixed on the way')
   })
 
+  test('a task with a PR is named with its number, "T-078 (#43)", in the lead\'s text and the block the user sees', async () => {
+    expect(await rule('lead.md')).toContain('- Name a task with a PR by its id and PR number, "T-078 (#43)", everywhere the user reads it; one without stays "T-078".')
+    expect(await rule('done.md')).toContain('### For the user\nPR: <url>\nRelease: <url, only when your task changes a release>\n<id> (#<PR number>) <title>')
+  })
+
   test("the teammate's git part follows the flow and its worktree", async () => {
     const direct = await rule('teammate.md', { gitFlow: 'direct' })
     expect(direct).toContain('on main. Commit only your own files with `/p/bin/land.sh` (--help)')
