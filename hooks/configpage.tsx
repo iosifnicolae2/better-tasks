@@ -160,6 +160,16 @@ export const FIELDS: readonly Field[] = [
   },
   {
     group: 'testing',
+    field: 'releaseVideos',
+    label: 'Release videos',
+    describe: 'A release comes with one narrated video of everything it ships: each task’s before/after video, linked from the release notes. Saved in this project.',
+    options: ON_OFF,
+    value: settings => (settings.releaseVideos ? 'on' : 'off'),
+    initial: 'on',
+    stored: isOn,
+  },
+  {
+    group: 'testing',
     field: 'offScreen',
     label: 'Test off-screen',
     describe: 'Teammates test and record in a hidden browser, simulator or terminal, so your screen, mouse and keyboard stay yours. Saved in this project.',

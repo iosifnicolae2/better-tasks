@@ -60,6 +60,8 @@ export type Settings = {
   /** Where Mac apps are tested and recorded: "virtual" (the project's own display) or a real screen's name (testenv.ts). */
   testScreen: string
   videoQuality: VideoQuality
+  /** A release comes with one video of its tasks' before/after videos (bin/release-video.sh); a project setting. */
+  releaseVideos: boolean
   /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
   gitFlow: GitFlow
   /** The shared branch of the dev-prs flow. */
@@ -99,6 +101,7 @@ export const FIELDS: Record<string, Field> = {
   offScreen: { kind: 'boolean' },
   testScreen: { kind: 'string' },
   videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
+  releaseVideos: { kind: 'boolean' },
   pullRequests: { kind: 'boolean' },
   gitFlow: { kind: 'string', values: GIT_FLOWS },
   devBranch: { kind: 'string' },
@@ -136,6 +139,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   offScreen: true,
   testScreen: 'virtual',
   videoQuality: 'medium',
+  releaseVideos: true,
   pullRequests: false,
   gitFlow: 'direct',
   devBranch: 'dev',
@@ -177,6 +181,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     offScreen: value('offScreen') === true,
     testScreen: String(value('testScreen')).trim() || 'virtual',
     videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
+    releaseVideos: value('releaseVideos') !== false,
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
     instructions: String(value('instructions')),
@@ -210,7 +215,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 export const CONFIG_FILE = '.claude/tasks/config.json'
 
 /** Settings that belong to the project only: the settings page writes them to its config.json, never to /config. */
-export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen', 'testScreen', 'prTemplate']
+export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen', 'testScreen', 'prTemplate', 'releaseVideos']
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }
