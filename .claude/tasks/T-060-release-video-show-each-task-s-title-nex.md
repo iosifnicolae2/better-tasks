@@ -27,3 +27,15 @@ What changed: each task's card in the release video now shows its title under it
 To try it: play the new v0.11.6 video at /private/tmp/claude-501/-Users-iosif-Documents-Projects-better-tasks/53ae7dac-9013-42a3-a974-c8490897e797/scratchpad/t060/videos/release-v0.11.6.mp4 and look at the T-059 card.
 After your yes I put this video in the v0.11.6 release notes (same release, no new tag).
 Is everything OK?
+- 2026-10-06: User replied to T-060's approval question with a general request, filed as T-061: every approval links the PR and the release, with the video inside them. For T-060 itself: put the new release video into the v0.11.6 notes now, so the user can check it in the release before approving. Then the lead asks again with the release link.
+- 2026-10-06: The new release video is in v0.11.6's notes (gh release edit, same tag): https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.6 . Video and poster on better-tasks-videos (c227eb5); both links answer 200. Still after the yes: full tests and this task's video.
+
+### For the user
+Links:
+Release: [v0.11.6](https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.6)
+Question:
+T-060 Release video: show each task's title next to its number
+What changed: each task's card in the release video now shows its title under its number, and the corner shows the version instead of the number a second time.
+To try it: open the release and play its video; look at the T-059 card.
+https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.6
+Is everything OK?
