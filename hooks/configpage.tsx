@@ -179,6 +179,16 @@ export const FIELDS: readonly Field[] = [
     stored: isOn,
   },
   testScreenField([]),
+  {
+    group: 'testing',
+    field: 'batchDeviceTests',
+    label: 'Batch device tests',
+    describe: 'When builds or device tests are slow, tasks that don’t touch each other share one build, each behind its own feature flag, removed once it works.',
+    options: ON_OFF,
+    value: settings => (settings.batchDeviceTests ? 'on' : 'off'),
+    initial: 'on',
+    stored: isOn,
+  },
   ...LEVELS.flatMap(modelFields),
   {
     group: 'models',

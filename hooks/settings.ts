@@ -62,6 +62,8 @@ export type Settings = {
   videoQuality: VideoQuality
   /** A release comes with one video of its tasks' before/after videos (bin/release-video.sh); a project setting. */
   releaseVideos: boolean
+  /** Slow builds or device tests: unrelated tasks share one build, each behind its own feature flag (lead.md, teammate.md). */
+  batchDeviceTests: boolean
   /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
   gitFlow: GitFlow
   /** The shared branch of the dev-prs flow. */
@@ -101,6 +103,7 @@ export const FIELDS: Record<string, Field> = {
   testScreen: { kind: 'string' },
   videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
   releaseVideos: { kind: 'boolean' },
+  batchDeviceTests: { kind: 'boolean' },
   pullRequests: { kind: 'boolean' },
   gitFlow: { kind: 'string', values: GIT_FLOWS },
   devBranch: { kind: 'string' },
@@ -138,6 +141,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   testScreen: 'virtual',
   videoQuality: 'medium',
   releaseVideos: true,
+  batchDeviceTests: true,
   pullRequests: false,
   gitFlow: DEFAULT_FLOW,
   devBranch: 'dev',
@@ -179,6 +183,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     testScreen: String(value('testScreen')).trim() || 'virtual',
     videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
     releaseVideos: value('releaseVideos') !== false,
+    batchDeviceTests: value('batchDeviceTests') !== false,
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
     excludeWorktreesFromIde: value('excludeWorktreesFromIde') !== false,
