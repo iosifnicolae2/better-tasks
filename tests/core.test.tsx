@@ -1195,6 +1195,20 @@ test('a newer release: asked once; Yes moves the pin, updates the plugin, asks t
   expect(host.notices).toContain(restartLaterLine('v0.10.8'))
 })
 
+test('a pin already at the release (a teammate pulled the bump): the install catches up, nothing to commit', async ($, on) => {
+  const clock = mock.clock(on, { now: MONDAY_OCT_5 })
+  mock.store(on)
+  answerSetup(on, { [updateQuestion('v0.10.8')]: 'Yes' })
+  const host = fakeHost(on, [], { [SHARED]: unpinned({ source: { source: 'github', repo: 'iosifnicolae2/better-tasks', ref: 'v0.10.8' } }) })
+  fakePluginCli(host, '0.10.7', '0.10.8')
+  host.runOutput[LS_REMOTE] = RELEASES
+  await $.session.start(SESSION)
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(host.ran).toContain('claude plugin update --scope user -- better-tasks@better-tasks')
+  expect(host.ran.some(command => command.includes(' commit '))).toBe(false)
+  expect(host.notices).toContain('better-tasks: updated to v0.10.8.')
+})
+
 test('a newer release, No: not asked again for that release', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   const store = new Map<string, unknown>()

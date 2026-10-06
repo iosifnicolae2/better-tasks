@@ -429,6 +429,7 @@ async function checkForUpdate($: EngineInterface): Promise<void> {
 async function updateTo($: EngineInterface, tag: string, install: Install): Promise<void> {
   const shared = await readShared($)
   const isPinnedHere = hasTeamInstall(shared) && pinnedTag(shared) !== undefined
+  const movesPin = isPinnedHere && pinnedTag(shared) !== tag
   const hadEdits = await hasSharedEdits($)
   const run = async (argv: string[]) => $.process.run(argv, { cwd: await $.session.root(), timeoutMs: 180_000 })
   const isDeclared = await isDeclaredByUser($)
@@ -442,8 +443,8 @@ async function updateTo($: EngineInterface, tag: string, install: Install): Prom
   const moved = await run(fetchArgv)
   if (moved.exitCode !== 0 && userRepinned !== undefined) await $.fs.write(userPath, user)
   if (moved.exitCode !== 0) return $.ui.log(`better-tasks: could not fetch ${tag}: ${moved.stderr.trim()}`)
-  if (isPinnedHere && isDeclared) await pinSharedTo($, shared, tag)
-  const pinNote = isPinnedHere ? ` ${SHARED_SETTINGS} now pins ${tag}. ${await selfCommit($, updateCommit(tag), hadEdits)}` : ''
+  if (movesPin && isDeclared) await pinSharedTo($, shared, tag)
+  const pinNote = movesPin ? ` ${SHARED_SETTINGS} now pins ${tag}. ${await selfCommit($, updateCommit(tag), hadEdits)}` : ''
   const updated = await run(updateArgv(install.scope))
   if (updated.exitCode !== 0 || (await versionNow($, install.scope)) !== tag.slice(1)) {
     return $.ui.log(`better-tasks: could not update to ${tag}: ${(updated.stderr || updated.stdout).trim()}. Try: ${updateArgv(install.scope).join(' ')}`)
