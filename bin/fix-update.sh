@@ -103,7 +103,7 @@ main() {
   move_marketplace
   move_project_pin
   update_installs
-  echo "better-tasks: done. Restart Claude Code to use $tag."
+  echo "better-tasks: done. Restart Claude Code to use $tag: quit, then run claude --continue."
 }
 
 main
