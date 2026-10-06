@@ -61,17 +61,13 @@ Restart Claude Code. Updates bring the latest [release](https://github.com/iosif
 <details>
 <summary>Update fails: "its source doesn't match its extraKnownMarketplaces entry", or "already at the latest version"?</summary>
 
-Your Claude Code settings pin better-tasks to a release, and better-tasks before v0.11.8 can't move that pin. Unstick it once, `vX.Y.Z` being the [latest release](https://github.com/iosifnicolae2/better-tasks/releases):
+Your Claude Code settings pin better-tasks to an old release, and better-tasks before v0.11.8 can't move that pin. Fix it once, in the project folder:
 
-1. In `~/.claude/settings.json`, under `extraKnownMarketplaces` → `better-tasks` → `source`, set `"ref"` to `"vX.Y.Z"`.
-2. Run:
+```sh
+curl -fsSL https://raw.githubusercontent.com/iosifnicolae2/better-tasks/main/bin/fix-update.sh | sh
+```
 
-   ```sh
-   claude plugin marketplace add iosifnicolae2/better-tasks#vX.Y.Z
-   claude plugin update --scope user better-tasks@better-tasks
-   ```
-
-Installed per project too? In each such project's folder: `claude plugin update --scope project better-tasks@better-tasks`. Restart Claude Code. From then on, Yes to the startup question updates it. No `"ref"` in that entry? The update commands at the top of this section are all it takes.
+It moves the pin to the latest release (a copy of your old settings: `~/.claude/settings.json.bak-better-tasks`), updates better-tasks and moves the project's pin: [bin/fix-update.sh](bin/fix-update.sh). Restart Claude Code. From then on, Yes to the startup question updates it.
 </details>
 
 <details>
