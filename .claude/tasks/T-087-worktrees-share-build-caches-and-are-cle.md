@@ -2,8 +2,8 @@
 id: T-087
 title: Worktrees share build caches and are cleaned up, for a fast feedback loop
 sprint: 2026-10-05
-urgent: true
-status: todo
+urgent: false
+status: done
 owner:
 rolled: 0
 order: -2
@@ -19,3 +19,4 @@ The lead does this one itself, as the user asked. Add short principle-level inst
 Update the tests that check the rules text.
 
 ## Notes
+- 2026-10-07: Done by the lead, as the user asked. Teammate rules: keep the loop fast (incremental builds, narrowest check first, full suite at the finish) and delete captures and build output when done; in a worktree, reuse the main checkout's build caches and dependencies. Lead rules: once a task is closed, remove its worktree and merged branch. 347 tests pass. Also removed 30 leftover clean worktrees (branches kept); left agent-a4fd357a8255c38b4 (T-045), which has uncommitted changes. Not released yet.

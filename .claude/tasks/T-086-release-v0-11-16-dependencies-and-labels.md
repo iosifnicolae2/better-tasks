@@ -2,8 +2,8 @@
 id: T-086
 title: Release v0.11.16 (dependencies and labels, footer, privacy, virtual display)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-6
 rolled: 0
 order: -5
@@ -24,3 +24,4 @@ The user approved: "Release tonight", once T-085 (#49)'s full tests pass. Waits 
 
 ## Notes
 2026-10-07: rebased on 9b64dfa (clean), 346 tests pass, pushed; released v0.11.16 (cf51f51) with video; ls-tree .claude/tasks count 0. https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.16
+- 2026-10-07: v0.11.16 published with the release video: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.16 (T-081 (#46), T-082 (#45), T-083 (#47), T-084 (#48), T-085 (#49)). Rebased cleanly onto 9b64dfa; 346 tests pass. The tag has 0 files under .claude/tasks. Main is level with origin.

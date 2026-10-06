@@ -2,8 +2,8 @@
 id: T-089
 title: Tests and docs read the rules straight from .claude/better-tasks (no generated copy)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: test-infra
 rolled: 0
 order: -2
@@ -30,3 +30,4 @@ T-089 (#50) Tests and docs read the rules straight from .claude/better-tasks
 A rule change needs no regenerate step: `sh scripts/test.sh` builds the tests' copy of the rules itself, since the test runner can't read files. The generated docs/instructions.md is gone. `bun scripts/instructions-doc.ts --open` shows that page on demand.
 - 2026-10-07: Lead: the stale line is part of this task. contribute.md now says `sh <fork>/scripts/test.sh` (test in rules.test.ts); no other rule, skill, CLAUDE.md or doc names the test command (done.md says only "full tests"). release.sh and scripts/*-check.sh use neither docs/instructions.md nor templates.gen.ts. test.sh 347 pass. Commit e2eca84; PR #50 updated.
 - 2026-10-07: Accepted. Full tests: test.sh 347 pass; video-branch, task-pr, open-pr, record-display checks ok; yaml-check 40/40; settings-doc current; skills-check ok; instructions-doc renders; tsc clean. Review PR #50 closed.
+- 2026-10-07: `sh scripts/test.sh` writes the rules copy (tests/templates.gen.ts, now git-ignored) from .claude/better-tasks, then runs `claude plugin test .`. The copy is needed because plugin tests get no file access. docs/instructions.md is removed and rendered on demand with `bun scripts/instructions-doc.ts --open`. contribute.md names the new test command. 347 tests pass; review PR #50 closed. Not released yet.

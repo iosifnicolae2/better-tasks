@@ -2,8 +2,8 @@
 id: T-088
 title: Keep tasks current; after the final PR check and merge, clean up the teammate and close the task
 sprint: 2026-10-05
-urgent: true
-status: todo
+urgent: false
+status: done
 owner:
 rolled: 0
 order: -2
@@ -16,3 +16,4 @@ User's words: "also a check to keep the task up to date, and after final pr chec
 - Teammate: the task file is kept current at each step.
 
 ## Notes
+- 2026-10-07: Done by the lead. Step 6: after the PR is closed or merged, in one go: close the task, stop the teammate, remove its worktree and merged branch. Status check: a task whose PR is closed or merged gets closed now, and each task file is kept current. Teammate: the task file is kept current at each step. 347 tests pass. Not released yet.
