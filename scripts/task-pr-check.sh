@@ -1,7 +1,7 @@
 #!/bin/sh
 # Checks bin/task_pr.py on a scratch repo with a stand-in gh: the draft PR before the approval, its video, its URL
 # last, the video attached and shown as a player too (what opens it to visitors), a new video in place of the old one,
-# the videos branch when gh can't attach, --ready, straight to main's review PR and its close.
+# the videos branch when gh can't attach, --ready, straight to main's review PR and its close, similar tasks in one PR.
 # Run: sh scripts/task-pr-check.sh (the plugin test runner can't start a shell). Prints "ok" or what failed.
 set -u
 script="$(cd "$(dirname "$0")/.." && pwd)/bin/task_pr.py"
@@ -32,7 +32,7 @@ elif args[:2] == ["pr", "view"]:
     if not pr: sys.exit(1)
     print(pr["url"] if "-q" in args else json.dumps(pr))
 elif args[:2] == ["pr", "create"]:
-    pr = {"url": "https://github.com/someone/app/pull/7", "body": attached(arg("--body")), "isDraft": "--draft" in args, "base": arg("--base")}
+    pr = {"url": "https://github.com/someone/app/pull/7", "title": arg("--title"), "body": attached(arg("--body")), "isDraft": "--draft" in args, "base": arg("--base")}
     json.dump(pr, open(state, "w")); print("Creating pull request\n" + pr["url"])
 elif args[:2] == ["pr", "edit"]:
     pr["body"] = attached(arg("--body")); json.dump(pr, open(state, "w"))
@@ -95,6 +95,29 @@ pr open T-9 --ready | grep -q 'stays a draft' || fail "straight to main let a re
 pr close T-9 >/dev/null
 [ -e "$work/pr.json" ] && fail "close left the PR open"
 git ls-remote --heads origin 'task/*' | grep -q . && fail "close left branches: $(git ls-remote --heads origin)"
+
+# Similar tasks bundled: one PR for both tasks' commits, the first one's video; each task file notes the PR and that video.
+printf -- '---\ntitle: Round the cart total\n---\n## Goal\nRound it.\n\n## Notes\n- 2026-10-07: started\n' >.claude/tasks/T-12-cart.md
+printf -- '---\ntitle: Round the checkout total\n---\n## Goal\nRound it too.\n' >.claude/tasks/T-13-checkout.md
+printf 'shared video' >.claude/tasks_videos/T-12.mp4
+printf 'poster' >.claude/tasks_videos/T-12.png
+commit e.txt e "Round the cart total (T-12)"
+commit f.txt f "Round the checkout total (T-13)"
+url="$(pr open T-12 T-13 --title 'Round the totals' | tail -1)"
+[ "$url" = "https://github.com/someone/app/pull/7" ] || fail "the bundle's open didn't end with its URL: $url"
+[ "$(pr_field title)" = "T-12 T-13 Round the totals" ] || fail "the bundle's title doesn't name both tasks: $(pr_field title)"
+pr_field body | grep -q '^- T-13 Round the checkout total$' || fail "the bundle's description doesn't list each task"
+[ "$(pr_field body | grep -c '<!-- video ')" = 1 ] || fail "the bundle shows other than one video"
+git fetch -q origin
+[ "$(git show origin/task/T-12:f.txt)" = f ] || fail "the bundle lacks the second task's commit"
+for file in T-12-cart T-13-checkout; do
+  grep -q "PR: $url" ".claude/tasks/$file.md" || fail "$file doesn't note the bundle's PR"
+  [ "$(sed -n '/^## Notes/{n;p;}' ".claude/tasks/$file.md")" = 'Video: [T-12.mp4](../tasks_videos/T-12.mp4)' ] || fail "$file doesn't open its notes with the shared video"
+done
+pr open T-12 T-13 >/dev/null
+[ "$(grep -c 'PR: ' .claude/tasks/T-13-checkout.md)" = 1 ] || fail "opening the bundle again noted its PR twice"
+pr close T-12 T-13 | grep -q 'closed the PR of task/T-12' || fail "close didn't close the bundle's PR"
+[ -e "$work/pr.json" ] && fail "close left the bundle's PR open"
 
 # Shared dev branch: a draft into main, ready after the yes.
 echo '{"gitFlow": "dev-prs"}' >.claude/tasks/config.json

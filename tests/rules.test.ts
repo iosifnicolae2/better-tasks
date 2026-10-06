@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
+import { resolvedIn } from '../hooks/coordinator'
 import { GIT_FLOWS } from '../hooks/gitflow'
 import { NO_FACTS, RULE_FILES, renderRule, rulesChangedNote, varsOf } from '../hooks/rules'
 import type { Facts } from '../hooks/rules'
@@ -144,6 +145,21 @@ describe('the shipped templates', () => {
     expect(lead.match(/Group similar/g)).toHaveLength(1)
   })
 
+  test('similar tasks can share one PR and one video: one question for it, naming every task, and each one closed on the yes', async () => {
+    const lead = await rule('lead.md', { demoVideos: true })
+    expect(lead).toContain('Ask the user about one PR at a time, once its video is in it: one question, never two PRs in it')
+    expect(lead).toContain('Similar tasks sharing one PR: one question that starts with every id, "<id>, <id> (#<PR number>): …".')
+    expect(lead).toContain('close the task (each task of a shared PR)')
+    expect(await rule('teammate.md')).toContain('- Similar tasks of yours can share one PR and one video (`better-tasks:pull-request`).')
+    const pr = await rule('pull-request.md', { demoVideos: true })
+    expect(pr).toContain("`open <id> <id> --title <words>` opens one PR for them all, with the first one's video; `close` takes the same ids.")
+    expect(pr).toContain('`open` notes "PR: <url>", and the video when there is none, in each task file.')
+    expect(await rule('video.md')).toContain('Tasks sharing one PR share one video, named for the first.')
+    const answers = { 'T-004, T-005 (#60): rounded both totals. Is everything OK?': 'Mark as resolved', 'T-007 (#61): fixed the footer, after T-004. OK?': 'Mark as resolved', 'T-009 (#62): x': 'Request changes' }
+    expect(resolvedIn(answers, 'T-')).toEqual(['T-004', 'T-005', 'T-007'])
+    expect(resolvedIn({ 'T-001 Fix login\nWhat changed: T-002 too.': 'Mark as resolved' }, 'T-')).toEqual(['T-001'])
+  })
+
   test('caches: the lead acts on an idle teammate before its cache runs out, or keeps a waiting one warm with a short note; a finished one is stopped; the teammate does not sit idle', async () => {
     expect(await rule('lead.md')).toContain('answer, route or unblock it promptly. One waiting on the user, for an approval say, gets a one-line note shortly before, to keep it warm; one whose task is closed is stopped instead.')
     expect(await rule('teammate.md')).toContain("Don't sit idle mid-task: keep going, and report promptly")
@@ -210,7 +226,7 @@ describe('the shipped templates', () => {
 
   test('closing a task cleans up its teammate and worktree, and the status check keeps tasks current', async () => {
     for (const gitFlow of ['direct', 'worktree-prs'])
-      expect(await rule('lead.md', { gitFlow })).toContain('close the task, stop the teammate, remove its worktree and merged branch')
+      expect(await rule('lead.md', { gitFlow })).toContain('close the task (each task of a shared PR), stop the teammate, remove its worktree and merged branch')
     expect(await rule('status-check.md', {}, { idleMinutes: 10 })).toContain('keep each task file current')
     expect(await rule('status-check.md', {}, { idleMinutes: 10 })).toContain('a task whose PR is closed or merged: close it')
     expect(await rule('teammate.md')).toContain('kept current at each step')
@@ -241,7 +257,7 @@ describe('the shipped templates', () => {
     for (const gitFlow of GIT_FLOWS) {
       const lead = await rule('lead.md', { gitFlow, demoVideos: true })
       expect(lead).toContain('It opens its PR as a draft, the video in it')
-      expect(lead).toContain('Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once')
+      expect(lead).toContain('Ask the user about one PR at a time, once its video is in it: one question, never two PRs in it or two questions at once')
       expect(lead).toContain('Its PR link (and its release\'s, if any) goes in your text just above the question and again inside it: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"')
       expect(lead).toContain('a draft release, the release video in its notes')
       const done = await rule('done.md', { gitFlow })

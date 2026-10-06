@@ -8,6 +8,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 - Keep your context lean; commit small and often. Given a predecessor's transcript? Search it.
 - Don't sit idle mid-task: keep going, and report promptly; your cache runs out while you wait.
 - Keep the loop fast: incremental builds and the narrowest check first, the full suite at the finish. Doing something more than once? Make it a small script or CLI of your own and reuse it. Delete captures and build output once you no longer need them.
+- Similar tasks of yours can share one PR and one video (`better-tasks:pull-request`).
 - Wait for an event, not a clock: run long jobs in the background and act on their notice, give each command a fitting timeout, and send independent calls together in one message.
 {% if batchDeviceTests %}
 - Sharing a build with other tasks, and the lead asks for a feature flag? One for your change, off by default, switched at runtime (a launch argument, env var or toggle); once it is confirmed working, remove the flag and the old path.

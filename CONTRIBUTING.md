@@ -9,7 +9,8 @@ Ask Claude for the change. It forks this repo, makes the change there, runs the 
 - `sh scripts/test.sh`: runs the tests. It first writes the rules in .claude/better-tasks/ as code into tests/templates.gen.ts (git-ignored), since the test runner can't read files; then `claude plugin test .`.
 - `bun scripts/yaml-check.ts [tasks folder]`: checks task front matter with real YAML parsers (Ruby's Psych, as GitHub uses, and Bun.YAML).
 - `sh scripts/video-branch-check.sh`: checks the video links `bin/video-branch.sh` prints.
-- `sh scripts/task-pr-check.sh`: checks `bin/task_pr.py` on a scratch repo with a stand-in gh: the draft PR with its video before the approval, a new video in place of the old, `--ready`, straight to main's review PR and `close`.
+- `sh scripts/task-pr-check.sh`: checks `bin/task_pr.py` on a scratch repo with a stand-in gh: the draft PR with its video before the approval, a new video in place of the old, `--ready`, straight to main's review PR and `close`, similar tasks in one PR with one video.
+- `sh scripts/release-video-check.sh`: checks `bin/release_video.py`'s tasks and cards without making a video: a shared PR's tasks, their one video, one card for them.
 - `sh scripts/open-pr-check.sh`: checks `bin/open-pr.sh` sends the gh token only to GitHub.
 - `sh scripts/record-display-check.sh` (macOS): checks `bin/record-display.sh`: own display per project, one recording at a time, a killed recording frees its turn, the chosen test screen and its fallback.
 - `bun scripts/settings-doc.ts`: regenerates the settings skill after a setting changes (`--check` says whether it is current).
