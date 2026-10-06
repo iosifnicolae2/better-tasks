@@ -66,8 +66,6 @@ export type Settings = {
   gitFlow: GitFlow
   /** The shared branch of the dev-prs flow. */
   devBranch: string
-  /** The project's own instructions for tasks: paths to files or folders, comma-separated (instructions.ts). */
-  instructions: string
   /** The user said yes to "may IntelliJ skip the worktrees folder?", asked once per project (intellij.ts). */
   excludeWorktreesFromIde: boolean
   /** False: the user said no to better-tasks in this project; it stays quiet (projectsetup.ts). */
@@ -105,7 +103,6 @@ export const FIELDS: Record<string, Field> = {
   pullRequests: { kind: 'boolean' },
   gitFlow: { kind: 'string', values: GIT_FLOWS },
   devBranch: { kind: 'string' },
-  instructions: { kind: 'string' },
   excludeWorktreesFromIde: { kind: 'boolean' },
   prTemplate: { kind: 'string' },
   openPrInBrowser: { kind: 'boolean' },
@@ -143,7 +140,6 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   pullRequests: false,
   gitFlow: 'direct',
   devBranch: 'dev',
-  instructions: '',
   excludeWorktreesFromIde: true,
   prTemplate: '',
   openPrInBrowser: true,
@@ -184,7 +180,6 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     releaseVideos: value('releaseVideos') !== false,
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
-    instructions: String(value('instructions')),
     excludeWorktreesFromIde: value('excludeWorktreesFromIde') !== false,
     useBetterTasks: value('useBetterTasks') !== false,
     prTemplate: String(value('prTemplate')).trim(),
@@ -215,7 +210,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
 export const CONFIG_FILE = '.claude/tasks/config.json'
 
 /** Settings that belong to the project only: the settings page writes them to its config.json, never to /config. */
-export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'instructions', 'offScreen', 'testScreen', 'prTemplate', 'releaseVideos']
+export const PROJECT_KEYS = ['gitFlow', 'devBranch', 'offScreen', 'testScreen', 'prTemplate', 'releaseVideos']
 
 /** The keys a project sets, and what was wrong with the rest (each skipped). */
 export type Overrides = { values: Record<string, unknown>; problems: string[] }

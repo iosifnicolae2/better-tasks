@@ -126,6 +126,7 @@ function fakeHost(
     host.ran.push(e.argv.join(' '))
     const [command, ...args] = e.argv
     const paths = args.filter(arg => !arg.startsWith('-'))
+    if (command === 'rm') for (const path of paths) host.files.delete(path)
     if (command === 'mv' && paths.length === 2) {
       const [from = '', to = ''] = paths
       for (const [path, text] of [...host.files]) {
@@ -228,7 +229,7 @@ test("the lead's rules: the task scenario, one question per task, the video befo
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
   expect(lead).toMatch(/^# better-tasks: you lead a team of Claude Code teammates\n/)
   expect(lead).toContain('## How a task goes')
-  expect(lead).toContain('One task per question.')
+  expect(lead).toContain('One task per question, plain words.')
   expect(lead).toContain('tell the teammate "<id> accepted: finish it"')
   expect(lead).toContain('load the `better-tasks:contribute` skill')
   expect(lead).not.toContain('{%')
@@ -303,7 +304,7 @@ test('a teammate in the shared checkout gets no worktree command rules', async (
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).not.toContain('Claude Code refuses a gh or git command')
+  expect(host.spawned[0]).not.toContain('stay in your worktree')
 })
 
 test('a teammate the lead spawns in a worktree itself gets the worktree command rules', async ($, on) => {
@@ -312,7 +313,7 @@ test('a teammate the lead spawns in a worktree itself gets the worktree command 
   const host = fakeHost(on)
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth', isolation: 'worktree' })
-  expect(host.spawned[0]).toContain('Claude Code refuses a gh or git command')
+  expect(host.spawned[0]).toContain('must plainly stay in your worktree')
 })
 
 const EXCLUDED = '<excludeFolder url="file://$MODULE_DIR$/.claude/worktrees" />'
@@ -655,11 +656,12 @@ test('a project still on .claude/manager/ is moved to .claude/tasks/ once, tasks
   await $.session.start(SESSION)
   await clock.advance(0)
   expect([...host.files.keys()].filter(path => path.includes('/.claude/')).sort()).toEqual([
+    `${ROOT}/.claude/better-tasks/teammate.md`,
     `${ROOT}/.claude/tasks/T-001-fix-login.md`,
     `${ROOT}/.claude/tasks/config.json`,
     `${ROOT}/.claude/tasks/sprints.md`,
-    `${ROOT}/.claude/tasks/teammate.md`,
   ])
+  expect(host.files.get(`${ROOT}/.claude/better-tasks/teammate.md`)).toBe('---\nreplace: true\n---\nBe brief.')
   expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '{}')).toEqual({ sprintsFile: '.claude/tasks/sprints.md', taskPrefix: 'BUG-' })
   expect(host.notices).toContain('better-tasks: moved .claude/manager/ to .claude/tasks/ (tasks, sprints, settings)')
   const list = String((await $.tool.call({ tool: 'mcp__better-tasks__task_list', tool_use_id: 'l1' })).result)
@@ -894,7 +896,7 @@ test('after 10 quiet minutes with work open, the coordinator is asked for a stat
   expect(statusPrompts(host)).toEqual([])
   await clock.advance(60_000)
   expect(statusPrompts(host)).toHaveLength(1)
-  expect(statusPrompts(host)[0]).toMatch(/^better-tasks status check: no activity for 10 min\. Move the work forward\.\n- team_status/)
+  expect(statusPrompts(host)[0]).toMatch(/^better-tasks status check: no activity for 10 min\. Move the work forward: /)
 })
 
 test('no status check with nothing open, while a turn runs, or with text in the composer', async ($, on) => {
@@ -1014,9 +1016,9 @@ test('with before/after videos on, teammates get the pointer to the video skill'
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).toContain('Record the before/after video on your build (`better-tasks:video`)')
+  expect(host.spawned[0]).toContain('Record the before/after video (`better-tasks:video`)')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain('The video is the functional test')
+  expect(composed.sections.at(-1)?.text).toContain('the video is the functional test')
   expect(host.toasts).toEqual([])
 })
 
@@ -1028,11 +1030,11 @@ test('with PR per task on, every named teammate gets its own worktree and the PR
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'worktree' })
-  expect(host.spawned[0]).toContain("Your PR opens after the user's yes: the `better-tasks:pull-request` skill")
-  expect(host.spawned[0]).toContain('Claude Code refuses a gh or git command')
+  expect(host.spawned[0]).toContain("your PR opens after the user's yes (`better-tasks:pull-request`)")
+  expect(host.spawned[0]).toContain('must plainly stay in your worktree')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain('gh pr merge <url> --squash --delete-branch')
-  expect(composed.sections.at(-1)?.text).toContain('opens its PR with the video')
+  expect(composed.sections.at(-1)?.text).toContain('Merge with `gh pr merge --squash`')
+  expect(composed.sections.at(-1)?.text).toContain('the full tests, then its PR')
 })
 
 test('with PR per task on and gh too old or missing, startup updates gh and says how it went', { options: { pullRequests: true } }, async ($, on) => {
@@ -1338,9 +1340,9 @@ test('off-screen is on by default and never asked; the rules follow', async ($, 
   expect(asked.some(question => /off-screen|background/i.test(question))).toBe(false)
 
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).toContain("capture how it is now (the BEFORE), off the user's screen")
+  expect(host.spawned[0]).toContain('`better-tasks:testing`')
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain('Teammates test off the user\'s screen.')
+  expect(composed.sections.at(-1)?.text).toContain('Teammates test off the user\'s screen;')
 })
 
 test('straight to main, the default: one checkout, and teammates commit only their own paths with land.sh', async ($, on) => {
@@ -1351,12 +1353,11 @@ test('straight to main, the default: one checkout, and teammates commit only the
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'none' })
-  expect(host.spawned[0]).toContain('you commit straight to main')
-  expect(host.spawned[0]).toMatch(/`\S+\/bin\/land\.sh -m "<what changed> \(<task id>\)" -- <your paths>`/)
+  expect(host.spawned[0]).toMatch(/on main\. Commit only your own files with `\S+\/bin\/land\.sh` \(--help\)/)
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
-  expect(composed.sections.at(-1)?.text).toContain("no PRs except a bug fix's")
+  expect(composed.sections.at(-1)?.text).toContain('only bug fixes have PRs')
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'bug', isolation: 'worktree' })
-  expect(host.spawned[1]).toContain('You work in your own git worktree, on its own branch.')
+  expect(host.spawned[1]).toContain('Your own worktree and branch')
 })
 
 test('the shared dev branch flow: no worktree, land on dev, the PR from the pull-request skill; the lead merges and syncs dev', async ($, on) => {
@@ -1368,32 +1369,33 @@ test('the shared dev branch flow: no worktree, land on dev, the PR from the pull
   await $.session.start(SESSION)
   const named = await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   expect(named.result).toEqual({ isolation: 'none' })
-  expect(host.spawned[0]).toContain('/bin/land.sh -b develop -m')
-  expect(host.spawned[0]).toContain('One checkout on `develop`, shared with the other teammates.')
+  expect(host.spawned[0]).toContain('on `develop`. Commit only your own files')
   const skill = (await $.skill.prompt({ skill: 'better-tasks:pull-request', text: '# PR' })).text
-  expect(skill).toContain('task_pr.py open <id>')
-  expect(skill).toContain('"## Asked for" (the user\'s words)')
+  expect(skill).toContain('task_pr.py open <id> --body-file')
+  expect(skill).not.toContain('--here')
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
   expect(lead).toContain('Shared `develop` branch')
   expect(lead).toContain('/bin/task_pr.py sync')
 })
 
-test("the project's instructions reach the lead and every teammate as paths with one line each, not the files", async ($, on) => {
+test('the old overrides and the "instructions" setting move to .claude/better-tasks/ once, and reach the prompts', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on, [], {
-    [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ instructions: 'docs/workflow.md, docs/gone.md' }),
-    [`${ROOT}/docs/workflow.md`]: '# Workflow\nCommits land on dev.\n\n## Details\nA long text the prompts never carry.\n',
+    [`${ROOT}/.claude/tasks/config.json`]: JSON.stringify({ instructions: 'docs/workflow.md, docs/rules/', taskPrefix: 'BUG-' }),
+    [`${ROOT}/.claude/tasks/coordinator.md`]: '<!-- extend -->\nAsk before big refactors.',
   })
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
+  expect(host.files.has(`${ROOT}/.claude/tasks/coordinator.md`)).toBe(false)
+  expect(host.files.get(`${ROOT}/.claude/better-tasks/lead.md`)).toBe('Ask before big refactors.\n\n## Project rules\nRead before you work: docs/workflow.md, docs/rules/.\n')
+  expect(JSON.parse(host.files.get(`${ROOT}/.claude/tasks/config.json`) ?? '{}')).toEqual({ taskPrefix: 'BUG-' })
+  expect(host.notices.some(line => line.startsWith('better-tasks: moved coordinator.md → .claude/better-tasks/lead.md'))).toBe(true)
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
-  expect(host.spawned[0]).toContain('## Project instructions')
-  expect(host.spawned[0]).toContain('- docs/workflow.md: Workflow: Commits land on dev.')
-  expect(host.spawned[0]).not.toContain('never carry')
+  expect(host.spawned[0]).toContain('## Project rules\nRead before you work: docs/workflow.md, docs/rules/.')
   const lead = (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })).sections.at(-1)?.text ?? ''
-  expect(lead).toContain('- docs/workflow.md: Workflow: Commits land on dev.')
-  expect(host.notices.filter(line => line === 'better-tasks: project instructions not found: docs/gone.md')).toHaveLength(1)
+  expect(lead).toContain('Ask before big refactors.')
+  expect(lead).toContain('Read before you work: docs/workflow.md')
 })
 
 // ---- Teammate models: Opus at low, medium and high effort for easy, normal and hard tasks (models.ts) ----
@@ -1437,11 +1439,10 @@ test('the lead is told which type to spawn for easy, normal, hard and stuck work
   await $.session.start(SESSION)
   const composed = await $.prompt.compose({ ...COMPOSE_BASE })
   const lead = composed.sections.at(-1)?.text ?? ''
-  expect(lead).toContain('`better-tasks:teammate-easy` for easy work (opus at low effort)')
-  expect(lead).toContain('`better-tasks:teammate-normal` for normal (opus at medium effort)')
-  expect(lead).toContain('`better-tasks:teammate-hard` for hard (opus at high effort)')
-  expect(lead).toContain('its successor goes one level up')
-  expect(lead).toContain('Never pass `model`')
+  expect(lead).toContain('`better-tasks:teammate-easy` (opus at low effort)')
+  expect(lead).toContain('`better-tasks:teammate-normal` (opus at medium effort)')
+  expect(lead).toContain('`better-tasks:teammate-hard` (opus at high effort)')
+  expect(lead).toContain('goes a level up')
 })
 
 test('with escalation off the lead is told a successor keeps its predecessor’s type', { options: { escalate: false } }, async ($, on) => {
@@ -1451,8 +1452,8 @@ test('with escalation off the lead is told a successor keeps its predecessor’s
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'You are Claude.', scope: 'shared' }] }))
   await $.session.start(SESSION)
   const lead = (await $.prompt.compose({ ...COMPOSE_BASE })).sections.at(-1)?.text ?? ''
-  expect(lead).toContain("A successor keeps its predecessor's type, even when it was stuck")
-  expect(lead).not.toContain('one level up')
+  expect(lead).toContain("A successor keeps its predecessor's level.")
+  expect(lead).not.toContain('a level up')
 })
 
 test('a named teammate gets the normal type unless the lead chose one; a scout is left alone', async ($, on) => {
@@ -1475,8 +1476,8 @@ test('a teammate below the hard level is told to report being stuck, while escal
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a1', description: 'd', prompt: 'p', name: 'auth' })
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a2', description: 'd', prompt: 'p', name: 'auth-2', subagent_type: 'better-tasks:teammate-easy' })
   await $.tool.call({ tool: 'Agent', tool_use_id: 'a3', description: 'd', prompt: 'p', name: 'auth-3', subagent_type: 'better-tasks:teammate-hard' })
-  expect(host.spawned[0]).toContain('Not getting there after real attempts?')
-  expect(host.spawned[1]).toContain('Not getting there after real attempts?')
+  expect(host.spawned[0]).toContain('Not getting there?')
+  expect(host.spawned[1]).toContain('Not getting there?')
   expect(host.spawned[2]).not.toContain('Not getting there')
 })
 

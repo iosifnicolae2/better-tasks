@@ -4,6 +4,7 @@
 # Usage: open-pr.sh <pr url>. Last line: "opened <url>", or "not ready: <why>" (exit 2: nothing opened).
 #        open-pr.sh --sends-token <link>: "yes" when the gh token would go with that link (scripts/open-pr-check.sh).
 set -u
+case "${1:-}" in -h|--help) sed -n '2,/^[^#]/{/^#/s/^# \{0,1\}//p;}' "$0"; exit 0 ;; esac
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 
 # The token goes only to GitHub's own hosts; curl drops it on a redirect to another host (no --location-trusted).

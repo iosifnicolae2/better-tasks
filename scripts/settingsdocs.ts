@@ -20,7 +20,6 @@ export const SETTING_DOCS: Record<string, Doc> = {
     about: 'How teammates\' work reaches main. direct ("Straight to main"): small commits on main, no branches, no PRs except a bug fix\'s (its own worktree and PR). dev-prs ("Shared dev branch, PR per task"): everyone commits on the dev branch in one checkout, a PR per task. worktree-prs ("Worktree and PR per task"): each teammate its own git worktree, branch and PR. Asked once per project at the first start.',
   },
   devBranch: { group: 'Git & PRs', about: 'The shared branch of the dev-prs git flow.' },
-  instructions: { group: 'General', about: 'The project\'s own rules for every task: files or folders, comma-separated. The lead\'s and teammates\' prompts get each path and its first line.' },
   longCache: { group: 'General', about: '1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself.' },
   statusEvery: { group: 'General', about: 'Minutes of quiet before the lead checks the open work and moves it forward. 0: off.' },
   keepAwake: { group: 'General', about: 'Holds caffeinate (the Mac stays awake) while any teammate runs.' },
@@ -94,7 +93,7 @@ function table(group: Group, userConfig: UserConfig): string {
 
 const HEAD = `---
 name: settings
-description: Every better-tasks setting, what each one means, its choices and default, where it is saved and how to change it. Load it when the user asks what better-tasks can be configured to do, asks about a setting (git flow, teammate models, videos, off-screen testing, the test screen, sprint length, editor, task ids, project instructions, PR upstream), or wants one changed.
+description: Every better-tasks setting, what each one means, its choices and default, where it is saved and how to change it. Load it when the user asks what better-tasks can be configured to do, asks about a setting (git flow, teammate models, videos, off-screen testing, the test screen, sprint length, editor, task ids, PR upstream), or wants one changed.
 ---
 
 # better-tasks settings

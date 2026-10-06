@@ -11,8 +11,6 @@ export const OVERRIDES_DIR = '.claude/tasks'
 export const EXTEND = '<!-- extend -->'
 
 export type TextName = 'task-template' | 'tips'
-/** The old overrides of the lead's and teammates' rules, still read: .claude/better-tasks/lead.md and teammate.md replace them. */
-export type LegacyRule = 'coordinator' | 'teammate'
 
 const TASK_TEMPLATE = `## Goal
 {goal}
@@ -45,7 +43,7 @@ export function fill(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole)
 }
 
-export function overridePath(name: TextName | LegacyRule): string {
+export function overridePath(name: TextName): string {
   return `${OVERRIDES_DIR}/${name}.md`
 }
 

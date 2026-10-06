@@ -15,7 +15,6 @@ import type { HostApp } from './editor'
 import type { Files } from './io'
 import { screenNames, screensArgv, SCREENS_FRESH_MS } from './testenv'
 import { CONFIG_FILE, PROJECT_KEYS, projectSettings, readOverrides, saveProjectValue, settingsFrom } from './settings'
-import { pathsOf } from './instructions'
 import { findPrTemplate, NEW_TEMPLATE, shownPath } from './prtemplate'
 import type { Editor } from './settings'
 import { goalOf, readSprints } from './sprintlog'
@@ -225,7 +224,6 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
   const starters = Object.keys(starterFiles())
   const present = await Promise.all(starters.map(exists))
   const redraw = () => $.ui.invalidate('ui.render')
-  const instructions = pathsOf(String(overrides.values.instructions ?? ''))[0]
   const prTemplate = await findPrTemplate(files, root, String(overrides.values.prTemplate ?? ''), $.plugin.root)
   /** Opens the PR template; better-tasks' own is first added to the repo, said plainly. */
   const openPrTemplate = async () => {
@@ -235,7 +233,7 @@ async function projectFacts($: EngineInterface, files: Files, editor: Editor): P
     redraw()
     return openFile($, editor, `${root}/${NEW_TEMPLATE}`)
   }
-  const fileAt = (label: string) => (label === 'instructions' ? (instructions ?? CONFIG_FILE) : (PROJECT_FILES[label] ?? CONFIG_FILE))
+  const fileAt = (label: string) => PROJECT_FILES[label] ?? CONFIG_FILE
   /** Opens one of the project's files, writing its starter text first when it is missing. */
   const openOrCreate = async (label: string) => {
     const path = fileAt(label)

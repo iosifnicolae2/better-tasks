@@ -40,7 +40,7 @@ describe('the template syntax', () => {
 })
 
 describe('project overrides', () => {
-  const shippedText = async (files: Record<string, string>, legacy?: string) => templateOf('lead.md', withProject(files), legacy)
+  const shippedText = async (files: Record<string, string>) => templateOf('lead.md', withProject(files))
 
   test('none: the plugin text; the same file (better-tasks itself): no double', async () => {
     expect(await shippedText({})).toBe(TEMPLATES['lead.md']!)
@@ -84,34 +84,34 @@ describe('the shipped templates', () => {
   test('the lead: the task scenario, the status check every few minutes, the video before the question, tests and PR after the yes', async () => {
     const lead = await rule('lead.md', { demoVideos: true, gitFlow: 'worktree-prs', statusEvery: 10 })
     expect(lead).toContain('## How a task goes')
-    expect(lead).toContain('The video is the functional test')
+    expect(lead).toContain('the video is the functional test')
     expect(lead).toContain('Every 10 quiet minutes')
-    expect(lead).toContain('It runs the full tests, opens its PR with the video')
-    expect(lead).toContain('`better-tasks:teammate-normal` for normal (opus at medium effort)')
-    expect(await rule('lead.md', { escalate: false })).not.toContain('one level up')
+    expect(lead).toContain('"<id> accepted: finish it": the full tests, then its PR')
+    expect(lead).toContain('`better-tasks:teammate-normal` (opus at medium effort)')
+    expect(await rule('lead.md', { escalate: false })).not.toContain('a level up')
   })
 
   test('new bugs: filed and fixed with a video and a PR; straight to main gets its own worktree', async () => {
     const direct = await rule('lead.md', { gitFlow: 'direct' })
-    expect(direct).toContain('every bug is fixed the same way, with a video and a PR')
+    expect(direct).toContain('fixed the same way, with a video and a PR the user sees before it merges')
     expect(direct).toContain('spawn its teammate with isolation "worktree"')
-    expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain("its owner fixes it on that task's branch")
-    expect(await rule('teammate.md')).toContain('"New bug: <what you saw>, <how to see it again>, BEFORE: <path>"')
+    expect(await rule('lead.md', { gitFlow: 'dev-prs' })).toContain("is fixed on that task's branch")
+    expect(await rule('teammate.md')).toContain('"New bug: <what>, <how to see it again>, BEFORE: <path>"')
   })
 
   test("the teammate's git part follows the flow and its worktree", async () => {
     const direct = await rule('teammate.md', { gitFlow: 'direct' })
-    expect(direct).toContain('`/p/bin/land.sh -m "<what changed> (<task id>)" -- <your paths>`')
+    expect(direct).toContain('on main. Commit only your own files with `/p/bin/land.sh` (--help)')
     expect(direct).not.toContain('pull-request')
-    expect(await rule('teammate.md', { gitFlow: 'dev-prs', devBranch: 'develop' })).toContain('`/p/bin/land.sh -b develop -m')
+    expect(await rule('teammate.md', { gitFlow: 'dev-prs', devBranch: 'develop' })).toContain('on `develop`.')
     const worktree = await rule('teammate.md', { gitFlow: 'direct' }, { isWorktree: true })
-    expect(worktree).toContain('the `better-tasks:pull-request` skill')
-    expect(worktree).toContain('Claude Code refuses a gh or git command')
+    expect(worktree).toContain('`better-tasks:pull-request`')
+    expect(worktree).toContain('must plainly stay in your worktree')
     expect(worktree).not.toContain('land.sh')
   })
 
   test('a teammate below the hard level, with escalation on, reports being stuck', async () => {
-    expect(await rule('teammate.md')).toContain('Not getting there after real attempts?')
+    expect(await rule('teammate.md')).toContain('Not getting there?')
     expect(await rule('teammate.md', {}, { isHard: true })).not.toContain('Not getting there')
     expect(await rule('teammate.md', { escalate: false })).not.toContain('Not getting there')
   })
@@ -119,12 +119,13 @@ describe('the shipped templates', () => {
   test('the skills follow the settings: quality, off-screen, the test screen, the PR flow, the upstream answer', async () => {
     expect(await rule('video.md', { videoQuality: 'low' })).toContain('--quality low')
     expect(await rule('testing.md', { offScreen: true })).toContain("the project's own virtual display")
-    expect(await rule('testing.md', { offScreen: true, testScreen: 'DELL' })).toContain('"DELL", chosen by the user')
-    expect(await rule('testing.md', { offScreen: false })).toContain('Tell the lead first')
-    expect(await rule('pull-request.md', { gitFlow: 'dev-prs' })).toContain('task_pr.py open')
-    expect(await rule('pull-request.md', { gitFlow: 'worktree-prs' })).toContain('gh pr create --base main')
+    expect(await rule('testing.md', { offScreen: true })).toContain("off the user's screen")
+    expect(await rule('testing.md', { offScreen: false, testScreen: 'DELL' })).toContain('"DELL"')
+    expect(await rule('testing.md', { offScreen: false })).not.toContain("off the user's screen")
+    expect(await rule('pull-request.md', { gitFlow: 'dev-prs' })).toContain('task_pr.py open <id> --body-file')
+    expect(await rule('pull-request.md', { gitFlow: 'worktree-prs' })).toContain('task_pr.py open <id> --here')
     expect(await rule('contribute.md', {}, { upstreamPr: 'never' })).toContain("don't ask")
-    expect(await rule('done.md', { gitFlow: 'worktree-prs' })).toContain('then your PR with the video')
+    expect(await rule('done.md', { gitFlow: 'worktree-prs' })).toContain('then your PR (`better-tasks:pull-request`)')
   })
 
   test('the status check says how long it was quiet', async () => {

@@ -4,6 +4,7 @@
 # The branch has its own history, never merged, so videos stay out of main. No checkout is touched.
 # Prints one link per file, pinned to the new commit, then the caption line that fits those links.
 set -eu
+case "${1:-}" in -h|--help) sed -n '2,/^[^#]/{/^#/s/^# \{0,1\}//p;}' "$0"; exit 0 ;; esac
 
 # The remote's web address, without any user or token in it (those would end up in the PR).
 web_url() {

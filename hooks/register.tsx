@@ -10,14 +10,13 @@ import { addSource, hasTeamInstall, maySelfCommit, needsPin, pinCommit, pinnedTa
 import { activeInstall, declaresMarketplace, DECLINED_KEY, listArgv, lsRemoteArgv, MANAGED_SETTINGS, offeredRelease, pinTarget, refreshArgv, releaseTags, repinArgv, restartLine, UPDATE_HEADER, UPDATE_NO, UPDATE_YES, updateArgv, updateQuestion } from './updatecheck'
 import type { Install } from './updatecheck'
 import { excludeWorktrees, IDE_SETTING } from './intellij'
-import { migrateFolder } from './migrate'
+import { migrateFolder, migrateRules } from './migrate'
 import { DEFAULT_TYPE, teammateTypes, typeOf } from './models'
 import { readUpstreamPr, saveUpstreamPr, UPSTREAM_PR_TOOL } from './contribute'
 import { contextBlock, footerText, isPerson, isQuestion, resolvedIn, unclosedLine, unfiledLine, withRules } from './coordinator'
 import { ENABLE_OPTION, QUESTION, SETTING_KEY, SETUP_TOAST, setupArgv, setupVerdict, voiceDir } from './demovideo'
 import { FLOW_ASK_HEADER, flowOfAnswer, flowOptions, flowQuestion, hasPrs, lookAt, recommend, usesWorktree } from './gitflow'
 import type { GitFlow, Probe } from './gitflow'
-import { instructionLines, instructionsBlock } from './instructions'
 import { findPrTemplate } from './prtemplate'
 import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub } from './pullrequest'
 import type { Io } from './io'
@@ -34,7 +33,6 @@ import type { Facts, RuleFile, RulesSent } from './rules'
 import { ourSkill } from './skills'
 import { changedSections } from './template'
 import type { Sources, Vars } from './template'
-import { EXTEND, overridePath } from './texts'
 import { IGNORE_COMMIT, isNotIgnored, withIgnoreLine, WORKTREES_FOLDER } from './ignoreworktrees'
 import { spawnTask, withSummary } from './spawn'
 import { fingerprintOf, NO_CHECK, statusDecision } from './status'
@@ -50,7 +48,6 @@ const FILING_TOOLS = ['task_create', 'task_update', 'task_note']
 
 let pluginOptions: PluginOptions = {}
 let loggedProblems = ''
-let loggedMissing = ''
 let loggedMissingTemplate = ''
 let voiceSetup: Promise<void> | undefined
 let ghUpdate: Promise<void> | undefined
@@ -94,6 +91,8 @@ export const register: Register = (on, options) => {
     await useLongCache($).catch(error => logFailure($, 'the 1-hour cache', error))
     const moved = await migrateFolder(ioOf($)).catch(error => `better-tasks: moving the old task folder failed: ${error}`)
     if (moved) $.ui.log(moved)
+    const rulesMoved = await migrateRules(ioOf($)).catch(error => `better-tasks: moving the old instruction overrides failed: ${error}`)
+    if (rulesMoved) $.ui.log(rulesMoved)
     await keepWorktreesFromIde($).catch(error => logFailure($, 'excluding the worktrees in IntelliJ', error))
     if (!(await setUpTeams($))) return started
     await update($, typesState, () => '')
@@ -117,8 +116,7 @@ export const register: Register = (on, options) => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (!(await teamsOn($)) || (await isOffHere($))) return composed
-    const lead = (await read($, rulesState)).shown || (await rememberRules($)).shown
-    const rules = [lead, await instructionsNow($, await settingsNow($))].filter(Boolean).join('\n\n')
+    const rules = (await read($, rulesState)).shown || (await rememberRules($)).shown
     return { sections: withRules(composed.sections, e.traits, e.tools, rules) }
   })
 
@@ -183,8 +181,7 @@ export const register: Register = (on, options) => {
     const type = e.subagent_type ?? (hasTypes ? DEFAULT_TYPE : undefined)
     const isWorktree = usesWorktree(settings.gitFlow, settings.worktree) && !e.isolation
     const teammate = await ruleNow($, 'teammate.md', { isWorktree: isWorktree || e.isolation === 'worktree', isHard: type === typeOf('hard') })
-    const instructions = await instructionsNow($, settings)
-    const prompt = [named.prompt, handover, teammate, instructions].filter(Boolean).join('\n\n')
+    const prompt = [named.prompt, handover, teammate].filter(Boolean).join('\n\n')
     return next({
       ...e,
       description: named.description,
@@ -565,17 +562,6 @@ async function probeOf($: EngineInterface): Promise<Probe> {
   }
 }
 
-/** The project's instructions block (instructions.ts); a path that isn't there is one log line, once. */
-async function instructionsNow($: EngineInterface, settings: Settings): Promise<string> {
-  if (!settings.instructions) return ''
-  const reader = { root: await $.session.root(), read: (path: string) => $.fs.read(path).catch(() => undefined), list: (path: string) => $.fs.list(path).catch(() => undefined) }
-  const { lines, missing } = await instructionLines(reader, settings.instructions)
-  const text = missing.join(', ')
-  if (text && text !== loggedMissing) $.ui.log(`better-tasks: project instructions not found: ${text}`)
-  loggedMissing = text
-  return instructionsBlock(lines)
-}
-
 // ---- The instruction templates (rules.ts, template.ts) ----
 
 /** Where the templates come from: the plugin's .claude/better-tasks/, and the project's files for its overrides. */
@@ -603,21 +589,12 @@ async function varsNow($: EngineInterface, facts: Partial<Facts> = {}): Promise<
   return varsOf(settings, { ...NO_FACTS, ...known, ...facts })
 }
 
-/** The old overrides in .claude/tasks/ (coordinator.md, teammate.md), read as overrides of lead.md and teammate.md. */
-async function legacyOverride($: EngineInterface, name: RuleFile): Promise<string | undefined> {
-  const old = name === 'lead.md' ? 'coordinator' : name === 'teammate.md' ? 'teammate' : undefined
-  if (!old) return undefined
-  const text = await $.fs.read(`${await $.session.root()}/${overridePath(old)}`).catch(() => undefined)
-  if (text === undefined) return undefined
-  return text.trimStart().startsWith(EXTEND) ? text : `---\nreplace: true\n---\n${text}`
-}
-
 /** One instruction, rendered now. A project override that doesn't render (a typo in a tag) is logged and left out. */
 async function ruleNow($: EngineInterface, name: RuleFile, facts: Partial<Facts> = {}): Promise<string> {
   const vars = await varsNow($, facts)
   const sources = sourcesOf($)
   try {
-    return await renderRule(name, sources, vars, await legacyOverride($, name))
+    return await renderRule(name, sources, vars)
   } catch (error) {
     logFailure($, `the project's ${TEMPLATES_DIR}/${name}`, error)
     return renderRule(name, { ...sources, project: async () => undefined }, vars)

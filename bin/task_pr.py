@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""A pull request per task, built from the shared dev branch without a worktree (git flow "dev-prs").
+"""A pull request per task, with its before/after video in it.
 
-    python3 task_pr.py open T-004 [--body-file pr.md] [--dry-run]
+    python3 task_pr.py open T-004 [--body-file pr.md] [--dry-run]           from the shared dev branch (git flow "dev-prs")
+    python3 task_pr.py open T-004 --here [--body-file pr.md] [--dry-run]    from this checkout's branch (a worktree)
     python3 task_pr.py sync
+
+`open --here` pushes this checkout's HEAD as `task/T-004` and opens its PR (or says the open one is up to date).
 
 `open` puts every commit on dev whose subject names the task ("(T-004)") onto branch `task/T-004`:
 origin's main plus those commits, each picked with `git merge-tree`, so no file in any checkout changes.
@@ -188,6 +191,8 @@ def open_pr(task: str, options: argparse.Namespace) -> int:
     upstream = f"{remote}/{main}"
     git("fetch", "--quiet", remote)
     branch = f"task/{task}"
+    if options.here:
+        return open_here(task, branch, upstream, main, options)
     remote_tip = git("rev-parse", "--verify", "--quiet", f"refs/remotes/{remote}/{branch}", ok=True)
     start = remote_tip or git("rev-parse", upstream)
     done = already_picked(upstream, remote_tip) if remote_tip else set()
@@ -212,6 +217,26 @@ def open_pr(task: str, options: argparse.Namespace) -> int:
     if existing.stdout.strip():
         say(f"{existing.stdout.strip()} is up to date")
         return 0
+    return create_pr(task, branch, main, commits, options)
+
+
+def open_here(task: str, branch: str, upstream: str, main: str, options: argparse.Namespace) -> int:
+    """This checkout's HEAD (a worktree's own branch) pushed as task/<id>, and its PR."""
+    commits = git("log", "--reverse", "--no-merges", "--format=%H", f"{upstream}..HEAD").splitlines()
+    if not commits:
+        sys.exit(f"task_pr: HEAD has no commit that {upstream} lacks")
+    if options.dry_run:
+        say(f"dry run: {branch} would be HEAD ({len(commits)} commits)")
+        return 0
+    git("push", "--quiet", "--force-with-lease", options.remote, f"HEAD:refs/heads/{branch}")
+    existing = run("gh", "pr", "view", branch, "--json", "url,state", "-q", 'select(.state=="OPEN") | .url')
+    if existing.stdout.strip():
+        say(f"{existing.stdout.strip()} is up to date")
+        return 0
+    return create_pr(task, branch, main, commits, options)
+
+
+def create_pr(task: str, branch: str, main: str, commits: list[str], options: argparse.Namespace) -> int:
     path = task_file(task)
     shown, attach = video_lines(task)
     body = Path(options.body_file).read_text() if options.body_file else default_body(task, path, commits)
@@ -251,7 +276,7 @@ def sync(options: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dev", default="dev", help="the shared branch teammates land on")
     parser.add_argument("--main", default="", help="the branch PRs go into (default: origin's HEAD branch)")
     parser.add_argument("--remote", default="origin")
@@ -260,6 +285,7 @@ def main() -> int:
     opened.add_argument("task", help="the task id, e.g. T-004")
     opened.add_argument("--body-file", help="the PR description (default: from the task file and the commits)")
     opened.add_argument("--dry-run", action="store_true", help="build the branch, push nothing")
+    opened.add_argument("--here", action="store_true", help="push this checkout's HEAD (a worktree's branch) instead of picking commits from dev")
     sub.add_parser("sync", help="after a merge: main follows origin's main, dev takes it in")
     options = parser.parse_args()
     return open_pr(options.task, options) if options.what == "open" else sync(options)

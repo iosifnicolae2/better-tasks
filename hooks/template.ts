@@ -92,9 +92,9 @@ export const OVERRIDE_DIR = '.claude/better-tasks'
  * name (its text after the plugin's), or replaced by it (`replace: true` in its front matter). In the
  * project's file, `@/name.md` alone on a line pulls in the plugin's file, `@./path` a project file.
  */
-export async function templateOf(name: string, sources: Sources, legacy?: string): Promise<string> {
+export async function templateOf(name: string, sources: Sources): Promise<string> {
   const shipped = (await sources.plugin(name)) ?? ''
-  const own = (await sources.project(`${OVERRIDE_DIR}/${name}`)) ?? legacy
+  const own = await sources.project(`${OVERRIDE_DIR}/${name}`)
   if (own === undefined || own === shipped) return shipped
   const front = own.match(FRONT_MATTER)?.[1] ?? ''
   const body = await withIncludes(own.replace(FRONT_MATTER, ''), sources)

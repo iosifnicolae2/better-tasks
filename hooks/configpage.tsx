@@ -308,8 +308,6 @@ export function ConfigPage(props: ConfigPageProps) {
           <Text color="warning" wrap="truncate-end">⚠ {project.problems.join(' · ')}</Text>
         </Box>
       )}
-      <Row ui={ui} rowKey="cfg-instructions" label="Project instructions" value={settings.instructions || 'none · set in config.json'}
-        isFromProject={fromProject.includes('instructions')} onPress={() => project.onOpen('instructions')} />
       <Row ui={ui} rowKey="cfg-pr-template" label="PR template" value={prTemplateValue(project.prTemplate)}
         isFromProject={fromProject.includes('prTemplate')} onPress={() => project.onOpen('pr-template')} />
       <Row ui={ui} rowKey="cfg-native" label="All Claude Code settings" value="/config" onPress={onOpenNative} />
@@ -347,9 +345,6 @@ function describeRow(fields: readonly Field[], rowKey: string, fromProject: read
   if (file !== undefined) {
     const exists = project.files.find(one => one.label === file)?.exists === true
     return `${file}: ${FILE_ABOUT[file] ?? ''} ⏎ ${exists ? 'opens it' : 'creates it from the shipped text, then opens it'}.`
-  }
-  if (rowKey === 'cfg-instructions') {
-    return 'Project instructions: files or folders every teammate and the lead follow, as "instructions" in config.json (comma-separated). The prompts get each path and its first line. ⏎ opens the first one, or config.json.'
   }
   if (rowKey === 'cfg-pr-template') {
     const action = project.prTemplate.source === 'shipped'

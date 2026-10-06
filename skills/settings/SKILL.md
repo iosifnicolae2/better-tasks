@@ -1,6 +1,6 @@
 ---
 name: settings
-description: Every better-tasks setting, what each one means, its choices and default, where it is saved and how to change it. Load it when the user asks what better-tasks can be configured to do, asks about a setting (git flow, teammate models, videos, off-screen testing, the test screen, sprint length, editor, task ids, project instructions, PR upstream), or wants one changed.
+description: Every better-tasks setting, what each one means, its choices and default, where it is saved and how to change it. Load it when the user asks what better-tasks can be configured to do, asks about a setting (git flow, teammate models, videos, off-screen testing, the test screen, sprint length, editor, task ids, PR upstream), or wants one changed.
 ---
 
 # better-tasks settings
@@ -21,7 +21,6 @@ Grep a key (`gitFlow`) or a word (`video`) to find its row.
 | Key | What it means | Choices | Default | Where |
 |---|---|---|---|---|
 | `editor` | Opens task files from the board. auto: IntelliJ in a JetBrains terminal, VS Code in VS Code, else the default app. | auto, default, code, idea, cursor, zed | "auto" | /config "Editor" or config.json |
-| `instructions` | The project's own rules for every task: files or folders, comma-separated. The lead's and teammates' prompts get each path and its first line. | string | "" | config.json |
 | `longCache` | 1-hour prompt cache for teammates and the lead, so a teammate stays cheap to resume. Unless you set a cache TTL yourself. | true, false | true | /config "1-hour prompt cache" or config.json |
 | `statusEvery` | Minutes of quiet before the lead checks the open work and moves it forward. 0: off. | number | 10 | /config "Status check (minutes)" or config.json |
 | `keepAwake` | Holds caffeinate (the Mac stays awake) while any teammate runs. | true, false | true | /config "Keep the Mac awake" or config.json |

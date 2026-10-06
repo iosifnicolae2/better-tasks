@@ -23,7 +23,8 @@ libass or freetype. The spec (paths relative to the spec file):
        {"say": "After login you land on the home page.",
         "at": 1.5,                              optional: start no earlier than this second of the clip
         "image": "before-1.png",                image clips only; a step without one keeps the last
-        "marks": [{"box": [x, y, w, h]}, {"arrow": [x1, y1, x2, y2]}],  pixels of the video or image
+        "marks": [{"box": [x, y, w, h]}],       pixels of the video or image; each box gets an arrow,
+                                                or give your own: {"arrow": [x1, y1, x2, y2]}
         "poster": true,                         optional: this step's frame goes in the poster
         "focus": [x, y, w, h]}                  optional: the poster shows this area of it
      ]},
@@ -68,6 +69,12 @@ LOUD_PEAK = 0.89  # -1 dBFS
 RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
 LABEL_COLORS = {'BEFORE': (180, 83, 9, 235), 'AFTER': (21, 128, 61, 235)}
+# Sizes per 1000 px of the frame's long side: kept small, so what the marks point at stays easy to see.
+MARK_LINE = 4  # a box's red line (thinner around a small target)
+ARROW_HEAD = 3.5  # an arrow's head, in line widths
+ARROW_LENGTH = 70  # an arrow drawn for a box that has none
+SUBTITLE_SIZE = 20
+LABEL_SIZE = 28
 FONTS = [
     '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
     '/System/Library/Fonts/Helvetica.ttc',
@@ -210,7 +217,7 @@ def overlay(canvas: tuple, label: str, step: dict | None, fit: Fit | None) -> Im
     draw = ImageDraw.Draw(image)
     unit = max(canvas) / 1000
     if step:
-        for mark in step.get('marks', []):
+        for mark in with_arrows(step.get('marks', [])):
             draw_mark(draw, mark, fit, unit)
         draw_subtitle(draw, step['say'], canvas, unit)
     draw_label(draw, label, unit)
@@ -218,20 +225,34 @@ def overlay(canvas: tuple, label: str, step: dict | None, fit: Fit | None) -> Im
 
 
 def draw_label(draw: ImageDraw.ImageDraw, label: str, unit: float) -> None:
-    text_font = font(round(34 * unit))
-    pad, margin = 14 * unit, 20 * unit
+    text_font = font(round(LABEL_SIZE * unit))
+    pad, margin = 12 * unit, 18 * unit
     left, top, right, bottom = draw.textbbox((margin + pad, margin + pad), label, font=text_font)
     color = LABEL_COLORS.get(label.upper(), (30, 30, 30, 235))
     draw.rounded_rectangle((margin, margin, right + pad, bottom + pad), radius=10 * unit, fill=color)
     draw.text((margin + pad, margin + pad), label, font=text_font, fill=WHITE)
 
 
+def with_arrows(marks: list) -> list:
+    """The step's marks; with no arrow among them, each box gets one, pointing at its left edge from the left."""
+    if any('arrow' in mark for mark in marks):
+        return marks
+    arrows = []
+    for mark in marks:
+        if 'box' in mark:
+            x, y, w, h = mark['box']
+            middle = y + h / 2
+            reach = ARROW_LENGTH * max(w, h, 400) / 400
+            arrows.append({'arrow': [max(0, x - reach - 12), middle, max(0, x - 12), middle]})
+    return marks + arrows
+
+
 def draw_mark(draw: ImageDraw.ImageDraw, mark: dict, fit: Fit, unit: float) -> None:
-    width = max(3, round(6 * unit))
+    width = max(2, round(MARK_LINE * unit))
     if 'box' in mark:
         x, y, w, h = mark['box']
         (left, top), (right, bottom) = fit.point(x, y), fit.point(x + w, y + h)
-        line = max(3, min(width, round(min(right - left, bottom - top) / 5)))  # thin around a small target
+        line = max(2, min(width, round(min(right - left, bottom - top) / 5)))  # thin around a small target
         rim = line + max(2, line // 2)
         corners = (left - rim, top - rim, right + rim, bottom + rim)  # around the target, never over it
         draw.rounded_rectangle(corners, radius=6 * unit, outline=WHITE, width=rim)
@@ -239,7 +260,7 @@ def draw_mark(draw: ImageDraw.ImageDraw, mark: dict, fit: Fit, unit: float) -> N
     if 'arrow' in mark:
         x1, y1, x2, y2 = mark['arrow']
         start, tip = fit.point(x1, y1), fit.point(x2, y2)
-        draw_arrow(draw, start, tip, width + 4, WHITE)
+        draw_arrow(draw, start, tip, width + 3, WHITE)
         draw_arrow(draw, start, tip, width, RED)
 
 
@@ -248,7 +269,7 @@ def draw_arrow(draw: ImageDraw.ImageDraw, start: tuple, tip: tuple, width: int, 
     length = float(np.hypot(*direction)) or 1.0
     along = direction / length
     across = np.array([-along[1], along[0]])
-    head = min(length * 0.6, width * 4.5)
+    head = min(length * 0.6, width * ARROW_HEAD)
     neck = np.subtract(tip, along * head)
     draw.line([start, tuple(neck)], fill=color, width=width)
     wing = across * head * 0.6
@@ -256,7 +277,7 @@ def draw_arrow(draw: ImageDraw.ImageDraw, start: tuple, tip: tuple, width: int, 
 
 
 def draw_subtitle(draw: ImageDraw.ImageDraw, text: str, canvas: tuple, unit: float) -> None:
-    text_font = font(round(30 * unit))
+    text_font = font(round(SUBTITLE_SIZE * unit))
     lines = wrap(draw, text, text_font, canvas[0] * 0.86)
     spacing = 8 * unit
     block = '\n'.join(lines)
@@ -538,7 +559,7 @@ if __name__ == '__main__':
         Voice('af_heart').say('Ready.')  # setup: fetches the model and voice once
         print('ready')
     else:
-        parser = argparse.ArgumentParser(prog='demo-video.sh')
+        parser = argparse.ArgumentParser(prog='demo-video.sh', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
         parser.add_argument('spec')
         parser.add_argument('--quality', choices=QUALITIES, default='medium')
         args = parser.parse_args()

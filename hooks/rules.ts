@@ -47,6 +47,7 @@ export function varsOf(settings: Settings, facts: Facts): Vars {
     testScreen: settings.testScreen,
     isVirtualScreen: settings.testScreen === VIRTUAL_SCREEN,
     statusEvery: settings.statusEvery,
+    openPrInBrowser: settings.openPrInBrowser,
     escalate: models.escalate,
     hasTypes: facts.hasTypes,
     easyType: typeOf('easy'),
@@ -66,8 +67,8 @@ export function varsOf(settings: Settings, facts: Facts): Vars {
 }
 
 /** One instruction file, the project's override applied, rendered with these values. */
-export async function renderRule(name: RuleFile, sources: Sources, vars: Vars, legacy?: string): Promise<string> {
-  return render(await templateOf(name, sources, legacy), vars)
+export async function renderRule(name: RuleFile, sources: Sources, vars: Vars): Promise<string> {
+  return render(await templateOf(name, sources), vars)
 }
 
 // ---- A setting changed mid-session ----

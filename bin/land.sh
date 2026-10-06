@@ -5,6 +5,7 @@
 # only if nobody moved it meanwhile (update-ref with its old value): then run it again. The branch
 # defaults to the one checked out. Prints the new commit.
 set -eu
+case "${1:-}" in -h|--help) sed -n '2,/^[^#]/{/^#/s/^# \{0,1\}//p;}' "$0"; exit 0 ;; esac
 
 branch=""
 set -- "$@" --end--
