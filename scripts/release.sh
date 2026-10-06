@@ -1,15 +1,21 @@
 #!/bin/sh
 # Cut a release: pin the marketplace entry to the new tag in a "Release" commit, tag it,
 # push the tag and main, create the GitHub release. Installs and updates get only tagged releases.
-# Usage: scripts/release.sh [--dry-run] v0.3.0 [notes.md]
+# Usage: scripts/release.sh [--dry-run | --draft] v0.3.0 [notes.md]
 # Without notes.md, the notes are the commit subjects since the last tag.
 # With the project setting releaseVideos (on unless .claude/tasks/config.json says false), the notes open with
 # a video of the release's tasks, each before and after (bin/release-video.sh), put on the videos branch.
 # --dry-run: makes the notes and the video and prints them; commits, tags, pushes and publishes nothing.
+# --draft: makes the notes and the video (uploaded) into a draft GitHub release of local main, so the release can be
+# checked before it is cut; pins, tags and pushes nothing but the video, and works with main ahead of origin or a
+# dirty tree. Run again, it updates the draft. Prints the draft's URL last. The release itself publishes the draft.
 set -eu
 
-dry_run=false
-if [ "${1:-}" = --dry-run ]; then dry_run=true; shift; fi
+dry_run=false draft=false
+case "${1:-}" in
+  --dry-run) dry_run=true; shift ;;
+  --draft) draft=true; shift ;;
+esac
 version=$1
 notes_file=${2:-}
 case $version in v*) ;; *) version=v$version ;; esac
@@ -23,9 +29,11 @@ setting() {
 }
 
 git fetch -q origin main --tags
-[ "$(git branch --show-current)" = main ] || fail "check out main first"
-[ -z "$(git status --porcelain --untracked-files=no)" ] || fail "commit or stash your changes first"
-[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] || fail "main and origin/main differ: pull or push first"
+if ! $draft; then
+  [ "$(git branch --show-current)" = main ] || fail "check out main first"
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || fail "commit or stash your changes first"
+  [ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] || fail "main and origin/main differ: pull or push first"
+fi
 git rev-parse -q --verify "refs/tags/$version" >/dev/null && fail "$version already exists"
 bun scripts/settings-doc.ts --check || fail "the settings skill is stale: run bun scripts/settings-doc.ts and commit"
 bun scripts/skills-check.ts || fail "a skill lacks what its readers rely on: see above"
@@ -89,6 +97,21 @@ if [ -n "$media" ]; then
   notes_file=$with_video
 fi
 
+# The draft release of this version, if there is one: gh finds drafts by their tag name too.
+has_draft() {
+  [ "$(gh release view "$version" --json isDraft -q .isDraft 2>/dev/null)" = true ]
+}
+
+if $draft; then
+  if has_draft; then
+    gh release edit "$version" --title "$version" --target main --notes-file "$notes_file" >/dev/null
+  else
+    gh release create "$version" --draft --target main --title "$version" --notes-file "$notes_file" >/dev/null
+  fi
+  gh release view "$version" --json url -q .url
+  exit 0
+fi
+
 if $dry_run; then
   echo "release: dry run of $version since ${previous:-the start}: nothing committed, tagged, pushed or published. The notes:"
   cat "$notes_file"
@@ -108,4 +131,8 @@ pin_marketplace
 git tag -a "$version" -m "$version" main
 git push -q origin "$version"
 git push -q origin main
-gh release create "$version" --verify-tag --title "$version" --notes-file "$notes_file"
+if has_draft; then
+  gh release edit "$version" --draft=false --tag "$version" --title "$version" --notes-file "$notes_file"
+else
+  gh release create "$version" --verify-tag --title "$version" --notes-file "$notes_file"
+fi
