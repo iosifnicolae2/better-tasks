@@ -105,9 +105,14 @@ describe('the shipped templates', () => {
     expect(await rule('done.md')).toContain('a small bug you fixed on the way')
   })
 
-  test('a task with a PR is named with its number, "T-078 (#43)", in the lead\'s text and the block the user sees', async () => {
-    expect(await rule('lead.md')).toContain('- Name a task with a PR by its id and PR number, "T-078 (#43)", everywhere the user reads it; one without stays "T-078".')
-    expect(await rule('done.md')).toContain('### For the user\nPR: <url>\nRelease: <url, only when your task changes a release>\n<id> (#<PR number>) <title>')
+  test('wherever the user reads a task, it is named by its id and PR number, "T-078 (#43)": questions and their headers, status lines, the block the user sees', async () => {
+    const lead = await rule('lead.md')
+    expect(lead).toContain('- Wherever the user reads a task (your text, questions, their headers and options, status lines, release notes), name it by its id, with its PR number once it has one: "T-078 (#43)", else "T-078".')
+    expect(lead).toContain('header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"')
+    expect(await rule('status-check.md')).toContain('each task by its id and PR number ("T-078 (#43)")')
+    const done = await rule('done.md')
+    expect(done).toContain('### For the user\nPR: <url>\nRelease: <url, only when your task changes a release>\n<id> (#<PR number>) <title>')
+    expect(done).toContain('the ones a release ships too, goes the same way: "T-078 (#43)"')
   })
 
   test("the teammate's git part follows the flow and its worktree", async () => {
@@ -144,7 +149,7 @@ describe('the shipped templates', () => {
       const lead = await rule('lead.md', { gitFlow, demoVideos: true })
       expect(lead).toContain('It opens its PR as a draft, the video in it')
       expect(lead).toContain('Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once')
-      expect(lead).toContain('Its PR link (and its release\'s, if any) goes in your text just above the question and again inside it: "<id>: <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"')
+      expect(lead).toContain('Its PR link (and its release\'s, if any) goes in your text just above the question and again inside it: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"')
       expect(lead).toContain('a draft release, the release video in its notes')
       const done = await rule('done.md', { gitFlow })
       expect(done).toContain('PR: <url>\nRelease: <url, only when your task changes a release>')

@@ -31,7 +31,7 @@ You coordinate; teammates do the work. File what the user says, route it, keep e
 - Never do the work yourself.
 - Write a thing once, in the task file; messages carry its path.
 - One owner per area, so two teammates never edit the same files.
-- Name a task with a PR by its id and PR number, "T-078 (#43)", everywhere the user reads it; one without stays "T-078".
+- Wherever the user reads a task (your text, questions, their headers and options, status lines, release notes), name it by its id, with its PR number once it has one: "T-078 (#43)", else "T-078".
 - A restart or other step only the user can do is a question (AskUserQuestion): "I'll restart" (or "I'll do it"), "Skip". A long command goes in your text before it, never in the box.
 
 ## Every message is filed
@@ -47,7 +47,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 1. The teammate captures how things are now, makes the change, and checks it as a user would.
 2. It records a before/after video of the fix or feature: the video is the functional test, and what the user sees.
 3. It opens its PR as a draft, the video in it, for review only. A task that changes a release also gets a draft release, the release video in its notes.
-4. It reports done. Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once, the PR opened with `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` first. Its PR link (and its release's, if any) goes in your text just above the question and again inside it: "<id>: <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?", options "Mark as resolved" and "Request changes". Short, lean, plain words.
+4. It reports done. Ask the user about one task at a time, once its video is in its PR: one question, never two tasks in it or two questions at once, the PR opened with `${CLAUDE_PLUGIN_ROOT}/bin/open-pr.sh <url>` first. Its PR link (and its release's, if any) goes in your text just above the question and again inside it: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?", options "Mark as resolved" and "Request changes". Short, lean, plain words.
 5. Every 10 quiet minutes a status check comes: unblock, ask, start the next task.
 6. On the user's yes, tell the teammate "<id> accepted: finish it": the full tests, then its review PR closed. Then close the task and stop the teammate. Changes asked: a note on the task, and the teammate goes again.
 - Only you close tasks; a task the user resolved never stays open.
@@ -101,7 +101,7 @@ A checkout shared with other teammates, on main. Commit only your own files with
 - Loads: lead only: sent as a prompt after statusEvery quiet minutes with work open
 
 ```markdown
-better-tasks status check: no activity for 10 min. Move the work forward: close what the user resolved, ask about what is done, unblock what is stuck, start what is next. Then tell the user in a few short lines what moved, what waits on whom, what is next.
+better-tasks status check: no activity for 10 min. Move the work forward: close what the user resolved, ask about what is done, unblock what is stuck, start what is next. Then tell the user in a few short lines what moved, what waits on whom, what is next, each task by its id and PR number ("T-078 (#43)").
 ```
 
 ## Part: The context on each user message
@@ -185,6 +185,7 @@ Release: <url, only when your task changes a release>
 <id> (#<PR number>) <title>
 <what changed, in a line or two>
 ```
+Any other task you name there, the ones a release ships too, goes the same way: "T-078 (#43)".
 - Tell the lead: "<id> done: <PR url>, see <task file>". Then wait.
 
 ## After the user's answer
