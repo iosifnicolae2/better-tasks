@@ -1,6 +1,7 @@
 import { VIDEO_SIZE } from './demovideo'
 import { usesWorktree } from './gitflow'
 import { describeChoice, typeOf } from './models'
+import type { OwnWorktree } from './ownworktree'
 import type { Settings } from './settings'
 import type { Sources, Vars } from './template'
 import { render, templateOf } from './template'
@@ -24,12 +25,16 @@ export type Facts = {
   hasOwnPrTemplate: boolean
   /** The teammate being spawned works in its own worktree. */
   isWorktree: boolean
+  /** That worktree is Claude Code's isolated one (worktreeSandbox on, or better-tasks couldn't make its own). */
+  isIsolated: boolean
+  /** The worktree better-tasks made for it (ownworktree.ts), when it did. */
+  ownWorktree: OwnWorktree | undefined
   /** The teammate being spawned is on the hard level (no "stuck" rule: it can't go up). */
   isHard: boolean
   idleMinutes: number
 }
 
-export const NO_FACTS: Facts = { pluginRoot: '${CLAUDE_PLUGIN_ROOT}', hasTypes: true, upstreamPr: 'ask', prTemplate: '', hasOwnPrTemplate: false, isWorktree: false, isHard: false, idleMinutes: 10 }
+export const NO_FACTS: Facts = { pluginRoot: '${CLAUDE_PLUGIN_ROOT}', hasTypes: true, upstreamPr: 'ask', prTemplate: '', hasOwnPrTemplate: false, isWorktree: false, isIsolated: false, ownWorktree: undefined, isHard: false, idleMinutes: 10 }
 
 /** Every value a template may read. */
 export function varsOf(settings: Settings, facts: Facts): Vars {
@@ -40,6 +45,9 @@ export function varsOf(settings: Settings, facts: Facts): Vars {
     devBranch: settings.devBranch,
     isReviewPr: settings.gitFlow === 'direct' && !isWorktree,
     isWorktree,
+    isSandboxed: settings.worktreeSandbox || facts.isIsolated,
+    worktreePath: facts.ownWorktree?.path ?? '',
+    worktreeBranch: facts.ownWorktree?.branch ?? '',
     demoVideos: settings.demoVideos,
     videoQuality: settings.videoQuality,
     videoSize: VIDEO_SIZE[settings.videoQuality],

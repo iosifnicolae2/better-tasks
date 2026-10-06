@@ -30,6 +30,12 @@
       "description": "Old switch, kept for projects that set it: with the git flow \"Straight to main\", each named teammate works in its own git worktree. Choose the git flow in /better-tasks config.",
       "default": false
     },
+    "worktreeSandbox": {
+      "type": "boolean",
+      "title": "Worktree sandbox",
+      "description": "Off (the default): better-tasks makes each teammate's git worktree itself, so Claude Code's isolation checks don't refuse its git, gh and shell commands (subshells, variables, heredocs) or edits of its task file; the teammate keeps to its worktree by its rules. On: Claude Code's isolated worktrees, with those checks. Your permission mode applies either way.",
+      "default": false
+    },
     "longCache": {
       "type": "boolean",
       "title": "1-hour prompt cache",

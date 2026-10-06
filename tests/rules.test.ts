@@ -176,11 +176,24 @@ describe('the shipped templates', () => {
     expect(await rule('teammate.md', { gitFlow: 'dev-prs', devBranch: 'develop' })).toContain('on `develop`.')
     const worktree = await rule('teammate.md', { gitFlow: 'direct' }, { isWorktree: true })
     expect(worktree).toContain('`better-tasks:pull-request`')
-    expect(worktree).toContain('must plainly stay in your worktree')
+    expect(worktree).toContain('keep to it yourself: start each command with `cd <your worktree> && `')
     expect(worktree).toContain("Reuse the main checkout's build caches")
     expect(worktree).not.toContain('land.sh')
     expect(direct).not.toContain("Reuse the main checkout's build caches")
     expect(direct).toContain('Keep the loop fast')
+  })
+
+  test('worktrees without the sandbox, the default: the teammate keeps to its worktree by its rules; with it, the plain-commands rule', async () => {
+    expect(settingsOf({}).worktreeSandbox).toBe(false)
+    const own = await rule('teammate.md', {}, { isWorktree: true, ownWorktree: { path: '/r/.claude/worktrees/auth', branch: 'worktree-auth' } })
+    expect(own).toContain('Your own worktree `/r/.claude/worktrees/auth`, on branch `worktree-auth`, and a PR that merges into main. No check holds you in it')
+    expect(own).toContain('start each command with `cd /r/.claude/worktrees/auth && `, and read and edit files under it. In the main checkout, edit only your task file: never commit, reset or switch branches there. Any shell form works')
+    expect(own).not.toContain('must plainly stay')
+    for (const sandboxed of [await rule('teammate.md', { worktreeSandbox: true }, { isWorktree: true }), await rule('teammate.md', {}, { isWorktree: true, isIsolated: true })]) {
+      expect(sandboxed).toContain('gh and git commands must plainly stay in your worktree: no subshells')
+      expect(sandboxed).not.toContain('No check holds you')
+      expect(sandboxed).toContain("Reuse the main checkout's build caches")
+    }
   })
 
   test('closing a task cleans up its teammate and worktree, and the status check keeps tasks current', async () => {
