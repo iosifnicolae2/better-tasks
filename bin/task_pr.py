@@ -136,8 +136,20 @@ def task_file(task: str) -> Path | None:
 def task_title(path: Path | None, task: str) -> str:
     if path is None:
         return task
-    match = re.search(r'^title:\s*"?(.*?)"?\s*$', path.read_text(), re.M)
-    return match.group(1) if match else path.stem
+    match = re.search(r'^title:\s*(.*?)\s*$', path.read_text(), re.M)
+    return unquoted(match.group(1)) if match else path.stem
+
+
+def unquoted(value: str) -> str:
+    """A YAML scalar as written: a double-quoted one has JSON's escapes, a single-quoted one doubles its quotes."""
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value[1:-1]
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    return value
 
 
 def section(text: str, name: str) -> str:
