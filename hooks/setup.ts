@@ -17,7 +17,8 @@ export const SETUP_PROMPT =
   'The better-tasks mod needs Claude Code agent teams, which are off in this session. ' +
   `Add "${TEAMS_FLAG}": "1" to the "env" block of ~/.claude/settings.json with the Edit tool ` +
   '(create the block if it is missing; keep everything else in the file as it is). ' +
-  'Then tell the user to restart the session: exit, then start `claude` again with the same flags. ' +
+  'Then ask the user with AskUserQuestion to restart the session (exit, then start `claude` again with the same flags), ' +
+  'options "Done", "I\'ll restart" and "Skip". ' +
   'Do nothing else until then.'
 
 /** The one line the coordinator reads beside a prompt while teams are off. */

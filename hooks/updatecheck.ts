@@ -1,6 +1,7 @@
 // The startup update check: the newest better-tasks release (a vX.Y.Z tag of its repo) against the one this
 // project pins and the one installed. Newer: asked once per version; Yes moves the pin, updates the plugin,
-// then the user restarts Claude Code. Only for an install from the marketplace (a linked install is the user's own).
+// then asks the user to restart Claude Code (Done / I'll restart / Skip). Only for an install from the marketplace
+// (a linked install is the user's own).
 
 export const PLUGIN_ID = 'better-tasks@better-tasks'
 export const MARKETPLACE_NAME = 'better-tasks'
@@ -11,7 +12,15 @@ export const UPDATE_HEADER = 'Update'
 export const DECLINED_KEY = 'updateDeclined'
 
 export const updateQuestion = (tag: string) => `better-tasks ${tag} is out. Update?`
-export const restartLine = (tag: string) => `better-tasks: updated to ${tag}. Restart Claude Code to use it.`
+export const updatedLine = (tag: string) => `better-tasks: updated to ${tag}.`
+
+/** After the update, the restart is a question: done, later on their own, or skipped. */
+export const RESTART_DONE = 'Done'
+export const RESTART_LATER = "I'll restart"
+export const RESTART_SKIP = 'Skip'
+export const RESTART_HEADER = 'Restart'
+export const restartQuestion = (tag: string) => `better-tasks ${tag} is installed. Restart Claude Code to use it: quit, then run claude --continue.`
+export const restartLaterLine = (tag: string) => `better-tasks: ${tag} runs once you restart Claude Code.`
 
 /** An install Claude Code knows: its version and the scope `claude plugin update` needs. */
 export type Install = { version: string; scope: string }

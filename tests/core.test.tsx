@@ -4,7 +4,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { ENABLE_OPTION, QUESTION } from '../hooks/demovideo'
 import { pinCommit, TEAM_COMMIT, TEAM_NO, TEAM_QUESTION, TEAM_YES, updateCommit } from '../hooks/teaminstall'
-import { DECLINED_KEY, updateQuestion } from '../hooks/updatecheck'
+import { DECLINED_KEY, RESTART_LATER, restartLaterLine, restartQuestion, updateQuestion } from '../hooks/updatecheck'
 import { IGNORE_COMMIT } from '../hooks/ignoreworktrees'
 import { PANE_COMMANDS } from '../hooks/pane'
 import { SCREEN_COMMANDS } from '../hooks/screen'
@@ -1176,10 +1176,10 @@ test('a worktree per task: the pin is written but left for the user to commit', 
   expect(host.notices.some(line => line.startsWith('better-tasks: pinned to v0.10.7') && line.endsWith('Commit it yourself.'))).toBe(true)
 })
 
-test('a newer release: asked once; Yes moves the pin, updates the plugin, says to restart', async ($, on) => {
+test('a newer release: asked once; Yes moves the pin, updates the plugin, asks to restart', async ($, on) => {
   const clock = mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const asked = answerSetup(on, { [updateQuestion('v0.10.8')]: 'Yes' })
+  const asked = answerSetup(on, { [updateQuestion('v0.10.8')]: 'Yes', [restartQuestion('v0.10.8')]: RESTART_LATER })
   const host = fakeHost(on, [], { [SHARED]: unpinned({ source: { source: 'github', repo: 'iosifnicolae2/better-tasks', ref: 'v0.10.7' } }) })
   fakePluginCli(host, '0.10.7', '0.10.8')
   host.runOutput[LS_REMOTE] = RELEASES
@@ -1189,7 +1189,10 @@ test('a newer release: asked once; Yes moves the pin, updates the plugin, says t
   expect(host.ran).toContain('claude plugin marketplace add --scope project -- iosifnicolae2/better-tasks#v0.10.8')
   expect(host.ran).toContain('claude plugin update --scope user -- better-tasks@better-tasks')
   expect(host.ran).toContain(`git -C ${ROOT} commit --quiet -m ${updateCommit('v0.10.8')} --only -- .claude/settings.json`)
-  expect(host.notices).toContain('better-tasks: updated to v0.10.8. Restart Claude Code to use it. .claude/settings.json now pins v0.10.8. Committed; push it for your teammates.')
+  expect(host.notices).toContain('better-tasks: updated to v0.10.8. .claude/settings.json now pins v0.10.8. Committed; push it for your teammates.')
+  await clock.advance(QUIET_PROMPT_BOX)
+  expect(asked[1]).toBe(restartQuestion('v0.10.8'))
+  expect(host.notices).toContain(restartLaterLine('v0.10.8'))
 })
 
 test('a newer release, No: not asked again for that release', async ($, on) => {
