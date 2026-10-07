@@ -23,7 +23,7 @@ libass or freetype. The spec (paths relative to the spec file):
     {"label": "BEFORE", "video": "before.mp4",  or leave out "video" and give each step an "image"
      "review": "live/review.json",              optional: a live review of this video; each report shows
                                                 top-right from its second until the next of its kind (step, watch,
-                                                flag; 4 s at least), a check's or flag's box in amber
+                                                flag; 4 to 12 s), a check's or flag's box in amber
      "steps": [
        {"say": "After login you land on the home page.",
         "at": 1.5,                              optional: start no earlier than this second of the clip
@@ -75,8 +75,8 @@ RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
 LABEL_COLORS = {'BEFORE': (180, 83, 9, 235), 'AFTER': (21, 128, 61, 235)}
 AMBER = (245, 158, 11, 255)
-# A live review's reports (bin/live-review.sh): how long each shows at least (hooks/livereview.ts holds the same) and its colors.
-FLAG_SECONDS = 4
+# A live review's reports (bin/live-review.sh): how long each shows, at least and at most (hooks/livereview.ts holds the same), and its colors.
+FLAG_SECONDS, FLAG_MAX_SECONDS = 4, 12
 FLAG_COLORS = {'error': (185, 28, 28, 235), 'warning': (180, 83, 9, 235), 'info': (30, 64, 120, 235)}
 STEP_COLOR = (40, 44, 52, 225)  # a tester's note: what is on screen, what just happened
 FLAG_SIZE = 16
@@ -313,11 +313,11 @@ def load_review(path: Path) -> dict:
 
 
 def flag_spans(flags: list) -> list:
-    """Each report with when it goes: at the next of its kind (step, watch, flag), but never before FLAG_SECONDS."""
+    """Each report with when it goes: at the next of its kind (step, watch, flag), FLAG_SECONDS to FLAG_MAX_SECONDS after it came."""
     ordered = sorted(flags, key=lambda flag: flag['at'])
     def end(index: int, flag: dict) -> float:
         upcoming = next((other['at'] for other in ordered[index + 1:] if other['kind'] == flag['kind']), float('inf'))
-        return max(flag['at'] + FLAG_SECONDS, upcoming)
+        return min(flag['at'] + FLAG_MAX_SECONDS, max(flag['at'] + FLAG_SECONDS, upcoming))
     return [(flag, end(index, flag)) for index, flag in enumerate(ordered)]
 
 
