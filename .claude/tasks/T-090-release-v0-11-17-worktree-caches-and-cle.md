@@ -2,8 +2,8 @@
 id: T-090
 title: Release v0.11.17 (worktree caches and cleanup, task upkeep, tests read the rules)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: release-7
 rolled: 0
 order: -2
@@ -22,3 +22,4 @@ The user approved: "Release now" for v0.11.17 with T-087, T-088 and T-089 (#50).
 
 ## Notes
 - 2026-10-07: released v0.11.17, https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.17; tests 347 pass; ls-tree check 0; no video (no task had one); clone removed.
+- 2026-10-07: v0.11.17 published: https://github.com/iosifnicolae2/better-tasks/releases/tag/v0.11.17 (T-087, T-088, T-089 (#50)). No release video, because none of its tasks had one. 347 tests pass via scripts/test.sh; the tag has 0 files under .claude/tasks; the temporary clone is removed.

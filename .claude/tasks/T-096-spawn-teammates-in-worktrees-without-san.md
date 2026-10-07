@@ -2,8 +2,8 @@
 id: T-096
 title: Spawn teammates in worktrees without sandboxing (a setting, on by default)
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: worktree-sandbox
 rolled: 0
 order: -4
@@ -34,3 +34,4 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/56
 T-096 (#56) Spawn teammates in worktrees without sandboxing
 Teammates still get their own copy of the project, but better-tasks now makes that copy itself. Claude Code no longer refuses their git, gh and shell commands, or their task-file notes. A new setting, "Worktree sandbox", is off by default; turn it on to get the old behavior back. Your permission settings don't change.
 - 2026-10-07: Accepted. Signed-out check (curl, no cookies): the PR's github.com/user-attachments video gave 404 (poster 200), so I put both on the videos branch (bin/video-branch.sh) and switched the PR body to the jsDelivr links; both 200 signed out (video/mp4, image/png). Full tests: `sh scripts/test.sh` 358 pass, tsc clean, settings-doc current, skills-check ok, templates current, `claude plugin validate .` passes (old warnings only). Review PR #56 closed. Not released yet.
+- 2026-10-07: New "Worktree sandbox" setting (worktreeSandbox, off by default): better-tasks makes each teammate's worktree itself with git (.claude/worktrees/<name>, branch worktree-<name>) and spawns it without Claude Code's isolation checks, which had refused 184 commands in better-tasks and 524 in church-hub. Permissions unchanged. Fixed on the way: origin/HEAD in a repo with no remote. 358 tests pass; review PR #56 closed. Not released yet.

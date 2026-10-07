@@ -3,7 +3,7 @@ id: T-098
 title: "Live Gemini review of test recordings: real-time flags, timestamped annotated video"
 sprint: 2026-10-05
 urgent: false
-status: doing
+status: done
 owner: live-review
 rolled: 0
 order: 3
@@ -46,3 +46,4 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/60
 T-098 (#60) Live Gemini review of test recordings
 While a teammate tests, Gemini watches the test screen live, notes each step like a human tester, and flags anything not OK at its second; the reports go on the video and in the task. Your billed Gemini key is set from the settings page and kept in the Keychain (every project, or one project).
 - 2026-10-07 (live-review): Accepted. Full tests: 374 pass, tsc clean, the shell checks, skills and yaml checks ok. Review PR #60 closed.
+- 2026-10-07: Accepted by the user. Live review (setting liveReview, off by default): while a teammate tests, Gemini (gemini-3.8-live via @google/genai, AI Studio key) watches the test display and writes timestamped step notes, watch results and flags; shown as cards on the video and listed in the task. Billed key in the Keychain, global or per project, set from the settings page. $0.018 for a 47 s test. 374 tests pass; review PR #60 closed.

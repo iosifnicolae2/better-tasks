@@ -2,8 +2,8 @@
 id: T-095
 title: "Analyse church-hub and best-remote-desktop sessions: where time and tokens go, and short rules to work faster"
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: session-analysis
 rolled: 0
 order: -3
@@ -26,3 +26,4 @@ No code change, PR or video is needed; the report is the result. Keep the script
 ## Notes
 - 2026-10-07: analyse.py (task folder) measures all 3,032 transcripts (worktree and scratchpad folders included) in ~5 s; tables.md holds every table, with a Headline section per project. Rerun: `python3 -I .claude/tasks/T-095/analyse.py` (`--json` for raw numbers).
 - 2026-10-07: writing report.md was refused by a guard on report files written by subagents; the report text went to the lead in the done message, to save as T-095/report.md.
+- 2026-10-07: Report published as the doc "Session bottlenecks: church-hub and best-remote-desktop" (https://claude.ai/code/artifact/49b367b3-177a-4e90-bb21-392aeb1d2ec1): top bottlenecks, the project comparison, rules, and recommended instructions with better-tasks candidates marked plus a paste-ready block. The user chose an artifact over report.md (the teammate's Write was blocked by a guard). Script and tables in .claude/tasks/T-095/. The user skipped turning the rules into better-tasks rules for now.

@@ -2,8 +2,8 @@
 id: T-091
 title: "Batch device builds and tests: unrelated tasks share a branch behind feature flags (setting, on by default)"
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: batch-testing
 rolled: 0
 order: -2
@@ -40,3 +40,4 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/51
 T-091 (#51) Batch device builds and tests: unrelated tasks share a branch behind feature flags
 New setting "Batch device tests", on by default. When builds or device tests are slow, each task first gets its own instance (simulator, emulator, app copy) tested in parallel; if that's not possible, unrelated tasks share one build, and only a change that needs testing on its own gets a short-lived feature flag, removed once it works. Off: the rule is gone.
 - 2026-10-07: Accepted. Full tests: 348 pass, tsc clean, settings-doc current, skills-check and yaml-check ok. Review PR #51 closed.
+- 2026-10-07: New "Batch device tests" setting (batchDeviceTests, on by default). Lead rule: an instance per task in parallel first; a shared build only when that's not possible; a short-lived feature flag (off by default, switched at runtime) only for a change that must be tested on its own or may clash, removed with the old path once confirmed. A matching teammate line. 348 tests pass; review PR #51 closed. Not released yet.

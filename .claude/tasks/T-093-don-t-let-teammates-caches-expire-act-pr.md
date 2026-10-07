@@ -2,8 +2,8 @@
 id: T-093
 title: "Don't let teammates' caches expire: act promptly, or send a short keep-warm note"
 sprint: 2026-10-05
-urgent: true
-status: todo
+urgent: false
+status: done
 owner: batch-testing
 rolled: 0
 order: -4
@@ -31,3 +31,4 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/53
 T-093 (#53) Don't let teammates' caches expire: act promptly, or send a short keep-warm note
 The lead now answers idle teammates promptly; one waiting on you for approval gets a short note before its cache runs out, and it's stopped only once its task is closed. Teammates don't sit idle mid-task, and the team list marks a cache that expires soon.
 - 2026-10-07: Accepted. Full tests: 351 pass, tsc clean. Review PR #53 closed.
+- 2026-10-07: The lead answers idle teammates promptly. One waiting on the user gets a one-line keep-warm note before its cache runs out, and is stopped only once its task is closed. Teammates don't sit idle mid-task. team_status flags "expires soon" at 10 minutes or less, and the status check covers it. 351 tests pass; review PR #53 closed. Not released yet.

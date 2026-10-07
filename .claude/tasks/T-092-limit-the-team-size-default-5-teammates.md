@@ -2,8 +2,8 @@
 id: T-092
 title: Limit the team size (default 5 teammates); group similar tasks onto one teammate
 sprint: 2026-10-05
-urgent: true
-status: doing
+urgent: false
+status: done
 owner: batch-testing
 rolled: 0
 order: -3
@@ -34,3 +34,4 @@ PR: https://github.com/iosifnicolae2/better-tasks/pull/52
 T-092 (#52) Limit the team size (default 5 teammates); group similar tasks onto one teammate
 New setting "Team size", 5 by default. At the limit a new teammate isn't started: the lead gives the task to a teammate already doing similar work, who takes it after its current one, or waits. The lead's rules now say to group similar tasks onto one teammate.
 - 2026-10-07: Accepted. Full tests: 351 pass, tsc clean, settings-doc current, skills-check and yaml-check ok. Review PR #52 closed.
+- 2026-10-07: "Team size" setting (maxTeammates, default 5, 0 means no limit): a spawn past it is refused, with each teammate's tasks listed. The lead groups similar tasks onto one teammate, and a teammate may own several. team_status shows the current task first. 351 tests pass; review PR #52 closed. Not released yet.
