@@ -45,3 +45,4 @@ What this means:
 PR: https://github.com/iosifnicolae2/better-tasks/pull/60
 T-098 (#60) Live Gemini review of test recordings
 While a teammate tests, Gemini watches the test screen live, notes each step like a human tester, and flags anything not OK at its second; the reports go on the video and in the task. Your billed Gemini key is set from the settings page and kept in the Keychain (every project, or one project).
+- 2026-10-07 (live-review): Accepted. Full tests: 374 pass, tsc clean, the shell checks, skills and yaml checks ok. Review PR #60 closed.
