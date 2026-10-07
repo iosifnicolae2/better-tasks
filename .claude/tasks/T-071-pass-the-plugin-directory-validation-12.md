@@ -3,7 +3,7 @@ id: T-071
 title: Pass the plugin directory validation (12 blocking issues + icon)
 sprint: 2026-10-05
 urgent: false
-status: todo
+status: done
 owner: validation
 rolled: 0
 order: 2
@@ -41,3 +41,4 @@ Fixed the 12 issues that blocked the directory submission, added a listing icon 
 - 2026-10-06: 2026-10-06 pane.tsx:421 fix: commit b409494 on local main (not pushed), pushed as task/T-071 @ c1cd830. All 16 config.set calls in the ui.press hook (14 in the portal's count, plus openPrInBrowser and demoVideos) now read `$.config.set({ key: 'better-tasks.<field>', value: value })`, with no shorthand. `value` is a plain local, computed before the switch. I also reworded a comment that named $.config.set. Checks: 322 pass, tsc clean, validate passes. The user sees no change.
 - 2026-10-06: Shipped in v0.11.12, and the portal shows 0 blocking issues. It stays open by the user's wish until the submission is done, and the submission is paused (T-070).
 - 2026-10-06: Moved out of "currently working on": waits on the paused submission (T-070). It stays open by the user's wish.
+- 2026-10-07: Closed by the user ("and also 071"). Portal validation fixes (12 blocking issues, icon, README disclosures) shipped in v0.11.12; the portal showed 0 blocking. The directory submission itself (T-070) was cancelled unsubmitted.
