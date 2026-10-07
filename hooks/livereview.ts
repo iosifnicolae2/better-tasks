@@ -20,8 +20,9 @@ export const TURN_SECONDS = 3
 export const QUIET_SECONDS = 10
 /** The small grey picture of a frame that tells whether it changed (see isChanged). */
 export const THUMB = { width: 192, height: 108 }
-/** How long a report shows at least on a video: until the next of its kind, but never shorter. */
+/** How long a report shows on a video: until the next of its kind, but at least FLAG_SECONDS and at most FLAG_MAX_SECONDS. */
 export const FLAG_SECONDS = 4
+export const FLAG_MAX_SECONDS = 12
 
 /** Paid-tier prices of the Live models, USD per million tokens (ai.google.dev/gemini-api/docs/pricing, 2026-10). */
 export const PRICES = {
@@ -190,7 +191,7 @@ export function markdownOf(review: Review): string {
   ].join('\n')
 }
 
-/** SubRip subtitles: each observation until the next of its kind, FLAG_SECONDS at least, cut short by the end of the video. */
+/** SubRip subtitles: each observation until the next of its kind (FLAG_SECONDS to FLAG_MAX_SECONDS), cut short by the end of the video. */
 export function srtOf(observations: Observation[], seconds: number): string {
   const time = (value: number) => {
     const ms = Math.round(Math.max(0, value) * 1000)
@@ -201,7 +202,7 @@ export function srtOf(observations: Observation[], seconds: number): string {
   return ordered
     .map((one, index) => {
       const next = ordered.slice(index + 1).find(other => other.kind === one.kind)
-      const end = Math.min(seconds, Math.max(one.at + FLAG_SECONDS, next?.at ?? seconds))
+      const end = Math.min(seconds, one.at + FLAG_MAX_SECONDS, Math.max(one.at + FLAG_SECONDS, next?.at ?? seconds))
       return `${index + 1}\n${time(one.at)} --> ${time(end)}\n${labelOf(one)}: ${one.text}\n`
     })
     .join('\n')
