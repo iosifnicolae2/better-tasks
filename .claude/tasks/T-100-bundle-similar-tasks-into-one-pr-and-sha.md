@@ -32,3 +32,4 @@ Video: [T-100.mp4](../tasks_videos/T-100.mp4)
 PR: https://github.com/iosifnicolae2/better-tasks/pull/58
 T-100 (#58) Bundle similar tasks into one PR and share one video
 A teammate with several similar tasks can now open one PR and record one video for all of them. Each task links that PR and that video. You get one question for the PR, naming every task, and your yes closes all of them. The release video shows the shared video once, on one card naming those tasks.
+- 2026-10-07: Accepted. Full tests: `sh scripts/test.sh` 359 pass, tsc clean, skills-check, settings-doc, task-pr-check, release-video-check, video-branch-check and yaml-check all ok. Review PR #58 closed. The signed-out 404 of the attached video: the lead traces it to this session running the installed v0.11.10 task_pr.py (no player), so it isn't filed. Not released yet.
