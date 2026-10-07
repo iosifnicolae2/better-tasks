@@ -1,6 +1,8 @@
 """Makes a narrated before/after demo video from screen recordings or screenshots.
 
 Run through bin/demo-video.sh (it picks Kokoro's Python). Usage: demo-video.sh spec.json [--quality low|medium|high]
+Or demo-video.sh --annotate <dir>/review.json [--quality ...]: a live review's recording (bin/live-review.sh)
+with each report on it, no voice, as <dir>/annotated.mp4.
 Quality (the setting videoQuality, medium by default): low fits 1280x720 in a small file, medium fits
 1920x1080, high fits 1920x1080 sharper in a bigger file. The video is scaled to fit, up or down.
 The video goes to <project>/.claude/tasks_videos/<name> (the main checkout's, also from a worktree;
@@ -19,6 +21,8 @@ libass or freetype. The spec (paths relative to the spec file):
   "voice": "af_heart",                          optional Kokoro voice
   "clips": [
     {"label": "BEFORE", "video": "before.mp4",  or leave out "video" and give each step an "image"
+     "review": "live/review.json",              optional: a live review of this video; each report shows
+                                                top-right from its second for a few seconds, its box in amber
      "steps": [
        {"say": "After login you land on the home page.",
         "at": 1.5,                              optional: start no earlier than this second of the clip
@@ -69,6 +73,12 @@ LOUD_PEAK = 0.89  # -1 dBFS
 RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
 LABEL_COLORS = {'BEFORE': (180, 83, 9, 235), 'AFTER': (21, 128, 61, 235)}
+AMBER = (245, 158, 11, 255)
+# A live review's reports (bin/live-review.sh): how long each shows (hooks/livereview.ts holds the same) and its colors.
+FLAG_SECONDS = 4
+FLAG_COLORS = {'error': (185, 28, 28, 235), 'warning': (180, 83, 9, 235), 'info': (30, 64, 120, 235)}
+FLAG_SIZE = 16
+FLAG_WIDTH = 0.34  # of the frame's width
 # Sizes per 1000 px of the frame's long side: kept small, so what the marks point at stays easy to see.
 MARK_LINE = 4  # a box's red line (thinner around a small target)
 ARROW_HEAD = 3.5  # an arrow's head, in line widths
@@ -98,6 +108,37 @@ def main(spec_path: str, quality_name: str) -> None:
         join(work, [path for path, _ in rendered], output)
         poster = make_poster(work, base, clips, [starts for _, starts in rendered], output)
     print(poster.as_uri())
+    print(output.as_uri())
+
+
+def annotate(review_path: str, quality_name: str) -> None:
+    """A live review's recording with its reports on it, silent, beside it as annotated.mp4."""
+    global quality
+    quality = QUALITIES[quality_name]
+    review_file = Path(review_path).resolve()
+    review = load_review(review_file)
+    video = review_file.parent / Path(review['video']).name
+    info = probe(video)
+    canvas, length = canvas_size(info['size']), info['duration']
+    fit = Fit(info['size'], canvas)
+    flags = review['observations']
+    cuts = sorted({0.0, *(time for time in flag_times(flags) if time < length)})
+    output = review_file.parent / 'annotated.mp4'
+    with tempfile.TemporaryDirectory(prefix='annotate-') as tmp:
+        work = Path(tmp)
+        frames = []
+        for index, (begin, end) in enumerate(zip(cuts, cuts[1:] + [length])):
+            path = work / f'frame{index}.png'
+            overlay(canvas, '', None, fit, showing(flags, begin)).save(path)
+            frames.append((path, end - begin))
+        write_narration(work / 'silence.wav', [], length)
+        width, height = canvas
+        graph = (f'[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
+                 f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps={FPS}[base];'
+                 f'[base][1:v]overlay=format=auto,format=yuv420p[v]')
+        inputs = ['-i', str(video), '-f', 'concat', '-safe', '0', '-i', str(write_frame_list(work / 'frames.txt', frames)),
+                  '-i', str(work / 'silence.wav')]
+        encode(inputs, graph, '2:a', length, output)
     print(output.as_uri())
 
 
@@ -211,8 +252,8 @@ def font(size: int):
     return ImageFont.load_default(size)
 
 
-def overlay(canvas: tuple, label: str, step: dict | None, fit: Fit | None) -> Image.Image:
-    """One transparent frame: the step's marks and subtitle, then the label top-left over them."""
+def overlay(canvas: tuple, label: str, step: dict | None, fit: Fit | None, flags: list = ()) -> Image.Image:
+    """One transparent frame: the step's marks and subtitle, the live review's reports showing, then the label."""
     image = Image.new('RGBA', canvas, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     unit = max(canvas) / 1000
@@ -220,8 +261,58 @@ def overlay(canvas: tuple, label: str, step: dict | None, fit: Fit | None) -> Im
         for mark in with_arrows(step.get('marks', [])):
             draw_mark(draw, mark, fit, unit)
         draw_subtitle(draw, step['say'], canvas, unit)
-    draw_label(draw, label, unit)
+    if flags:
+        draw_flags(draw, flags, canvas, fit, unit)
+    if label:
+        draw_label(draw, label, unit)
     return image
+
+
+def draw_flags(draw: ImageDraw.ImageDraw, flags: list, canvas: tuple, fit: Fit, unit: float) -> None:
+    """Each report as a card down the top-right corner ("0:12 FLAG, error" over its sentence), its box in amber."""
+    text_font, head_font = font(round(FLAG_SIZE * unit)), font(round(FLAG_SIZE * 0.85 * unit))
+    pad, margin, gap = 10 * unit, 18 * unit, 8 * unit
+    width = canvas[0] * FLAG_WIDTH
+    top = margin
+    for flag in flags:
+        if flag.get('box'):
+            x, y, w, h = flag['box']
+            (left, upper), (right, lower) = fit.point(x, y), fit.point(x + w, y + h)
+            draw.rounded_rectangle((left, upper, right, lower), radius=4 * unit, outline=AMBER, width=max(2, round(3 * unit)))
+        kind = 'FLAG' if flag['kind'] == 'flag' else 'watch'
+        head = f"{clock(flag['at'])}  {kind}, {flag['severity']}"
+        lines = wrap(draw, flag['text'], text_font, width - 2 * pad)[:4]
+        line_h = text_font.size * 1.25
+        height = pad * 2 + head_font.size * 1.4 + line_h * len(lines)
+        left = canvas[0] - margin - width
+        draw.rounded_rectangle((left, top, left + width, top + height), radius=8 * unit,
+                               fill=FLAG_COLORS.get(flag['severity'], FLAG_COLORS['warning']))
+        draw.text((left + pad, top + pad), head, font=head_font, fill=(255, 255, 255, 200))
+        for row, line in enumerate(lines):
+            draw.text((left + pad, top + pad + head_font.size * 1.4 + row * line_h), line, font=text_font, fill=WHITE)
+        top += height + gap
+
+
+def clock(seconds: float) -> str:
+    whole = max(0, int(seconds))
+    return f'{whole // 60}:{whole % 60:02d}'
+
+
+def flags_of(base: Path, clip: dict) -> list:
+    """The reports of the clip's live review, if it names one."""
+    return load_review(base / clip['review'])['observations'] if clip.get('review') else []
+
+
+def load_review(path: Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def showing(flags: list, moment: float) -> list:
+    return [flag for flag in flags if flag['at'] <= moment < flag['at'] + FLAG_SECONDS]
+
+
+def flag_times(flags: list) -> list:
+    return [time for flag in flags for time in (flag['at'], flag['at'] + FLAG_SECONDS)]
 
 
 def draw_label(draw: ImageDraw.ImageDraw, label: str, unit: float) -> None:
@@ -335,19 +426,21 @@ def render_clip(work: Path, base: Path, clip: dict, canvas: tuple, voice: Voice,
     write_narration(work / 'voice.wav', timed, length)
 
     starts = [start for start, _ in timed]
-    bounds = list(zip([0.0] + starts, starts + [length]))
+    flags = flags_of(base, clip)
+    cuts = sorted({0.0, *starts, *(time for time in flag_times(flags) if time < length)})
     frames = []
-    shot, shot_fit = None, None
-    for index, (begin, end) in enumerate(bounds):
-        step = steps[index - 1] if index > 0 else None
+    shot, shot_fit, shown = None, None, None
+    for index, (begin, end) in enumerate(zip(cuts, cuts[1:] + [length])):
+        current = sum(1 for start in starts if start <= begin)  # steps begun: the step showing is the last of them
+        step = steps[current - 1] if current > 0 else None
         if video:
             fit = Fit(probe(video)['size'], canvas)
-            frame = overlay(canvas, label, step, fit)
+            frame = overlay(canvas, label, step, fit, showing(flags, begin))
         else:
             image = (step or steps[0]).get('image')
-            if image:
-                shot, shot_fit = fitted(base / image, canvas)
-            frame = Image.alpha_composite(shot, overlay(canvas, label, step, shot_fit))
+            if image and image != shown:
+                shot, shot_fit, shown = *fitted(base / image, canvas), image
+            frame = Image.alpha_composite(shot, overlay(canvas, label, step, shot_fit, showing(flags, begin)))
         path = work / f'frame{index}.png'
         frame.save(path)
         frames.append((path, end - begin))
@@ -560,7 +653,13 @@ if __name__ == '__main__':
         print('ready')
     else:
         parser = argparse.ArgumentParser(prog='demo-video.sh', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-        parser.add_argument('spec')
+        parser.add_argument('spec', nargs='?')
+        parser.add_argument('--annotate', metavar='REVIEW_JSON')
         parser.add_argument('--quality', choices=QUALITIES, default='medium')
         args = parser.parse_args()
-        main(args.spec, args.quality)
+        if args.annotate:
+            annotate(args.annotate, args.quality)
+        elif args.spec:
+            main(args.spec, args.quality)
+        else:
+            parser.error('a spec, or --annotate review.json')

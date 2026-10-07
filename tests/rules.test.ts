@@ -71,7 +71,7 @@ describe('the shipped templates', () => {
   test('every file renders under every git flow, videos, off-screen and model setting, with no tag left', async () => {
     for (const gitFlow of GIT_FLOWS) {
       for (const flag of [true, false]) {
-        const values = { gitFlow, demoVideos: flag, offScreen: !flag, escalate: flag, batchDeviceTests: flag, testScreen: flag ? 'virtual' : 'DELL' }
+        const values = { gitFlow, demoVideos: flag, offScreen: !flag, escalate: flag, batchDeviceTests: flag, liveReview: flag, testScreen: flag ? 'virtual' : 'DELL' }
         for (const name of RULE_FILES) {
           for (const facts of [{ isWorktree: flag, isHard: flag, hasTypes: flag, hasOwnPrTemplate: flag, upstreamPr: flag ? 'ask' : 'never' }]) {
             const text = await rule(name, values, facts)

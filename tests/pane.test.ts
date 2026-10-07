@@ -582,7 +582,7 @@ for (const surface of SURFACES) {
     expect(await ui.find({ key: 'task-T-001' })).toBeUndefined()
     expect(await ui.findAll({ type: 'Select' })).toHaveLength(0)
     const before = await shape()
-    for (const key of ['cfg-editor', 'cfg-gitFlow', 'cfg-longCache', 'cfg-statusEvery', 'cfg-maxTeammates', 'cfg-keepAwake', 'cfg-batchDeviceTests', 'cfg-videoQuality', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
+    for (const key of ['cfg-editor', 'cfg-gitFlow', 'cfg-longCache', 'cfg-statusEvery', 'cfg-maxTeammates', 'cfg-keepAwake', 'cfg-batchDeviceTests', 'cfg-liveReview', 'cfg-videoQuality', 'cfg-easyModel', 'cfg-easyEffort', 'cfg-normalModel', 'cfg-normalEffort', 'cfg-hardModel', 'cfg-hardEffort', 'cfg-escalate', 'cfg-sprintWeeks', 'cfg-sprintStart']) {
       await ui.press({ key })
     }
     expect(settings).toEqual([
@@ -592,6 +592,7 @@ for (const surface of SURFACES) {
       ['better-tasks.maxTeammates', 8],
       ['better-tasks.keepAwake', false],
       ['better-tasks.batchDeviceTests', false],
+      ['better-tasks.liveReview', true],
       ['better-tasks.videoQuality', 'high'],
       ['better-tasks.easyModel', 'fable'],
       ['better-tasks.easyEffort', 'medium'],
@@ -607,6 +608,17 @@ for (const surface of SURFACES) {
     files.delete(`${ROOT}/.claude/tasks/config.json`)
     expect(await shape()).toBe(before)
     settings.length = 0
+    await ui.unmount()
+  })
+
+  test(`the Gemini API key row says where the key is kept, asked of the Keychain through live-review.sh, never the key (${surface})`, async ($, on) => {
+    const { commands } = fakeProject(on, {}, {}, { '/bin/sh': 'global\n' })
+    await $.command.run(sprintCommand('config'))
+    const ui = await $.ui.mount({ plugin: 'better-tasks', surface, ...PANE })
+    expect(await ui.find({ key: 'cfg-gemini-key' })).toBeDefined()
+    await ui.drawn()
+    expect(await ui.find({ type: 'Text', text: 'every project · change' })).toBeDefined()
+    expect(commands.some(argv => argv[1]?.endsWith('/bin/live-review.sh') && argv.slice(2).join(' ') === 'key status')).toBe(true)
     await ui.unmount()
   })
 
