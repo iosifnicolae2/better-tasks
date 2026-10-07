@@ -110,11 +110,12 @@ describe('live review: the annotation format', () => {
     expect(clockOf(65.9)).toBe('1:05')
   })
 
-  test('subtitles: each report for 4 seconds, cut at the end of the video', () => {
+  test('subtitles: each report until the next, 4 seconds at least, cut at the end of the video', () => {
     expect(srtOf(observations, 30)).toBe([
-      '1\n00:00:03,900 --> 00:00:07,900\nwatch, error: Total stays $40.00 after Add\n',
+      '1\n00:00:03,900 --> 00:00:27,400\nwatch, error: Total stays $40.00 after Add\n',
       '2\n00:00:27,400 --> 00:00:30,000\nFLAG, error: TypeError: Cannot read properties of undefined\n',
     ].join('\n'))
+    expect(srtOf([flag(1, 'a'), flag(2, 'b')], 30)).toContain('00:00:01,000 --> 00:00:05,000')
   })
 
   test('review.md: what was watched, how many flagged, the cost, then the list', () => {

@@ -20,7 +20,7 @@ export const TURN_SECONDS = 3
 export const QUIET_SECONDS = 10
 /** The small grey picture of a frame that tells whether it changed (see isChanged). */
 export const THUMB = { width: 192, height: 108 }
-/** How long a flag stays on the annotated video. */
+/** How long a report shows at least on a video: until the next one, but never shorter. */
 export const FLAG_SECONDS = 4
 
 /** Paid-tier prices of the Live models, USD per million tokens (ai.google.dev/gemini-api/docs/pricing, 2026-10). */
@@ -174,7 +174,7 @@ export function markdownOf(review: Review): string {
   const flags = review.observations.filter(one => one.kind === 'flag').length
   return [
     `# Live review of ${review.video}`,
-    `Gemini (${review.model}) watched ${clockOf(review.seconds)} of the test for: ${review.watch.trim() || 'nothing in particular'}.`,
+    `Gemini (${review.model}) watched ${clockOf(review.seconds)} of the test for: ${review.watch.trim().replace(/\.$/, '') || 'nothing in particular'}.`,
     `${review.observations.length} observations, ${flags} flagged. Cost about $${costOf(review.usage).toFixed(3)}.`,
     '',
     listOf(review.observations),
@@ -182,16 +182,19 @@ export function markdownOf(review: Review): string {
   ].join('\n')
 }
 
-/** SubRip subtitles: each observation for FLAG_SECONDS, cut short by the end of the video. */
+/** SubRip subtitles: each observation until the next, FLAG_SECONDS at least, cut short by the end of the video. */
 export function srtOf(observations: Observation[], seconds: number): string {
   const time = (value: number) => {
     const ms = Math.round(Math.max(0, value) * 1000)
     const pad = (n: number, width = 2) => String(n).padStart(width, '0')
     return `${pad(Math.floor(ms / 3_600_000))}:${pad(Math.floor(ms / 60_000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`
   }
-  return [...observations]
-    .sort((a, b) => a.at - b.at)
-    .map((one, index) => `${index + 1}\n${time(one.at)} --> ${time(Math.min(seconds, one.at + FLAG_SECONDS))}\n${label(one)}: ${one.text}\n`)
+  const ordered = [...observations].sort((a, b) => a.at - b.at)
+  return ordered
+    .map((one, index) => {
+      const end = Math.min(seconds, Math.max(one.at + FLAG_SECONDS, ordered[index + 1]?.at ?? 0))
+      return `${index + 1}\n${time(one.at)} --> ${time(end)}\n${label(one)}: ${one.text}\n`
+    })
     .join('\n')
 }
 
