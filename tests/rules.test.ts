@@ -147,7 +147,7 @@ describe('the shipped templates', () => {
 
   test('similar tasks can share one PR and one video: one question for it, naming every task, and each one closed on the yes', async () => {
     const lead = await rule('lead.md', { demoVideos: true })
-    expect(lead).toContain('Ask the user about one PR at a time, once its video is in it: one question, never two PRs in it')
+    expect(lead).toContain('Ask the user about one PR at a time, once its video is in it, never two PRs in one ask')
     expect(lead).toContain('Similar tasks sharing one PR: one question that starts with every id, "<id>, <id> (#<PR number>): …".')
     expect(lead).toContain('close the task (each task of a shared PR)')
     expect(await rule('teammate.md')).toContain('- Similar tasks of yours can share one PR and one video (`better-tasks:pull-request`).')
@@ -257,8 +257,8 @@ describe('the shipped templates', () => {
     for (const gitFlow of GIT_FLOWS) {
       const lead = await rule('lead.md', { gitFlow, demoVideos: true })
       expect(lead).toContain('It opens its PR as a draft, the video in it')
-      expect(lead).toContain('Ask the user about one PR at a time, once its video is in it: one question, never two PRs in it or two questions at once')
-      expect(lead).toContain('Its PR link (and its release\'s, if any) goes in your text just above the question and again inside it: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"')
+      expect(lead).toContain('Ask the user about one PR at a time, once its video is in it, never two PRs in one ask')
+      expect(lead).toContain('Its PR link (and its release\'s, if any) goes in as above: header "<id> (#<PR number>)", "<id> (#<PR number>): <what it implemented or fixed, in a few words>. PR: <url>. Is everything OK?"')
       expect(lead).toContain('a draft release, the release video in its notes')
       const done = await rule('done.md', { gitFlow })
       expect(done).toContain('PR: <url>\nRelease: <url, only when your task changes a release>')
