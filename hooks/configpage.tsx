@@ -408,7 +408,7 @@ function describeRow(fields: readonly Field[], rowKey: string, fromProject: read
     return `PR template: what every PR description fills in: the request and why at the top, then the video, what changed, how to test. A path of your own: "prTemplate" in config.json; else the project’s, else better-tasks’. ${action}`
   }
   if (rowKey === GEMINI_KEY_ROW) {
-    return 'Gemini API key: for live review, from aistudio.google.com/apikey. Kept in the macOS Keychain, never in a file: one for every project, or this project’s own, which wins. ⏎ sets, changes or removes it.'
+    return 'Gemini API key: for live review, from an AI Studio project with billing on (Plan “Paid” at aistudio.google.com/apikey): on the free tier Google may use what is sent to improve its products, and people may review it. Kept in the macOS Keychain, never in a file: one for every project, or this project’s own, which wins. ⏎ sets, changes or removes it.'
   }
   if (rowKey === 'cfg-sprints') return 'Sprint goals & reviews: opens sprints.md, one section per sprint.'
   if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Better Tasks: …”."

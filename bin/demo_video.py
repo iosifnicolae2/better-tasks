@@ -22,7 +22,8 @@ libass or freetype. The spec (paths relative to the spec file):
   "clips": [
     {"label": "BEFORE", "video": "before.mp4",  or leave out "video" and give each step an "image"
      "review": "live/review.json",              optional: a live review of this video; each report shows
-                                                top-right from its second until the next (4 s at least), its box in amber
+                                                top-right from its second until the next of its kind (step, watch,
+                                                flag; 4 s at least), a check's or flag's box in amber
      "steps": [
        {"say": "After login you land on the home page.",
         "at": 1.5,                              optional: start no earlier than this second of the clip
@@ -77,6 +78,7 @@ AMBER = (245, 158, 11, 255)
 # A live review's reports (bin/live-review.sh): how long each shows at least (hooks/livereview.ts holds the same) and its colors.
 FLAG_SECONDS = 4
 FLAG_COLORS = {'error': (185, 28, 28, 235), 'warning': (180, 83, 9, 235), 'info': (30, 64, 120, 235)}
+STEP_COLOR = (40, 44, 52, 225)  # a tester's note: what is on screen, what just happened
 FLAG_SIZE = 16
 FLAG_WIDTH = 0.34  # of the frame's width
 # Sizes per 1000 px of the frame's long side: kept small, so what the marks point at stays easy to see.
@@ -269,26 +271,27 @@ def overlay(canvas: tuple, label: str, step: dict | None, fit: Fit | None, flags
 
 
 def draw_flags(draw: ImageDraw.ImageDraw, flags: list, canvas: tuple, fit: Fit, unit: float) -> None:
-    """Each report as a card down the top-right corner ("0:12 FLAG, error" over its sentence), its box in amber."""
+    """Each report as a card down the top-right corner ("0:12 FLAG, error" over its sentence), its box in amber.
+    A tester's note ("step") first, in grey; checks and flags under it in their severity's color."""
     text_font, head_font = font(round(FLAG_SIZE * unit)), font(round(FLAG_SIZE * 0.85 * unit))
     pad, margin, gap = 10 * unit, 18 * unit, 8 * unit
     width = canvas[0] * FLAG_WIDTH
     top = margin
-    for flag in flags:
-        if flag.get('box'):
+    for flag in sorted(flags, key=lambda flag: flag['kind'] != 'step'):
+        if flag.get('box') and flag['kind'] != 'step':
             x, y, w, h = flag['box']
             (left, upper), (right, lower) = fit.point(x, y), fit.point(x + w, y + h)
             line = max(2, round(3 * unit))
             rim = line + 4 * unit  # around its target, never over it
             draw.rounded_rectangle((left - rim, upper - rim, right + rim, lower + rim), radius=4 * unit, outline=AMBER, width=line)
-        kind = 'FLAG' if flag['kind'] == 'flag' else 'watch'
-        head = f"{clock(flag['at'])}  {kind}, {flag['severity']}"
+        kind = {'flag': 'FLAG', 'watch': 'watch'}.get(flag['kind'])
+        head = f"{clock(flag['at'])}  {kind}, {flag['severity']}" if kind else f"{clock(flag['at'])}  step"
         lines = wrap(draw, flag['text'], text_font, width - 2 * pad)[:4]
         line_h = text_font.size * 1.25
         height = pad * 2 + head_font.size * 1.4 + line_h * len(lines)
         left = canvas[0] - margin - width
         draw.rounded_rectangle((left, top, left + width, top + height), radius=8 * unit,
-                               fill=FLAG_COLORS.get(flag['severity'], FLAG_COLORS['warning']))
+                               fill=STEP_COLOR if flag['kind'] == 'step' else FLAG_COLORS.get(flag['severity'], FLAG_COLORS['warning']))
         draw.text((left + pad, top + pad), head, font=head_font, fill=(255, 255, 255, 200))
         for row, line in enumerate(lines):
             draw.text((left + pad, top + pad + head_font.size * 1.4 + row * line_h), line, font=text_font, fill=WHITE)
@@ -310,10 +313,12 @@ def load_review(path: Path) -> dict:
 
 
 def flag_spans(flags: list) -> list:
-    """Each report with when it goes: at the next report, but never before FLAG_SECONDS."""
+    """Each report with when it goes: at the next of its kind (step, watch, flag), but never before FLAG_SECONDS."""
     ordered = sorted(flags, key=lambda flag: flag['at'])
-    nexts = [flag['at'] for flag in ordered[1:]] + [float('inf')]
-    return [(flag, max(flag['at'] + FLAG_SECONDS, upcoming)) for flag, upcoming in zip(ordered, nexts)]
+    def end(index: int, flag: dict) -> float:
+        upcoming = next((other['at'] for other in ordered[index + 1:] if other['kind'] == flag['kind']), float('inf'))
+        return max(flag['at'] + FLAG_SECONDS, upcoming)
+    return [(flag, end(index, flag)) for index, flag in enumerate(ordered)]
 
 
 def showing(flags: list, moment: float) -> list:

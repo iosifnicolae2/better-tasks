@@ -20,7 +20,7 @@ export const TURN_SECONDS = 3
 export const QUIET_SECONDS = 10
 /** The small grey picture of a frame that tells whether it changed (see isChanged). */
 export const THUMB = { width: 192, height: 108 }
-/** How long a report shows at least on a video: until the next one, but never shorter. */
+/** How long a report shows at least on a video: until the next of its kind, but never shorter. */
 export const FLAG_SECONDS = 4
 
 /** Paid-tier prices of the Live models, USD per million tokens (ai.google.dev/gemini-api/docs/pricing, 2026-10). */
@@ -45,11 +45,14 @@ export const keyArgv = (root: string, ...args: string[]) => ['/bin/sh', `${root}
 
 export type Severity = 'info' | 'warning' | 'error'
 
-/** One report: "watch" answers the teammate's instructions, "flag" is something not OK it found on its own. */
+/**
+ * One report: "step" narrates what is on screen and what just happened, as a tester's notes; "watch" answers the
+ * teammate's instructions; "flag" is something not OK it found on its own.
+ */
 export type Observation = {
   /** Seconds into the recording. */
   at: number
-  kind: 'watch' | 'flag'
+  kind: 'step' | 'watch' | 'flag'
   severity: Severity
   text: string
   /** Where on the recording, in its pixels: [x, y, w, h]. */
@@ -82,7 +85,7 @@ export const OBSERVE_TOOL = {
     type: 'OBJECT',
     properties: {
       at: { type: 'NUMBER', description: 'The "t=" seconds of the frame that shows it.' },
-      kind: { type: 'STRING', enum: ['watch', 'flag'], description: 'watch: about what you were asked to check. flag: anything else that is not OK.' },
+      kind: { type: 'STRING', enum: ['step', 'watch', 'flag'], description: 'step: what is on screen and what just happened. watch: about what you were asked to check. flag: anything else that is not OK.' },
       severity: { type: 'STRING', enum: ['info', 'warning', 'error'] },
       text: { type: 'STRING', description: 'One short sentence: what is on screen, quoting visible text exactly.' },
       box: { type: 'ARRAY', items: { type: 'INTEGER' }, description: 'Where it is: [ymin, xmin, ymax, xmax], each 0-1000 of the frame.' },
@@ -91,13 +94,14 @@ export const OBSERVE_TOOL = {
   },
 } as const
 
-/** Gemini's standing instructions: the teammate's own, then what to flag unasked. */
+/** Gemini's standing instructions: narrate like a tester, the teammate's checks, then what to flag unasked. */
 export function instructionsOf(watch: string): string {
   return [
     'You watch the screen of a software test as it happens and report through the observe function only. Never speak.',
     'Every few seconds you get the frames that changed, each after its time "t=<seconds>s"; a frame stays on screen until the next one.',
     'Report only what the frames show. Read every number and text off the screen exactly; never assume a step worked because it was expected to, and never describe a change you did not see.',
     'After each batch, call observe once for each new thing, with "at" the time of the frame that shows it. Never report a thing twice. Nothing new: call nothing.',
+    'Narrate like a human tester taking notes: for each change on screen, kind "step", severity info: where the user is and what just happened, quoting what changed (e.g. "Settings page open; Editor shows code", "Pressed Enter: Editor now shows cursor").',
     `The tester asked you to check: ${watch.trim() || 'nothing in particular'}`,
     'For each of those checks, once a frame shows its outcome, report kind "watch": severity info if the screen shows it as asked, error if not, quoting what the screen shows instead.',
     'Also report kind "flag" for anything else that is not OK, unasked: error messages, crashes, warnings, glitches, cut-off or overlapping text, broken layout, empty areas that should have data, a loading or progress state still on screen 10 seconds later (say how long), wrong numbers or sums, typos, unexpected dialogs.',
@@ -136,7 +140,7 @@ export function observationOf(args: Record<string, unknown>, now: number, latest
   if (!text) return undefined
   const said = Number(args.at)
   const at = Number.isFinite(said) && said >= 0 && said <= now ? said : latest
-  const kind = args.kind === 'watch' ? 'watch' : 'flag'
+  const kind = args.kind === 'watch' || args.kind === 'step' ? args.kind : 'flag'
   const severity = args.severity === 'info' || args.severity === 'error' ? args.severity : 'warning'
   const box = boxOf(args.box, size)
   return { at: round(at), kind, severity, text, ...(box ? { box } : {}) }
@@ -161,28 +165,32 @@ export function clockOf(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
 }
 
-const label = (one: Observation) => (one.kind === 'watch' ? `watch, ${one.severity}` : `FLAG, ${one.severity}`)
+/** "step", "watch, info", "FLAG, error" */
+export const labelOf = (one: Observation) => (one.kind === 'step' ? 'step' : `${one.kind === 'flag' ? 'FLAG' : 'watch'}, ${one.severity}`)
 
 /** The list for the task file and the PR: "- 0:12 FLAG, error: The save button does nothing." */
 export function listOf(observations: Observation[]): string {
   if (observations.length === 0) return '- No observations.'
-  return [...observations].sort((a, b) => a.at - b.at).map(one => `- ${clockOf(one.at)} ${label(one)}: ${one.text}`).join('\n')
+  return [...observations].sort((a, b) => a.at - b.at).map(one => `- ${clockOf(one.at)} ${labelOf(one)}: ${one.text}`).join('\n')
 }
 
 /** review.md: what was watched, the cost, then the list. */
 export function markdownOf(review: Review): string {
-  const flags = review.observations.filter(one => one.kind === 'flag').length
+  const count = (kind: Observation['kind'], one: string, many: string) => {
+    const n = review.observations.filter(other => other.kind === kind).length
+    return `${n} ${n === 1 ? one : many}`
+  }
   return [
     `# Live review of ${review.video}`,
     `Gemini (${review.model}) watched ${clockOf(review.seconds)} of the test for: ${review.watch.trim().replace(/\.$/, '') || 'nothing in particular'}.`,
-    `${review.observations.length} observations, ${flags} flagged. Cost about $${costOf(review.usage).toFixed(3)}.`,
+    `${count('step', 'step', 'steps')} noted, ${count('watch', 'check', 'checks')} reported, ${count('flag', 'flag', 'flags')}. Cost about $${costOf(review.usage).toFixed(3)}.`,
     '',
     listOf(review.observations),
     '',
   ].join('\n')
 }
 
-/** SubRip subtitles: each observation until the next, FLAG_SECONDS at least, cut short by the end of the video. */
+/** SubRip subtitles: each observation until the next of its kind, FLAG_SECONDS at least, cut short by the end of the video. */
 export function srtOf(observations: Observation[], seconds: number): string {
   const time = (value: number) => {
     const ms = Math.round(Math.max(0, value) * 1000)
@@ -192,8 +200,9 @@ export function srtOf(observations: Observation[], seconds: number): string {
   const ordered = [...observations].sort((a, b) => a.at - b.at)
   return ordered
     .map((one, index) => {
-      const end = Math.min(seconds, Math.max(one.at + FLAG_SECONDS, ordered[index + 1]?.at ?? 0))
-      return `${index + 1}\n${time(one.at)} --> ${time(end)}\n${label(one)}: ${one.text}\n`
+      const next = ordered.slice(index + 1).find(other => other.kind === one.kind)
+      const end = Math.min(seconds, Math.max(one.at + FLAG_SECONDS, next?.at ?? seconds))
+      return `${index + 1}\n${time(one.at)} --> ${time(end)}\n${labelOf(one)}: ${one.text}\n`
     })
     .join('\n')
 }
