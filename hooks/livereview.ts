@@ -119,7 +119,7 @@ export function isChanged(last: Uint8Array | undefined, next: Uint8Array): boole
 /** A frame box from Gemini ([ymin, xmin, ymax, xmax], 0-1000) in the recording's pixels: [x, y, w, h]. */
 export function boxOf(value: unknown, size: [number, number]): Observation['box'] {
   if (!Array.isArray(value) || value.length !== 4 || !value.every(n => Number.isFinite(Number(n)))) return undefined
-  const [ymin, xmin, ymax, xmax] = value.map(n => Math.min(1000, Math.max(0, Number(n))))
+  const [ymin = 0, xmin = 0, ymax = 0, xmax = 0] = value.map(n => Math.min(1000, Math.max(0, Number(n))))
   if (xmax <= xmin || ymax <= ymin) return undefined
   const [width, height] = size
   const x = Math.round((xmin / 1000) * width)
@@ -144,7 +144,7 @@ export function observationOf(args: Record<string, unknown>, now: number, latest
 
 /** Whether it says again what an earlier one of its kind said (Gemini repeats itself across turns). */
 export function isRepeat(earlier: Observation[], one: Observation): boolean {
-  const words = (text: string) => text.toLowerCase().replace(/[^a-z0-9$.%]+/g, ' ').trim()
+  const words = (text: string) => text.toLowerCase().replace(/\.(?!\d)/g, ' ').replace(/[^a-z0-9$%.]+/g, ' ').trim()
   return earlier.some(other => other.kind === one.kind && words(other.text) === words(one.text))
 }
 

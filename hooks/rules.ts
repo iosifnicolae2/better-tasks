@@ -53,6 +53,7 @@ export function varsOf(settings: Settings, facts: Facts): Vars {
     videoSize: VIDEO_SIZE[settings.videoQuality],
     offScreen: settings.offScreen,
     batchDeviceTests: settings.batchDeviceTests,
+    liveReview: settings.liveReview,
     testScreen: settings.testScreen,
     isVirtualScreen: settings.testScreen === VIRTUAL_SCREEN,
     statusEvery: settings.statusEvery,

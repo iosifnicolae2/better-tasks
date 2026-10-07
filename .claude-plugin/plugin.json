@@ -84,6 +84,12 @@
       "description": "When builds or device tests are slow, each task gets its own instance (simulator, emulator, app copy) where possible; else tasks that don't touch each other share one build, risky ones behind a short-lived feature flag that comes out once the task works.",
       "default": true
     },
+    "liveReview": {
+      "type": "boolean",
+      "title": "Live review (Gemini)",
+      "description": "While a teammate tests on the test screen, Gemini watches it live and reports, at the second it saw it, what the teammate asked it to check and anything else not OK; the teammate then reviews those moments. Sends only the test display's changed frames (masks blacked out) to Google's Gemini Live API under your own AI Studio key, kept in the macOS Keychain (the settings page's \"Gemini API key\" row). About $0.02 a minute on the paid tier.",
+      "default": false
+    },
     "pullRequests": {
       "type": "boolean",
       "title": "PR per task",

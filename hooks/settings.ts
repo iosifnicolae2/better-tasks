@@ -66,6 +66,8 @@ export type Settings = {
   videoQuality: VideoQuality
   /** A release comes with one video of its tasks' before/after videos (bin/release-video.sh); a project setting. */
   releaseVideos: boolean
+  /** Gemini watches teammates' tests live and reports, timestamped (bin/live-review.sh, hooks/livereview.ts). */
+  liveReview: boolean
   /** Slow builds or device tests: an instance per task where possible, else unrelated tasks share one build, risky ones behind a feature flag (lead.md, teammate.md). */
   batchDeviceTests: boolean
   /** How a teammate's work reaches main (gitflow.ts); the old pullRequests switch reads as worktree-prs. */
@@ -110,6 +112,7 @@ export const FIELDS: Record<string, Field> = {
   videoQuality: { kind: 'string', values: VIDEO_QUALITIES },
   releaseVideos: { kind: 'boolean' },
   batchDeviceTests: { kind: 'boolean' },
+  liveReview: { kind: 'boolean' },
   pullRequests: { kind: 'boolean' },
   gitFlow: { kind: 'string', values: GIT_FLOWS },
   devBranch: { kind: 'string' },
@@ -150,6 +153,7 @@ export const DEFAULTS: Readonly<Record<string, string | number | boolean>> = {
   videoQuality: 'medium',
   releaseVideos: true,
   batchDeviceTests: true,
+  liveReview: false,
   pullRequests: false,
   gitFlow: DEFAULT_FLOW,
   devBranch: 'dev',
@@ -194,6 +198,7 @@ export function settingsOf(options: PluginOptions | Record<string, unknown>): Se
     videoQuality: oneOf('videoQuality', VIDEO_QUALITIES) as VideoQuality,
     releaseVideos: value('releaseVideos') !== false,
     batchDeviceTests: value('batchDeviceTests') !== false,
+    liveReview: value('liveReview') === true,
     gitFlow: flowOf(options),
     devBranch: String(value('devBranch')).trim() || 'dev',
     excludeWorktreesFromIde: value('excludeWorktreesFromIde') !== false,

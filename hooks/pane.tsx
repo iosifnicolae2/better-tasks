@@ -14,6 +14,8 @@ import { openCommand } from './editor'
 import type { HostApp } from './editor'
 import type { Files } from './io'
 import { screenNames, screensArgv, SCREENS_FRESH_MS } from './testenv'
+import { keyArgv, keyPlaceOf } from './livereview'
+import type { KeyPlace } from './livereview'
 import { CONFIG_FILE, PROJECT_KEYS, projectSettings, readOverrides, saveProjectValue, settingsFrom } from './settings'
 import { findPrTemplate, NEW_TEMPLATE, shownPath } from './prtemplate'
 import type { Editor } from './settings'
@@ -114,6 +116,36 @@ async function videoOf($: EngineInterface, id: string): Promise<string | undefin
   const folder = `${await $.session.root()}/${VIDEOS_FOLDER}`
   const names = (await $.fs.list(folder).catch(() => [])).map(entry => entry.name)
   return names.includes(`${id}.mp4`) ? `${folder}/${id}.mp4` : undefined
+}
+
+let geminiKeySeen: KeyPlace | undefined
+let geminiKeyAsked: Promise<void> | undefined
+
+/** Where the live review's Gemini key is kept, as last seen; asks the Keychain in the background the first time, then redraws. */
+function geminiKeyPlace($: EngineInterface): KeyPlace | undefined {
+  if (!geminiKeySeen && !geminiKeyAsked) {
+    geminiKeyAsked = $.session.root()
+      .then(root => $.process.run(keyArgv($.plugin.root, 'status'), { cwd: root }))
+      .then(done => { geminiKeySeen = keyPlaceOf(done.stdout) }, () => { geminiKeySeen = 'none' })
+      .then(() => $.ui.invalidate('ui.render'))
+      .finally(() => { geminiKeyAsked = undefined })
+  }
+  return geminiKeySeen
+}
+
+/** The "Gemini API key" row: for which projects, then live-review.sh asks for the key itself, hidden (or removes it). */
+async function changeGeminiKey($: EngineInterface): Promise<void> {
+  const place = geminiKeySeen ?? 'none'
+  const choices = ['Every project', 'Only this project', ...(place === 'none' ? [] : ['Remove it'])]
+  const answer = await $.ui.ask('Which projects should this Gemini API key work for?', choices).catch(() => undefined)
+  if (!answer || !choices.includes(answer)) return
+  const args = answer === 'Remove it'
+    ? ['remove', ...(place === 'project' ? ['--project'] : [])]
+    : ['set', ...(answer === 'Only this project' ? ['--project'] : [])]
+  const done = await $.process.run(keyArgv($.plugin.root, ...args), { cwd: await $.session.root(), timeoutMs: 300_000 })
+  $.ui.toast(`better-tasks: Gemini API key ${(done.exitCode === 0 ? done.stdout : done.stderr).trim()}`)
+  geminiKeySeen = undefined
+  $.ui.invalidate('ui.render')
 }
 
 let screensSeen: { names: string[]; at: number } | undefined
@@ -443,6 +475,7 @@ export function registerPane(on: On, options: PluginOptions): void {
       case 'openPrInBrowser': written = await $.config.set({ key: 'better-tasks.openPrInBrowser', value: value }); break
       case 'demoVideos': written = await $.config.set({ key: 'better-tasks.demoVideos', value: value }); break
       case 'batchDeviceTests': written = await $.config.set({ key: 'better-tasks.batchDeviceTests', value: value }); break
+      case 'liveReview': written = await $.config.set({ key: 'better-tasks.liveReview', value: value }); break
       case 'videoQuality': written = await $.config.set({ key: 'better-tasks.videoQuality', value: value }); break
       case 'easyModel': written = await $.config.set({ key: 'better-tasks.easyModel', value: value }); break
       case 'easyEffort': written = await $.config.set({ key: 'better-tasks.easyEffort', value: value }); break
@@ -636,6 +669,8 @@ export function registerPane(on: On, options: PluginOptions): void {
             onOpenSprints={() => void openFile($, settings.editor, sprintsFile)}
             focusedRow={String((await $.store.get(CONFIG_ROW_KEY)) ?? '')}
             screens={await connectedScreens($)}
+            geminiKey={geminiKeyPlace($)}
+            onGeminiKey={() => void changeGeminiKey($)}
             onBack={showPage('board')} />
         </Box>
       )

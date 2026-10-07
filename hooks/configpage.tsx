@@ -4,6 +4,7 @@ import { DEFAULT_FLOW, FLOW_LABELS, GIT_FLOWS } from './gitflow'
 import { EFFORTS, LEVELS, MODELS, VIDEO_QUALITIES } from './settings'
 import type { Level, Settings, VideoQuality } from './settings'
 import { VIRTUAL_SCREEN } from './testenv'
+import type { KeyPlace } from './livereview'
 
 // The settings page of the Sprint pane, in the manner of Claude Code's own /config: one row per
 // setting with its value in a fixed column; Enter (or a click) changes it in place; one line at the
@@ -209,6 +210,16 @@ export const FIELDS: readonly Field[] = [
     initial: 'on',
     stored: isOn,
   },
+  {
+    group: 'testing',
+    field: 'liveReview',
+    label: 'Live review (Gemini)',
+    describe: 'Gemini watches teammates’ tests as they run and reports, at the second it saw it, what they asked it to check and anything else not OK. Only the test display’s changed frames leave the Mac, to Google, under your key below. About $0.02 a minute.',
+    options: ON_OFF,
+    value: settings => (settings.liveReview ? 'on' : 'off'),
+    initial: 'off',
+    stored: isOn,
+  },
   ...LEVELS.flatMap(modelFields),
   {
     group: 'models',
@@ -295,6 +306,9 @@ export type ConfigPageProps = {
   focusedRow: string
   /** The real screens connected now, by name (testenv.ts connectedScreens). */
   screens?: readonly string[]
+  /** Where the live review's Gemini key is kept (livereview.ts); undefined while unknown. */
+  geminiKey?: KeyPlace
+  onGeminiKey: () => void
   onChange: (field: string, value: ConfigValue) => void
   onOpenNative: () => void
   onOpenSprints: () => void
@@ -309,7 +323,7 @@ const FILE_ABOUT: Record<string, string> = {
 }
 
 export function ConfigPage(props: ConfigPageProps) {
-  const { ui, settings, sprintPreview, fromProject, project, focusedRow, screens = [], onChange, onOpenNative, onOpenSprints, onBack } = props
+  const { ui, settings, sprintPreview, fromProject, project, focusedRow, screens = [], geminiKey, onGeminiKey, onChange, onOpenNative, onOpenSprints, onBack } = props
   const { Box, Button, Text } = ui
   const fields = fieldsWith(screens)
   const fieldRow = (field: Field) => (
@@ -323,6 +337,9 @@ export function ConfigPage(props: ConfigPageProps) {
       {GROUPS.map(group => [
         <Heading ui={ui} title={group.title} />,
         ...fields.filter(field => field.group === group.id).map(fieldRow),
+        ...(group.id === 'testing'
+          ? [<Row ui={ui} rowKey={GEMINI_KEY_ROW} label="Gemini API key" value={geminiKeyValue(geminiKey)} onPress={onGeminiKey} />]
+          : []),
       ])}
       <Box paddingLeft={4} height={1} overflow="hidden">
         <Text color="subtle" wrap="truncate-end">{sprintPreview}</Text>
@@ -355,6 +372,14 @@ export function ConfigPage(props: ConfigPageProps) {
   )
 }
 
+const GEMINI_KEY_ROW = 'cfg-gemini-key'
+
+function geminiKeyValue(place: KeyPlace | undefined): string {
+  if (place === 'project') return 'this project’s · change'
+  if (place === 'global') return 'every project · change'
+  return place === 'none' ? 'not set · set' : '…'
+}
+
 function fileValue(file: { label: string; exists: boolean }, projectValues: number): string {
   if (file.label === 'config.json') return file.exists ? `${projectValues} value${projectValues === 1 ? '' : 's'} · open` : 'none · create'
   return file.exists ? 'custom · open' : 'default · create'
@@ -381,6 +406,9 @@ function describeRow(fields: readonly Field[], rowKey: string, fromProject: read
       ? 'This project has none, so PRs use better-tasks’ own. ⏎ adds it as .github/pull_request_template.md and opens it.'
       : '⏎ opens it.'
     return `PR template: what every PR description fills in: the request and why at the top, then the video, what changed, how to test. A path of your own: "prTemplate" in config.json; else the project’s, else better-tasks’. ${action}`
+  }
+  if (rowKey === GEMINI_KEY_ROW) {
+    return 'Gemini API key: for live review, from aistudio.google.com/apikey. Kept in the macOS Keychain, never in a file: one for every project, or this project’s own, which wins. ⏎ sets, changes or removes it.'
   }
   if (rowKey === 'cfg-sprints') return 'Sprint goals & reviews: opens sprints.md, one section per sprint.'
   if (rowKey === 'cfg-native') return "All Claude Code settings: opens /config; this plugin's rows read “Better Tasks: …”."
