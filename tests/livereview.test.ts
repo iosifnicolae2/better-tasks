@@ -50,6 +50,7 @@ describe('live review: what Gemini reports', () => {
     expect(text).toContain('The tester asked you to check: the total updates after Add')
     expect(text).toContain('Also report kind "flag" for anything else that is not OK, unasked')
     expect(text).toContain('Never speak.')
+    expect(text).toContain('Narrate like a human tester taking notes: for each change on screen, kind "step"')
     expect(instructionsOf('  ')).toContain('check: nothing in particular')
     expect(OBSERVE_TOOL.behavior).toBe('NON_BLOCKING')
     expect(OBSERVE_TOOL.parameters.required).toEqual(['at', 'kind', 'severity', 'text'])
@@ -62,6 +63,7 @@ describe('live review: what Gemini reports', () => {
     expect(observationOf({ at: 'soon', text: 'x' }, 20, 18, SIZE)?.at).toBe(18)
     expect(observationOf({ at: -1, text: 'x' }, 20, 18, SIZE)?.at).toBe(18)
     expect(observationOf({ kind: 'info', severity: 'loud', text: 'x' }, 20, 18, SIZE)).toMatchObject({ kind: 'flag', severity: 'warning' })
+    expect(observationOf({ kind: 'step', severity: 'info', text: 'Pressed Add' }, 20, 18, SIZE)).toMatchObject({ kind: 'step' })
     expect(observationOf({ at: 3, text: '  ' }, 20, 18, SIZE)).toBeUndefined()
   })
 
@@ -107,12 +109,13 @@ describe('live review: the annotation format', () => {
   test('the list for the task file and the PR: by time, "m:ss", watch or FLAG and severity', () => {
     expect(listOf(observations)).toBe('- 0:03 watch, error: Total stays $40.00 after Add\n- 0:27 FLAG, error: TypeError: Cannot read properties of undefined')
     expect(listOf([])).toBe('- No observations.')
+    expect(listOf([{ at: 1, kind: 'step', severity: 'info', text: 'Checkout open; Total shows $40.00' }])).toBe('- 0:01 step: Checkout open; Total shows $40.00')
     expect(clockOf(65.9)).toBe('1:05')
   })
 
-  test('subtitles: each report until the next, 4 seconds at least, cut at the end of the video', () => {
+  test('subtitles: each report until the next of its kind, 4 seconds at least, cut at the end of the video', () => {
     expect(srtOf(observations, 30)).toBe([
-      '1\n00:00:03,900 --> 00:00:27,400\nwatch, error: Total stays $40.00 after Add\n',
+      '1\n00:00:03,900 --> 00:00:30,000\nwatch, error: Total stays $40.00 after Add\n',
       '2\n00:00:27,400 --> 00:00:30,000\nFLAG, error: TypeError: Cannot read properties of undefined\n',
     ].join('\n'))
     expect(srtOf([flag(1, 'a'), flag(2, 'b')], 30)).toContain('00:00:01,000 --> 00:00:05,000')
@@ -123,7 +126,7 @@ describe('live review: the annotation format', () => {
     expect(markdownOf(review)).toBe([
       '# Live review of /r/recording.mov',
       'Gemini (gemini-3.8-live) watched 0:47 of the test for: the total.',
-      '2 observations, 1 flagged. Cost about $1.450.',
+      '0 steps noted, 1 check reported, 1 flag. Cost about $1.450.',
       '',
       listOf(observations),
       '',

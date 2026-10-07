@@ -3,7 +3,8 @@
 # what you asked it to watch and anything else that is not OK. Records only the test display (a turn of
 # record-display.sh), looks at it once a second; every 3 s the frames that changed (masks blacked out, 1280 px
 # wide) go to Google's Gemini Live API under the user's own AI Studio key, read from the macOS Keychain (never
-# a file). Paid tier: about $0.02 a minute; Google may keep and use what free-tier keys send.
+# a file). About $0.02 a minute. Use a key of an AI Studio project with billing on (Plan "Paid" on
+# aistudio.google.com/apikey): on the free tier Google may use what is sent to improve its products, and people may review it.
 #   live-review.sh start --watch "<what to check>" [--mask x,y,w,h]... [--out <dir>]
 #       inside a record-display.sh turn (BT_DISPLAY_CAPTURE set): records that display and streams it;
 #       prints the review's folder and the pid to stop. Reports come one a line in <dir>/live.log.
@@ -19,6 +20,7 @@ set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
 service="better-tasks gemini"
 sdk_version="2.27.0"
+billed_why="on the free tier Google may use what is sent to improve its products, and people may review it"
 
 project_root() {
   common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || pwd)"
@@ -35,10 +37,10 @@ has_key() { security find-generic-password -s "$service" -a "$1" >/dev/null 2>&1
 # Asks for the key without showing it: on the terminal when there is one, else in a macOS dialog.
 ask_key() {
   if [ -t 0 ]; then
-    printf 'Gemini API key (from aistudio.google.com/apikey, hidden): ' >&2
+    printf 'A Gemini API key from an AI Studio project with billing on (%s), hidden: ' "$billed_why" >&2
     stty -echo; IFS= read -r key; stty echo; echo >&2
   else
-    key="$(osascript -e 'text returned of (display dialog "Gemini API key for better-tasks live review (from aistudio.google.com/apikey):" default answer "" with hidden answer with title "better-tasks" with icon note)' 2>/dev/null)" || return 1
+    key="$(osascript -e "text returned of (display dialog \"Gemini API key for better-tasks live review, from an AI Studio project with billing on (Plan: Paid at aistudio.google.com/apikey): $billed_why.\" default answer \"\" with hidden answer with title \"better-tasks\" with icon note)" 2>/dev/null)" || return 1
   fi
   printf %s "$key"
 }

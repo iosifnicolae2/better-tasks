@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 
 import {
-  addUsage, clockOf, DEFAULT_MODEL, FPS, FRAME_WIDTH, GLOBAL_ACCOUNT, instructionsOf, isChanged, isRepeat, KEYCHAIN_SERVICE,
+  addUsage, clockOf, DEFAULT_MODEL, FPS, FRAME_WIDTH, GLOBAL_ACCOUNT, instructionsOf, isChanged, isRepeat, KEYCHAIN_SERVICE, labelOf,
   markdownOf, OBSERVE_TOOL, observationOf, QUIET_SECONDS, shifted, srtOf, THUMB, TURN_SECONDS,
 } from '../hooks/livereview.ts'
 
@@ -85,7 +85,7 @@ function onMessage(message) {
     const observation = call.name === OBSERVE_TOOL.name ? observationOf(call.args ?? {}, now(), state.latest, size) : undefined
     if (observation && !isRepeat(state.observations, observation)) {
       state.observations.push(observation)
-      log(`${clockOf(observation.at)} ${observation.kind === 'flag' ? 'FLAG' : 'watch'}, ${observation.severity}: ${observation.text}`)
+      log(`${clockOf(observation.at)} ${labelOf(observation)}: ${observation.text}`)
     }
   }
   if (calls.length > 0) {

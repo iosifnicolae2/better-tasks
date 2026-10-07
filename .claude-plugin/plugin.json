@@ -87,7 +87,7 @@
     "liveReview": {
       "type": "boolean",
       "title": "Live review (Gemini)",
-      "description": "While a teammate tests on the test screen, Gemini watches it live and reports, at the second it saw it, what the teammate asked it to check and anything else not OK; the teammate then reviews those moments. Sends only the test display's changed frames (masks blacked out) to Google's Gemini Live API under your own AI Studio key, kept in the macOS Keychain (the settings page's \"Gemini API key\" row). About $0.02 a minute on the paid tier.",
+      "description": "While a teammate tests on the test screen, Gemini watches it live and reports, at the second it saw it, what the teammate asked it to check and anything else not OK; the teammate then reviews those moments. Sends only the test display's changed frames (masks blacked out) to Google's Gemini Live API under your own key, kept in the macOS Keychain (the settings page's \"Gemini API key\" row): a key of an AI Studio project with billing on, since on the free tier Google may use what is sent to improve its products, and people may review it. About $0.02 a minute.",
       "default": false
     },
     "pullRequests": {

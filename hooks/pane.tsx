@@ -137,7 +137,7 @@ function geminiKeyPlace($: EngineInterface): KeyPlace | undefined {
 async function changeGeminiKey($: EngineInterface): Promise<void> {
   const place = geminiKeySeen ?? 'none'
   const choices = ['Every project', 'Only this project', ...(place === 'none' ? [] : ['Remove it'])]
-  const answer = await $.ui.ask('Which projects should this Gemini API key work for?', choices).catch(() => undefined)
+  const answer = await $.ui.ask('Which projects should this Gemini API key work for? Use a key of a billed AI Studio project, so Google won’t use or review what it sends.', choices).catch(() => undefined)
   if (!answer || !choices.includes(answer)) return
   const args = answer === 'Remove it'
     ? ['remove', ...(place === 'project' ? ['--project'] : [])]
