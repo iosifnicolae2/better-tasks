@@ -22,7 +22,7 @@ libass or freetype. The spec (paths relative to the spec file):
   "clips": [
     {"label": "BEFORE", "video": "before.mp4",  or leave out "video" and give each step an "image"
      "review": "live/review.json",              optional: a live review of this video; each report shows
-                                                top-right from its second for a few seconds, its box in amber
+                                                top-right from its second until the next (4 s at least), its box in amber
      "steps": [
        {"say": "After login you land on the home page.",
         "at": 1.5,                              optional: start no earlier than this second of the clip
@@ -74,7 +74,7 @@ RED = (230, 30, 40, 255)
 WHITE = (255, 255, 255, 255)
 LABEL_COLORS = {'BEFORE': (180, 83, 9, 235), 'AFTER': (21, 128, 61, 235)}
 AMBER = (245, 158, 11, 255)
-# A live review's reports (bin/live-review.sh): how long each shows (hooks/livereview.ts holds the same) and its colors.
+# A live review's reports (bin/live-review.sh): how long each shows at least (hooks/livereview.ts holds the same) and its colors.
 FLAG_SECONDS = 4
 FLAG_COLORS = {'error': (185, 28, 28, 235), 'warning': (180, 83, 9, 235), 'info': (30, 64, 120, 235)}
 FLAG_SIZE = 16
@@ -278,7 +278,9 @@ def draw_flags(draw: ImageDraw.ImageDraw, flags: list, canvas: tuple, fit: Fit, 
         if flag.get('box'):
             x, y, w, h = flag['box']
             (left, upper), (right, lower) = fit.point(x, y), fit.point(x + w, y + h)
-            draw.rounded_rectangle((left, upper, right, lower), radius=4 * unit, outline=AMBER, width=max(2, round(3 * unit)))
+            line = max(2, round(3 * unit))
+            rim = line + 4 * unit  # around its target, never over it
+            draw.rounded_rectangle((left - rim, upper - rim, right + rim, lower + rim), radius=4 * unit, outline=AMBER, width=line)
         kind = 'FLAG' if flag['kind'] == 'flag' else 'watch'
         head = f"{clock(flag['at'])}  {kind}, {flag['severity']}"
         lines = wrap(draw, flag['text'], text_font, width - 2 * pad)[:4]
@@ -307,12 +309,19 @@ def load_review(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def flag_spans(flags: list) -> list:
+    """Each report with when it goes: at the next report, but never before FLAG_SECONDS."""
+    ordered = sorted(flags, key=lambda flag: flag['at'])
+    nexts = [flag['at'] for flag in ordered[1:]] + [float('inf')]
+    return [(flag, max(flag['at'] + FLAG_SECONDS, upcoming)) for flag, upcoming in zip(ordered, nexts)]
+
+
 def showing(flags: list, moment: float) -> list:
-    return [flag for flag in flags if flag['at'] <= moment < flag['at'] + FLAG_SECONDS]
+    return [flag for flag, end in flag_spans(flags) if flag['at'] <= moment < end]
 
 
 def flag_times(flags: list) -> list:
-    return [time for flag in flags for time in (flag['at'], flag['at'] + FLAG_SECONDS)]
+    return [time for flag, end in flag_spans(flags) for time in (flag['at'], end)]
 
 
 def draw_label(draw: ImageDraw.ImageDraw, label: str, unit: float) -> None:
@@ -555,13 +564,17 @@ def poster_step(clip: dict) -> int:
 
 
 def poster_half(work: Path, base: Path, clip: dict, starts: list) -> dict:
-    """One half: the poster step's frame at source size with its marks, the area to show, its label and sentence."""
+    """One half: the poster step's frame at source size with its marks and reports, the area to show, its label and sentence."""
     index = poster_step(clip)
     step = clip['steps'][index]
     frame = step_frame(work, base, clip, index, starts[index])
     draw = ImageDraw.Draw(frame)
+    same, unit = Fit(frame.size, frame.size), max(frame.size) / 1000
     for mark in step.get('marks', []):
-        draw_mark(draw, mark, Fit(frame.size, frame.size), max(frame.size) / 1000)
+        draw_mark(draw, mark, same, unit)
+    flags = showing(flags_of(base, clip), starts[index] + POSTER_DELAY)
+    if flags:
+        draw_flags(draw, flags, frame.size, same, unit)
     return {'frame': frame, 'area': focus_area(step, frame.size), 'label': clip['label'], 'say': step['say']}
 
 
