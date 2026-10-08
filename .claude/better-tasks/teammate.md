@@ -19,7 +19,7 @@ A project extends it with its own .claude/better-tasks/teammate.md, or replaces 
 {% endif %}
 
 ## How your task goes
-1. Capture how it is now, before you change anything (`better-tasks:testing`).
+1. Load `better-tasks:testing`, then capture how it is now, before you change anything.
 2. Make the change, and check it as a user would.
 {% if demoVideos %}
 3. Record the before/after video (`better-tasks:video`): your functional test, and what the user sees.
