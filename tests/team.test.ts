@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { settingsOf } from '../hooks/settings'
-import { effortOf, mateLine, stateOf, teamOf } from '../hooks/team'
+import { effortOf, mateLine, outsideTeam, stateOf, teamOf } from '../hooks/team'
 import type { Teammate } from '../types'
 
 const MODELS = settingsOf({ hardEffort: 'xhigh' }).models
@@ -28,4 +28,18 @@ test('its state is one plain word', () => {
 test('its line reads name · effort · state', () => {
   expect(mateLine(mate({ effort: 'medium', activity: 'editing auth.ts', percent: 41 }))).toBe('login · medium · working · context 41 % · editing auth.ts')
   expect(mateLine(mate({}))).toBe('login · idle · context ?')
+})
+
+const loginAgent = { id: 'a9', name: 'login', teammateId: 'login@s1', description: 'login', type: 'teammate', status: 'idle' as const }
+
+test('a message stays on this session\'s team', () => {
+  for (const to of ['login', 'login [3fa9c1]', 'login@s1', 'a9', 'team-lead', 'main']) expect(outsideTeam([loginAgent], to, true, '')).toBeUndefined()
+  expect(outsideTeam([loginAgent], 'church-hub-f8', false, '')).toContain("church-hub-f8 is not on this project's team")
+  expect(outsideTeam([loginAgent], 'search', true, '')).toBeDefined()
+})
+
+test('the lead messages another session only when the user names it this turn', () => {
+  expect(outsideTeam([loginAgent], 'church-hub-f8', false, 'tell church-hub-f8 the rules changed')).toBeUndefined()
+  expect(outsideTeam([loginAgent], 'church-hub-f8', true, 'tell church-hub-f8 the rules changed')).toBeDefined()
+  expect(outsideTeam([], 'church-hub-f8', false, 'tell the other session')).toBeDefined()
 })

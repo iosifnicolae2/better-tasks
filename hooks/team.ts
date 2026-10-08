@@ -71,6 +71,28 @@ export function findMate(team: readonly Teammate[], to: string): Teammate | unde
   return team.find(mate => mate.name === name || mate.id === name)
 }
 
+/** Names any session's team answers to: its lead, the main loop, everyone. */
+const TEAM_WIDE = ['team-lead', 'main', '*']
+
+/** Whether a SendMessage `to` names this session's own team (a teammate by name, "name [ref]", "name@team" or id), not another session. */
+export function isOwnTarget(agents: readonly AgentInfo[], to: string): boolean {
+  const name = to.replace(/\s*\[.*\]$/, '').trim()
+  if (TEAM_WIDE.includes(name)) return true
+  return agents.some(agent => [agent.id, agent.name, agent.teammateId, agent.teammateId?.replace(/@.*$/, '')].includes(name))
+}
+
+/**
+ * Why a SendMessage may not go: it names another session's agent, from a teammate, or from the lead in a turn the user's
+ * own words did not start and name it in. Undefined when it may go.
+ */
+export function outsideTeam(agents: readonly AgentInfo[], to: string, fromTeammate: boolean, userText: string): string | undefined {
+  if (isOwnTarget(agents, to)) return undefined
+  const name = to.replace(/\s*\[.*\]$/, '').trim()
+  if (!fromTeammate && name !== '' && userText.toLowerCase().includes(name.toLowerCase())) return undefined
+  return `${name} is not on this project's team (team_status lists it): better-tasks keeps messages and wake-ups to this session's ` +
+    'teammates. Route its work to one of them, or spawn one. Another session is messaged only when the user asks for it by name.'
+}
+
 /** The teammate a successor ("login-2") takes over from: the newest other one of its area. */
 export function predecessorOf(team: readonly Teammate[], name: string): Teammate | undefined {
   const area = areaOf(name)

@@ -133,6 +133,11 @@ describe('the shipped templates', () => {
     expect(overLimit([], 'cart', 0, [])).toBeUndefined()
   })
 
+  test("the lead messages and wakes only this session's team; another session only when the user names it", async () => {
+    expect(await rule('lead.md')).toContain("Your team is this session's teammates (team_status): message and wake only them.")
+    expect(await rule('status-check.md')).toContain("an idle teammate of this session's team (team_status)")
+  })
+
   test('efficient tooling and event-driven waiting for teammates; the lead waits on events too and spawns only when a teammate pays its start-up cost', async () => {
     const teammate = await rule('teammate.md')
     expect(teammate).toContain('the full suite at the finish. Doing something more than once? Make it a small script or CLI of your own and reuse it.')
@@ -163,7 +168,7 @@ describe('the shipped templates', () => {
   test('caches: the lead acts on an idle teammate before its cache runs out, or keeps a waiting one warm with a short note; a finished one is stopped; the teammate does not sit idle', async () => {
     expect(await rule('lead.md')).toContain('answer, route or unblock it promptly. One waiting on the user, for an approval say, gets a one-line note shortly before, to keep it warm; one whose task is closed is stopped instead.')
     expect(await rule('teammate.md')).toContain("Don't sit idle mid-task: keep going, and report promptly")
-    expect(await rule('status-check.md')).toContain('act on an idle teammate whose cache expires soon (or send it a one-line note)')
+    expect(await rule('status-check.md')).toContain("act on an idle teammate of this session's team (team_status) whose cache expires soon (or send it a one-line note)")
   })
 
   test('new bugs: small ones fixed in the task; bigger or other-area ones asked as a new task, fixed with a video and a PR; straight to main gets its own worktree', async () => {
