@@ -248,7 +248,7 @@ describe('the shipped templates', () => {
     expect(await rule('video.md', {})).toContain('Never show secrets or personal data')
     expect(await rule('pull-request.md', {})).toContain('No secrets or personal data')
     expect(await rule('testing.md', { offScreen: true })).toContain("the project's own virtual display")
-    expect(await rule('testing.md', { offScreen: true })).toContain('makes the display when there is none, one more when another task is using it')
+    expect(await rule('testing.md', { offScreen: true })).toContain('it makes the display when there is none and keeps it')
     expect(await rule('testing.md', { offScreen: true })).toContain("off the user's screen")
     expect(await rule('testing.md', { offScreen: false, testScreen: 'DELL' })).toContain('"DELL"')
     expect(await rule('testing.md', { offScreen: false })).not.toContain("off the user's screen")
