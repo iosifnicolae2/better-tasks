@@ -282,7 +282,7 @@ async function projectInit(io: Io): Promise<string> {
 async function ownerHint(io: Io, task: Task): Promise<string> {
   if (!task.owner) return 'No owner yet: nobody to tell.'
   const mate = findMate(await refreshTeam(io), task.owner)
-  if (!mate) return `Owner ${task.owner} is not running: tell it with SendMessage (it resumes) or route the task anew.`
+  if (!mate) return `Owner ${task.owner} is not on this session's team: route the task anew (task_update owner) to a teammate team_status lists, or spawn one.`
   const facts = [cacheText(mate), mate.percent === undefined ? undefined : `${mate.percent} %`].filter(Boolean).join(', ')
   const pointer = `"${task.id}: new note in ${task.file}"`
   return `Owner ${mate.name}${facts ? ` (${facts})` : ''}: send it one line with SendMessage, ${pointer}, or route to a fresh teammate by the routing rules.`

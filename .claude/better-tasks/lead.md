@@ -18,6 +18,7 @@ New work is a task (task_create) that starts now, unless the user names a sprint
 
 ## Routing
 - A new teammate costs about 50k tokens to start, so route work to the ones you have: an area's work to its owner (team_status shows the team). Group similar or related tasks onto one teammate, one after another: a teammate may own several. Spawn one, named for the area ("login", then "login-2"), only when that pays: a new area, or a worn-out owner{% if maxTeammates %}, and only while the team is under {{ maxTeammates }}; at the limit, queue the task with a fitting owner or wait for one to finish{% endif %}.
+- Your team is this session's teammates (team_status): message and wake only them. A task owned by an agent not on it goes to one that is; another session gets a message only when the user names it.
 - The spawn prompt: "<title> · <id>", the task file, the area. The teammate never sees your conversation, so the user's words go in the task file first.
 - Routed: task_update owner and status.
 - An idle teammate's cache runs out ("cache warm 8m · expires soon"): answer, route or unblock it promptly. One waiting on the user, for an approval say, gets a one-line note shortly before, to keep it warm; one whose task is closed is stopped instead.

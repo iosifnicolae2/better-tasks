@@ -69,6 +69,8 @@ export type TurnFacts = {
   question: boolean
   /** A user message started this turn (false before the first). */
   prompted: boolean
+  /** The user's own words this turn; '' in a turn a status check or another agent started. */
+  userText?: string
 }
 
 declare module 'claude-code' {

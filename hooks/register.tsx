@@ -27,7 +27,7 @@ import { projectSettings, readOverrides, saveProjectValue } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
 import { isOpen, listTasks, saveTask, today, whenOf } from './tasks'
-import { contextTokens, isActive, overLimit, predecessorOf, refreshTeam } from './team'
+import { contextTokens, isActive, outsideTeam, overLimit, predecessorOf, refreshTeam } from './team'
 import { NO_FACTS, renderRule, rulesChangedNote, TEMPLATES_DIR, varsOf } from './rules'
 import type { Facts, RuleFile, RulesSent } from './rules'
 import { ourSkill } from './skills'
@@ -165,7 +165,7 @@ export const register: Register = (on, options) => {
     const state = teamsState(await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'), (await $.settings.read()).env)
     if (state !== 'on') return next({ ...e, context: [...(e.context ?? []), waitingLine(state)] })
     const reminder = unfiledLine(await read($, turnState))
-    await update($, turnState, () => ({ asked: false, filed: false, question: isQuestion(e.text), prompted: true }))
+    await update($, turnState, () => ({ asked: false, filed: false, question: isQuestion(e.text), prompted: true, userText: e.text }))
     const settings = await settingsNow($)
     await syncTeammateTypes($, settings).catch(() => undefined)
     const notices = [await changedRulesNote($), await read($, noticeState), unclosedLine(await unclosedIds($)), reminder].filter(Boolean).join('\n')
@@ -233,6 +233,7 @@ export const register: Register = (on, options) => {
     if (agentId === undefined) {
       const now = await $.clock.now()
       await update($, statusState, check => ({ ...check, busy: false, activeAt: now }))
+      await update($, turnState, facts => ({ ...facts, userText: '' }))
     }
     if (agentId !== undefined) {
       await update($, activityState, ({ [agentId]: _ended, ...rest }) => rest)
@@ -252,6 +253,14 @@ export const register: Register = (on, options) => {
       await refreshTeam(ioOf($))
     }
     return result
+  })
+
+  // Messages and wake-ups stay on this project's team: another session's agent only when the user names it (team.ts outsideTeam).
+  on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {
+    if (!(await teamsOn($)) || (await isOffHere($))) return next(e)
+    const userText = (await read($, turnState)).userText ?? ''
+    const outside = outsideTeam(await $.agent.list(), String(e.to ?? ''), e.agentId !== undefined, userText)
+    return outside ? { deny: outside } : next(e)
   })
 
   on('tool.call', { tool: 'mcp__better-tasks__task_create' }, ($, e) => serveTool($, e, 'task_create'))
