@@ -1,8 +1,0 @@
-{
-  "shareWithTeam": true,
-  "tasksInGit": true,
-  "excludeWorktreesFromIde": true,
-  "offScreen": true,
-  "demoVideos": true,
-  "gitFlow": "direct"
-}
