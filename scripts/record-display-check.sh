@@ -1,7 +1,8 @@
 #!/bin/sh
 # Checks bin/record-display.sh on this Mac: two projects record at once on their own displays, two recordings
-# at once in one project each get their own display, a recording killed mid-way frees its display, a display is
-# kept between recordings. Adds three virtual displays below the screens and removes them at the end.
+# in one project take turns, a recording killed mid-way frees the turn, the display is kept between recordings.
+# Adds two virtual displays below the screens and removes them at the end: each add and remove makes macOS
+# reconfigure every screen, so run it only when the user agrees.
 # Run: sh scripts/record-display-check.sh (the plugin test runner can't start a shell). Prints "ok" or what failed.
 script="$(cd "$(dirname "$0")/.." && pwd)/bin/record-display.sh"
 work="$(mktemp -d -t record-display-check)"
@@ -20,9 +21,9 @@ cleanup() { # the check's displays never outlive it, even when it fails or is st
 trap cleanup EXIT INT TERM
 in_dir "$alpha" "$script" status >/dev/null # compiles once, before the timing below
 
-# Each recording logs "<name> start|end <epoch> <display id>" and holds the display 4 s.
+# Each recording logs "<name> start|end <epoch> <display id>" and holds the display 2 s.
 record() { # <dir> <name>
-  in_dir "$1" "$script" run --label "$2" -- sh -c "echo \"$2 start \$(date +%s) \$BT_DISPLAY_ID\"; sleep 4; echo \"$2 end \$(date +%s)\"" \
+  in_dir "$1" "$script" run --label "$2" -- sh -c "echo \"$2 start \$(date +%s) \$BT_DISPLAY_ID\"; sleep 2; echo \"$2 end \$(date +%s)\"" \
     >>"$work/log" 2>/dev/null
 }
 value() { grep "^$1 $2 " "$work/log" | cut -d' ' -f"$3"; }
@@ -34,29 +35,27 @@ record "$work/alpha-worktree" a2 &
 record "$beta" b1 &
 wait
 
-[ "$(value a2 start 3)" -lt "$(value a1 end 3)" ] 2>/dev/null || fail "a2 waited for a1 in the same project"
-[ "$(value a2 start 4)" != "$(value a1 start 4)" ] || fail "a1 and a2 shared display $(value a1 start 4)"
+[ "$(value a2 start 3)" -ge "$(value a1 end 3)" ] 2>/dev/null || fail "a2 started before a1 ended in the same project"
 [ "$(value b1 start 3)" -lt "$(value a1 end 3)" ] 2>/dev/null || fail "beta waited for alpha"
 [ "$(value b1 start 4)" != "$(value a1 start 4)" ] || fail "alpha and beta shared display $(value b1 start 4)"
-[ "$(value a0 start 4)" = "$(value a1 start 4)" ] || fail "alpha's display was made again (second recording)"
-record "$work/alpha-worktree" a3
-[ "$(value a0 start 4)" = "$(value a3 start 4)" ] || fail "alpha's first display was not reused (worktree, once free)"
+[ "$(value a0 start 4)" = "$(value a2 start 4)" ] || fail "alpha's display was made again (worktree or second recording)"
 
 # Killed hard mid-recording: the next one still gets its turn.
 (cd "$alpha" && exec "$script" run --label doomed -- sleep 60) >/dev/null 2>&1 &
 doomed=$!
 sleep 2
 kill -9 "$doomed"
-sleep 2 # its turn sees its parent gone within a second
-next="$(in_dir "$alpha" "$script" run -- printenv BT_DISPLAY_ID 2>/dev/null)"
-[ "$next" = "$(value a0 start 4)" ] || fail "a killed recording kept its display (next got $next)"
+in_dir "$alpha" "$script" run -- true >/dev/null 2>&1 &
+next=$!
+sleep 5
+if kill -0 "$next" 2>/dev/null; then kill "$next"; fail "a killed recording kept the turn"; fi
 
 # start/stop: the turn outlives its shell, stop frees it.
 held="$(in_dir "$alpha" "$script" start --minutes 1 | sed -n 's/.*held by pid \([0-9]*\).*/\1/p')"
-in_dir "$alpha" "$script" status | grep -q ": in use" || fail "start did not take the turn"
+in_dir "$alpha" "$script" status | grep -q "^in use" || fail "start did not take the turn"
 in_dir "$alpha" "$script" stop "$held"
 sleep 1
-in_dir "$alpha" "$script" status | grep -q ": in use" && fail "stop did not free the turn"
+in_dir "$alpha" "$script" status | grep -q "^free" || fail "stop did not free the turn"
 
 # The test screen: a real screen chosen in config.json is used; one not connected falls back with one line.
 mkdir -p "$alpha/.claude/tasks"
