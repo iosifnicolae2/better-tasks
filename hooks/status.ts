@@ -1,7 +1,7 @@
 import type { StatusCheck, Task, Teammate } from '../types'
 import { dependenciesOf } from './tasks'
 
-// The status check: after a quiet spell, the coordinator is asked to move the open work forward.
+// The status check: after a quiet spell while a task is running, the coordinator is asked to move the open work forward.
 
 const MAX_MINUTES = 60
 const MINUTE = 60_000
@@ -19,6 +19,9 @@ export function fingerprintOf(tasks: readonly Task[], team: readonly Teammate[],
   const mates = team.map(mate => `${mate.name}:${mate.status}:${mate.activity ?? ''}`)
   return [...work, ...mates, ...unclosed.map(id => `resolved:${id}`)].join('|')
 }
+
+/** Whether any work is running: a task being worked on. Open tasks not started and idle teammates don't wake the coordinator. */
+export const isRunning = (tasks: readonly Pick<Task, 'status'>[]): boolean => tasks.some(task => task.status === 'doing')
 
 export type StatusFacts = {
   now: number
