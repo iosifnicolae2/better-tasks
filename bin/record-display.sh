@@ -1,17 +1,18 @@
 #!/bin/sh
-# The project's own virtual display (macOS), one recording at a time: a second recording in the same project
-# waits its turn; another project has its own display and records at the same time. Made once and kept
+# The project's own virtual display (macOS), made on the first turn, one recording on it at a time: a second
+# recording in the same project at the same time gets the project's next display (made when it has none yet,
+# up to 8; past that it waits its turn); another project has its own displays. Each is made once and kept
 # (no screen redraws per recording), in a row below the lowest physical screen, so the real screens stay put.
 # It looks like the main screen: its "looks like" size and its Retina scale (the first real screen's when the
 # main one is virtual; 1920x1080 at 1x when none answers). A kept display that no longer matches is made anew.
 # A crashed recording frees its turn: the lock dies with its process; a start ends by itself after --minutes.
 #   record-display.sh run [--size WxH] [--label text] -- <command...>
-#       waits its turn, runs the command with BT_DISPLAY_ID, BT_DISPLAY_BOUNDS ("x y w h") and
+#       takes a turn, runs the command with BT_DISPLAY_ID, BT_DISPLAY_BOUNDS ("x y w h") and
 #       BT_DISPLAY_CAPTURE (for screencapture -D) set, then gives the turn back.
 #   record-display.sh start [--size WxH] [--minutes n] [--label text]
 #       the same over several commands: prints those values and the turn's pid; stop it when done.
 #   --size WxH: the display's "looks like" size instead of the main screen's (the scale is still the main screen's)
-#   record-display.sh stop <pid> | status | remove (the project's display) | arrange (every virtual display below the screens)
+#   record-display.sh stop <pid> | status | remove (the project's displays) | arrange (every virtual display below the screens)
 #   record-display.sh look: the look the display copies, "w=.. h=.. scale=.. from=<screen>"
 #   record-display.sh screens: the real screens, "<id><tab><name>" each; virtuals: the virtual displays' ids
 #   record-display.sh dim|undim <file>: external screens' brightness to 0 over DDC/CI, or back; ddc: what each answers
@@ -19,7 +20,7 @@
 # The project may test on a real screen instead: "testScreen" in .claude/tasks/config.json (a name from `screens`;
 # "virtual", the default, is the project's own display); --screen <name> or BT_TEST_SCREEN wins over it.
 # A chosen screen that is not connected: the virtual display, with one line on stderr saying so.
-# Works in any git worktree of the project: they share its one display. Kept until `remove` or logout.
+# Works in any git worktree of the project: they share its displays. Kept until `remove` or logout.
 # Why not a Space (Mission Control desktop): only the Dock may move another app's windows between Spaces
 # (tested on macOS 27: our move of a TextEdit window was ignored), and making a desktop takes clicks.
 set -eu
@@ -75,34 +76,35 @@ wanted_look() {
   echo "$(field "$look" w)x$(field "$look" h)@$(field "$look" scale)"
 }
 
-# The project's display: the kept one while it still looks like the main screen, or a new one. Prints its id.
+# The turn's display ($own): the kept one while it still looks like the main screen, or a new one. Prints its id.
 display_id() {
-  if [ -s "$base.display" ] && kill -0 "$(field "$(cat "$base.display")" pid)" 2>/dev/null; then
-    if [ "$(field "$(cat "$base.display")" look)" = "$(wanted_look)" ]; then
-      field "$(cat "$base.display")" id
+  if [ -s "$own.display" ] && kill -0 "$(field "$(cat "$own.display")" pid)" 2>/dev/null; then
+    if [ "$(field "$(cat "$own.display")" look)" = "$(wanted_look)" ]; then
+      field "$(cat "$own.display")" id
       return
     fi
-    remove >/dev/null
-    while holder_alive "$base.keeper"; do sleep 0.1; done
+    remove_display "$own.keeper" >/dev/null
+    while holder_alive "$own.keeper"; do sleep 0.1; done
   fi
-  pid="$(detached "$base.display" "$exe" display --lock "$base.keeper" \
-    --name "better-tasks $project" --serial "$(slot)" ${size:+--size "$size"})"
-  id="$(field "$(await_ready "$base.display" "$pid")" id)"
+  name="better-tasks $project"; [ "$own" = "$base" ] || name="$name ${own##*.}"
+  keeper="$(detached "$own.display" "$exe" display --lock "$own.keeper" \
+    --name "$name" --serial "$(slot)" ${size:+--size "$size"})"
+  id="$(field "$(await_ready "$own.display" "$keeper")" id)"
   "$exe" fit "$id" ${size:+--size "$size"} | grep -v '^ready' >&2 || true
   echo "$id"
 }
 
 # The display's serial: a slot number reused across projects. macOS remembers each serial's place, so only
 # a slot's very first display makes macOS lay out the screens anew (the helper then puts them back).
-# A slot is free when the project that last had it keeps no display. Prints this project's slot.
+# A slot is free when the display that last had it is gone and no turn is making it. Prints the slot of the turn's display.
 slot() {
   until mkdir "$state/slots.lock" 2>/dev/null; do sleep 0.1; done
   touch "$state/slots"
-  mine="$(awk -v b="$base" '$2 == b { print $1 }' "$state/slots")"
+  mine="$(awk -v b="$own" '$2 == b { print $1 }' "$state/slots")"
   if [ -z "$mine" ]; then
     mine="$(free_slot)"
     awk -v s="$mine" '$1 != s' "$state/slots" >"$state/slots.new"
-    echo "$mine $base" >>"$state/slots.new"
+    echo "$mine $own" >>"$state/slots.new"
     mv "$state/slots.new" "$state/slots"
   fi
   rmdir "$state/slots.lock"
@@ -112,7 +114,7 @@ slot() {
 free_slot() {
   n=1
   while owner="$(awk -v s="$n" '$1 == s { print $2 }' "$state/slots")" && [ -n "$owner" ]; do
-    holder_alive "$owner.keeper" || break
+    holder_alive "$owner.keeper" || holder_alive "$owner.turn" || break
     n=$((n + 1))
   done
   echo "$n"
@@ -125,18 +127,38 @@ chosen_screen() {
   plutil -extract testScreen raw -o - "$root/.claude/tasks/config.json" 2>/dev/null || echo virtual
 }
 
-# Sets screen_id (empty: the virtual display) and turn (its lock: a real screen's is shared by every project).
+# Sets screen_id (empty: the virtual display) and, for a real screen, turn (its lock, shared by every project).
 resolve_screen() {
   name="$(chosen_screen)" screen_id=""
   if [ "$name" != virtual ]; then
     screen_id="$("$exe" screens | awk -F '\t' -v n="$name" '$2 == n { print $1; exit }')"
     [ -n "$screen_id" ] || echo "better-tasks: the test screen \"$name\" is not connected, so this uses the virtual display." >&2
   fi
-  if [ -n "$screen_id" ]; then
-    turn="$state/screen-$(printf %s "$name" | cksum | cut -d' ' -f1).turn"
-  else
-    turn="$base.turn"
-  fi
+  [ -z "$screen_id" ] || turn="$state/screen-$(printf %s "$name" | cksum | cut -d' ' -f1).turn"
+}
+
+# Takes a turn (turn options in "$@"); sets pid, its holder, and own, the files of the virtual display it uses.
+# A real screen: waits for it. Virtual: the project's first display nobody uses, so tasks at the same time
+# each get their own (made on first use); all 8 in use: waits for the first.
+take_turn() {
+  if [ -n "$screen_id" ]; then hold_turn "$turn" 1800 "$@"; return; fi
+  n=1
+  while [ "$n" -le 8 ]; do
+    own="$base"; [ "$n" = 1 ] || own="$base.$n"
+    hold_turn "$own.turn" 0 "$@" 2>/dev/null && return
+    n=$((n + 1))
+  done
+  own="$base"
+  hold_turn "$own.turn" 1800 "$@"
+}
+
+hold_turn() { # <lock> <seconds to wait for it> <turn options...>: sets pid; fails when it is not free in time
+  lock="$1" wait="$2"; shift 2
+  out="$(mktemp -t better-tasks-turn)"
+  pid="$(detached "$out" "$exe" turn --lock "$lock" --max-wait "$wait" --label "$label" "$@")"
+  await_ready "$out" "$pid" >/dev/null; taken=$?
+  rm -f "$out"
+  return "$taken"
 }
 
 # Sets BT_DISPLAY_ID, BT_DISPLAY_BOUNDS, BT_DISPLAY_CAPTURE.
@@ -166,11 +188,8 @@ run() {
   parse_options "$@"; shift $(($# - rest_count))
   [ $# -gt 0 ] || { echo "run: no command after --" >&2; exit 2; }
   resolve_screen
-  out="$(mktemp -t better-tasks-turn)"
-  "$exe" turn --lock "$turn" --label "$label" --max-seconds 86400 --parent $$ >"$out" 2>&1 &
-  pid=$!
-  trap 'kill $pid 2>/dev/null; rm -f "$out"' EXIT INT TERM
-  await_ready "$out" "$pid" >/dev/null || exit 1
+  take_turn --max-seconds 86400 --parent $$ || exit 1
+  trap 'kill $pid 2>/dev/null' EXIT INT TERM
   display_values
   export BT_DISPLAY_ID BT_DISPLAY_BOUNDS BT_DISPLAY_CAPTURE
   "$@"
@@ -179,10 +198,7 @@ run() {
 start() {
   parse_options "$@"
   resolve_screen
-  out="$(mktemp -t better-tasks-turn)"
-  pid="$(detached "$out" "$exe" turn --lock "$turn" --label "$label" --max-seconds "$((minutes * 60))")"
-  await_ready "$out" "$pid" >/dev/null || exit 1
-  rm -f "$out"
+  take_turn --max-seconds "$((minutes * 60))" || exit 1
   display_values
   echo "BT_DISPLAY_ID=$BT_DISPLAY_ID"
   echo "BT_DISPLAY_BOUNDS=\"$BT_DISPLAY_BOUNDS\""
@@ -192,19 +208,30 @@ start() {
 
 stop() {
   pid="${1:?stop: which pid? start printed it}"
-  grep -qs "^pid $pid " "$base.turn" "$state"/screen-*.turn || { echo "pid $pid does not hold $project's turn" >&2; exit 1; }
+  grep -qs "^pid $pid " "$base.turn" "$base".[0-9]*.turn "$state"/screen-*.turn || { echo "pid $pid does not hold $project's turn" >&2; exit 1; }
   kill "$pid"
 }
 
 holder_alive() { [ -s "$1" ] && kill -0 "$(cut -d' ' -f2 "$1")" 2>/dev/null; }
 
+# Each of the project's displays, and whether a turn uses it.
 status() {
-  if holder_alive "$base.keeper"; then echo "$project's display: $(cat "$base.keeper")"; else echo "$project has no display now"; fi
-  if holder_alive "$base.turn"; then echo "in use: $(cat "$base.turn")"; else echo "free"; fi
+  shown=""
+  for keeper in "$base.keeper" "$base".[0-9]*.keeper; do
+    holder_alive "$keeper" || continue
+    own="${keeper%.keeper}" shown=1
+    if holder_alive "$own.turn"; then use="in use: $(cat "$own.turn")"; else use="free"; fi
+    echo "$project's display $(cut -d' ' -f4 "$keeper"): $use"
+  done
+  [ -n "$shown" ] || echo "$project has no display yet: run or start makes it"
+}
+
+remove_display() { # <keeper file>
+  if holder_alive "$1"; then kill "$(cut -d' ' -f2 "$1")"; echo "removed $project's display $(cut -d' ' -f4 "$1")"; fi
 }
 
 remove() {
-  if holder_alive "$base.keeper"; then kill "$(cut -d' ' -f2 "$base.keeper")"; echo "removed $project's display"; fi
+  for keeper in "$base.keeper" "$base".[0-9]*.keeper; do remove_display "$keeper"; done
 }
 
 exe="$(binary)" || exit 1
