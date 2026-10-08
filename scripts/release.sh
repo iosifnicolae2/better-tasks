@@ -38,6 +38,8 @@ fi
 git rev-parse -q --verify "refs/tags/$version" >/dev/null && fail "$version already exists"
 bun scripts/settings-doc.ts --check || fail "the settings skill is stale: run bun scripts/settings-doc.ts and commit"
 bun scripts/skills-check.ts || fail "a skill lacks what its readers rely on: see above"
+[ "$(cat "$bin/record_display.swift" "$bin/record_display.h" | shasum -a 256 | cut -d' ' -f1)" = "$(cat "$bin/record_display.sha256")" ] ||
+  fail "bin/record_display is older than its Swift source: run sh scripts/build-display-helper.sh and commit"
 
 # The last release's tag: a package off main (its parent is that release's commit), or, before v0.11.15, on main.
 previous=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
