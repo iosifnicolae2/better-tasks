@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { NO_CHECK, statusDecision, waitMinutes } from '../hooks/status'
+import { isRunning, NO_CHECK, statusDecision, waitMinutes } from '../hooks/status'
 
 const MINUTE = 60_000
 const base = { every: 10, hasWork: true, composerText: '', fingerprint: 'a' }
@@ -25,5 +25,11 @@ describe('status check decision', () => {
     const skipped = statusDecision({ ...base, now: 20 * MINUTE, check: seen })
     expect(skipped).toEqual({ fire: false, check: { ...seen, checkedAt: 20 * MINUTE, quiet: 1 } })
     expect([0, 1, 2, 3, 4, 5].map(quiet => waitMinutes(10, quiet))).toEqual([10, 10, 20, 40, 60, 60])
+  })
+
+  test('work counts only while a task is running: todo, done or no tasks stay silent', () => {
+    expect(isRunning([])).toBe(false)
+    expect(isRunning([{ status: 'todo' }, { status: 'done' }, { status: 'cancelled' }])).toBe(false)
+    expect(isRunning([{ status: 'todo' }, { status: 'doing' }])).toBe(true)
   })
 })

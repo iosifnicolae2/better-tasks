@@ -37,7 +37,7 @@ import { IGNORE_COMMIT, isNotIgnored, withIgnoreLine, WORKTREES_FOLDER } from '.
 import { addArgs, baseOf, includedFiles, ownWorktreeOf, worktreePaths } from './ownworktree'
 import type { OwnWorktree } from './ownworktree'
 import { spawnTask, withSummary } from './spawn'
-import { fingerprintOf, NO_CHECK, statusDecision } from './status'
+import { fingerprintOf, isRunning, NO_CHECK, statusDecision } from './status'
 import { startupTips } from './tips'
 import { runTool, TOOLS } from './tools'
 
@@ -893,7 +893,7 @@ async function tick($: EngineInterface): Promise<void> {
   await checkStatus($, settings).catch(error => logFailure($, 'the status check', error))
 }
 
-/** After a quiet spell with open work, one prompt asks the coordinator to move it forward (see status.ts). */
+/** After a quiet spell with a task running, one prompt asks the coordinator to move it forward (see status.ts). */
 async function checkStatus($: EngineInterface, settings: Settings): Promise<void> {
   const now = await $.clock.now()
   const day = await today(ioOf($))
@@ -905,7 +905,7 @@ async function checkStatus($: EngineInterface, settings: Settings): Promise<void
     now,
     every: settings.statusEvery,
     check,
-    hasWork: tasks.length > 0 || team.length > 0,
+    hasWork: isRunning(tasks),
     composerText: (await $.prompt.read().catch(() => ({ text: '' }))).text,
     fingerprint: fingerprintOf(tasks, team, await unclosedIds($)),
   })
