@@ -90,7 +90,8 @@ export function outsideTeam(agents: readonly AgentInfo[], to: string, fromTeamma
   const name = to.replace(/\s*\[.*\]$/, '').trim()
   if (!fromTeammate && name !== '' && userText.toLowerCase().includes(name.toLowerCase())) return undefined
   return `${name} is not on this project's team (team_status lists it): better-tasks keeps messages and wake-ups to this session's ` +
-    'teammates. Route its work to one of them, or spawn one. Another session is messaged only when the user asks for it by name.'
+    'teammates. Route its work to one of them, or spawn one. Another session gets a message only once the user names it this turn ' +
+    '(in a message or an answer): ask them.'
 }
 
 /** The teammate a successor ("login-2") takes over from: the newest other one of its area. */

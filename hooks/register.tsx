@@ -178,8 +178,9 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
     const answered = await next(e)
     if (e.agentId !== undefined) return answered
-    await update($, turnState, facts => ({ ...facts, asked: true }))
-    const resolved = resolvedIn((answered.result as { answers?: unknown } | undefined)?.answers, (await settingsNow($)).tasks.prefix)
+    const answers = (answered.result as { answers?: unknown } | undefined)?.answers
+    await update($, turnState, facts => ({ ...facts, asked: true, userText: [facts.userText, ...answerTexts(answers)].join('\n') }))
+    const resolved = resolvedIn(answers, (await settingsNow($)).tasks.prefix)
     if (resolved.length > 0) await update($, resolvedState, ids => [...new Set([...ids, ...resolved])])
     return answered
   })
@@ -913,6 +914,10 @@ async function checkStatus($: EngineInterface, settings: Settings): Promise<void
   const text = await ruleNow($, 'status-check.md', { idleMinutes: Math.round((now - check.activeAt) / 60_000) })
   void $.prompt.submit({ text }).catch(() => undefined)
 }
+
+/** The user's own answers (not the questions, which the model wrote). */
+const answerTexts = (answers: unknown) =>
+  answers && typeof answers === 'object' ? Object.values(answers).filter((value): value is string => typeof value === 'string') : []
 
 /** The tasks the user resolved that are still open; closed ones leave the list, so a reopened task is not closed again. */
 async function unclosedIds($: EngineInterface): Promise<string[]> {
