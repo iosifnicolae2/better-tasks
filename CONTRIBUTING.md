@@ -12,7 +12,7 @@ Ask Claude for the change. It forks this repo, makes the change there, runs the 
 - `sh scripts/task-pr-check.sh`: checks `bin/task_pr.py` on a scratch repo with a stand-in gh: the draft PR with its video before the approval, a new video in place of the old, `--ready`, straight to main's review PR and `close`, similar tasks in one PR with one video.
 - `sh scripts/release-video-check.sh`: checks `bin/release_video.py`'s tasks and cards without making a video: a shared PR's tasks, their one video, one card for them.
 - `sh scripts/open-pr-check.sh`: checks `bin/open-pr.sh` sends the gh token only to GitHub.
-- `sh scripts/record-display-check.sh` (macOS): checks `bin/record-display.sh`: own display per project, one recording at a time, a killed recording frees its turn, the chosen test screen and its fallback.
+- `sh scripts/record-display-check.sh` (macOS): checks `bin/record-display.sh`: own displays per project, one more for each recording at the same time, a killed recording frees its display, the chosen test screen and its fallback.
 - `bun scripts/settings-doc.ts`: regenerates the settings skill after a setting changes (`--check` says whether it is current).
 - `bun scripts/skills-check.ts`: checks each skill has its front matter and its template.
 - `bun scripts/instructions-doc.ts`: renders every instruction text better-tasks loads, as the model gets it, into one Markdown file from the current sources and prints its path (`--open` opens it).
