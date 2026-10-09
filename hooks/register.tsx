@@ -22,7 +22,7 @@ import { GH_UPDATE_TOAST, ghProblem, ghUpdateArgv, ghUpdateVerdict, hasGitHub } 
 import type { Io } from './io'
 import { PANE_COMMANDS, registerPane } from './pane'
 import { registerScreen, SCREEN_COMMANDS, SCREEN_TOOLS } from './screen'
-import { hasPointer, pointerPrompt, RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine } from './setup'
+import { RESTART_TEXT, SETUP_PROMPT, teamsState, waitingLine, withoutPointer } from './setup'
 import { projectSettings, readOverrides, saveProjectValue } from './settings'
 import type { Settings } from './settings'
 import { sprintStart } from './sprints'
@@ -84,6 +84,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    await unpointUserRules($).catch(error => logFailure($, 'removing its old CLAUDE.md section', error))
     if (await isOffHere($)) {
       await declareCommands($)
       $.ui.log(OFF_LINE)
@@ -103,7 +104,6 @@ export const register: Register = (on, options) => {
     if (!(await setUpTeams($))) return started
     await update($, typesState, () => '')
     await syncTeammateTypes($, await settingsNow($)).catch(error => logFailure($, 'the teammate agent types', error))
-    if (e.isInteractive) await pointUserRules($).catch(error => logFailure($, 'the CLAUDE.md pointer', error))
     if (e.isInteractive) void startQuestions($).catch(error => logFailure($, 'the startup questions', error))
     const startedAt = await $.clock.now()
     await update($, statusState, () => ({ ...NO_CHECK, activeAt: startedAt }))
@@ -361,16 +361,14 @@ async function teamsOn($: EngineInterface): Promise<boolean> {
   return (await $.env.get('CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS')) === '1'
 }
 
-/** Once per session: true when agent teams are on; else asks Claude to set them up, or says to restart. */
-/** Once per machine: ask Claude to point the user's global CLAUDE.md at our team rules (the user approves the edit). */
-async function pointUserRules($: EngineInterface): Promise<void> {
-  if (await $.store.get('claudeMdAsked')) return
-  const home = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? '~'}/.claude`
-  const path = `${home}/CLAUDE.md`
+/** Takes the section older versions added out of the user's global CLAUDE.md, so nothing of better-tasks acts while it is disabled (setup.ts). */
+async function unpointUserRules($: EngineInterface): Promise<void> {
+  const path = `${await claudeDirOf($)}/CLAUDE.md`
   const text = await $.fs.read(path).catch(() => undefined)
-  if (text !== undefined && hasPointer(text)) return
-  await $.store.set('claudeMdAsked', true)
-  void $.prompt.submit({ text: pointerPrompt(path, text !== undefined) }).catch(() => undefined)
+  const without = text === undefined ? undefined : withoutPointer(text)
+  if (without === undefined) return
+  await $.fs.write(path, without)
+  $.ui.log(`better-tasks: took its section out of ${path}; its rules now come only from the plugin, so none apply while it is disabled`)
 }
 
 /**

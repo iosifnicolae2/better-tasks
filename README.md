@@ -91,12 +91,12 @@ better-tasks has no server and collects no data: nothing is sent to its author o
   - `.idea/`: marks `.claude/worktrees/` excluded in IntelliJ, only in a project that has `.idea/`.
   - `.claude/settings.json` (the project's): adds better-tasks, pinned to a release, when you answer "everyone on this project", and moves that pin when you say Yes to an update. It commits only that file.
   - `~/.claude/settings.json`: moves your pin of better-tasks to the new release when you say Yes to an update (back as it was if the update fails).
-  - `~/.claude/CLAUDE.md` and `~/.claude/settings.json` through Claude, with your approval: see the prompts below.
+  - `~/.claude/CLAUDE.md`: takes out the "Agent teams" line older versions added there, so nothing of better-tasks stays in your instructions while it is disabled. Your own lines stay.
+  - `~/.claude/settings.json` through Claude, with your approval: see the prompts below.
 - **Files it reads**: your project, Claude Code's settings (to pin and update the plugin), and a finished teammate's transcript in `~/.claude/projects/`, which only its successor is pointed at.
 - **Settings and environment**: in this Claude Code process it sets `CLAUDE_CODE_PROMPT_CACHE_TTL` and `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL` to `1h` (setting `longCache`), unless you set a TTL yourself. Its settings page writes only its own `/config` rows (`better-tasks.*`) or the project's `.claude/tasks/config.json`. When you turn a setting on, it sets up what that setting needs (the Kokoro voice for videos, `gh` for pull requests).
 - **Slash commands it runs**: `/config`, only when you press "All Claude Code settings" on its settings page. It adds `/better-tasks` and `/away`.
 - **Prompts it submits, in your session**:
-  - Once per machine: asks Claude to add a line to `~/.claude/CLAUDE.md` pointing at its team rules. You approve the edit.
   - When agent teams are off: asks Claude to add `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` to the `env` block of `~/.claude/settings.json` (you approve the edit) and then to ask you to restart.
   - After `statusEvery` quiet minutes (10 by default, 0 turns it off) while a task is running (status `doing`) and nothing is in your prompt box: a status check asking the lead to move the open tasks forward ([.claude/better-tasks/status-check.md](.claude/better-tasks/status-check.md)).
   - "Start" on a task of the board: a prompt to start that task.
