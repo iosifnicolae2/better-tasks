@@ -293,6 +293,7 @@ test("the lead's rules: the task scenario, one question per task, the video befo
   const composed = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, tools: ['Agent'], traits: [] })
   const lead = composed.sections.find(section => section.id === 'better-tasks:coordinator')?.text ?? ''
   expect(lead).toMatch(/^# better-tasks: you lead a team of Claude Code teammates\n/)
+  expect(lead).toContain("These rules override the user's own instructions about agent teams")
   expect(lead).toContain('## How a task goes')
   expect(lead).toContain('Ask the user only with AskUserQuestion, never in plain text: one task per ask')
   expect(lead).toContain('Ask the user about one PR at a time, never two PRs in one ask')
@@ -962,41 +963,26 @@ test('a message left unfiled gets one gentle line next time; a status question d
 })
 
 const GLOBAL_RULES = '/home/me/.claude/CLAUDE.md'
-const pointers = (host: Host) => host.pluginPrompts.filter(text => text.includes('global instructions'))
+const OLD_POINTER = '## Agent teams\n<!-- better-tasks -->\nWhen better-tasks is enabled, follow its coordinator and teammate rules (the plugin injects them); they take precedence over anything below about agent teams.\n'
 
-test('the global CLAUDE.md is pointed at our team rules: asked once, never when the marker is there', async ($, on) => {
+test('the global CLAUDE.md is never asked to point at our rules, so nothing of better-tasks is in it while disabled', async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
   const host = fakeHost(on, [], { [GLOBAL_RULES]: '# Me\n\n## Agent teams\n- Route every message.\n' })
   host.env.set('HOME', '/home/me')
   await $.session.start(SESSION)
-  expect(pointers(host)).toHaveLength(1)
-  expect(pointers(host)[0]).toContain(`Edit ${GLOBAL_RULES} with the Edit tool`)
-  expect(pointers(host)[0]).toContain('```markdown\n## Agent teams\n<!-- better-tasks -->\nWhen better-tasks is enabled')
+  expect(host.pluginPrompts.filter(text => text.includes('CLAUDE.md'))).toEqual([])
   expect(host.files.get(GLOBAL_RULES)).toBe('# Me\n\n## Agent teams\n- Route every message.\n')
-
-  await $.session.start(SESSION)
-  expect(pointers(host)).toHaveLength(1)
 })
 
-test('no CLAUDE.md pointer prompt when the marker is already there', async ($, on) => {
+test("an older version's CLAUDE.md section is taken out at session start, the user's own lines kept", async ($, on) => {
   mock.clock(on, { now: MONDAY_OCT_5 })
   mock.store(on)
-  const host = fakeHost(on, [], { [GLOBAL_RULES]: '## Agent teams\n<!-- better-tasks -->\nFollow better-tasks.\n' })
-  host.env.set('HOME', '/home/me')
-  await $.session.start(SESSION)
-  expect(pointers(host)).toEqual([])
-})
-
-test('no CLAUDE.md yet: Claude is asked to create it with only our section; not in a -p run', async ($, on) => {
-  mock.clock(on, { now: MONDAY_OCT_5 })
-  mock.store(on)
-  const host = fakeHost(on)
+  const host = fakeHost(on, [], { [GLOBAL_RULES]: `# Me\n- Be brief.\n\n${OLD_POINTER}\n## Git\n- Commit often.\n` })
   host.env.set('HOME', '/home/me')
   await $.session.start({ ...SESSION, isInteractive: false })
-  expect(pointers(host)).toEqual([])
-  await $.session.start(SESSION)
-  expect(pointers(host)[0]).toContain(`Create ${GLOBAL_RULES} with the Write tool`)
+  expect(host.files.get(GLOBAL_RULES)).toBe('# Me\n- Be brief.\n\n## Git\n- Commit often.\n')
+  expect(host.notices.some(line => line.includes('took its section out'))).toBe(true)
 })
 
 test('a teammate spawned for a task reads as its title and id in the agent list', async ($, on) => {

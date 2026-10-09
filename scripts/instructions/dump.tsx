@@ -1,7 +1,7 @@
 // Named without .test so the suite skips it: scripts/instructions-doc.ts copies it into a scratch plugin, next to the inputs.ts it writes,
 // and runs it with `claude plugin test`. It starts a session on a fake engine and prints, as one JSON line,
 // every text better-tasks puts in front of the model: the lead's rules, a teammate's prompt, the context on
-// each user message, the CLAUDE.md pointer, the agent types, tools, commands and the skills as they load.
+// each user message, the agent types, tools, commands and the skills as they load.
 import { mock, test } from 'claude-code/testing'
 
 import { CONFIG, OPTIONS, SKILLS } from './inputs'
